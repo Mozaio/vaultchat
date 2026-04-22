@@ -1,15 +1,18 @@
 /**
- * libsodium-wrappers (CJS) hängt nach await ready() alle crypto_* APIs an
- * module.exports — in Vite/Rollup erscheint das als **default export**.
+ * libsodium-wrappers-**sumo** (CJS): voller WASM inkl. Argon2id (`crypto_pwhash`).
+ * Die schlanke Variante `libsodium-wrappers` liefert kein pwhash — dann fehlen
+ * crypto_pwhash_SALTBYTES & Co. nach ready().
  *
- * `import * as ns from "libsodium-wrappers"` liefert dagegen oft ein synthetisches
+ * Default-Export mutiert nach `ready()`; Namespace-Import ist weiterhin riskant.
+ *
+ * `import * as ns from "libsodium-wrappers-sumo"` liefert dagegen oft ein synthetisches
  * Namespace-Objekt: `.ready` ist erreichbar, aber die später hinzugefügten
  * crypto_*-Member liegen nur auf `ns.default`. Validieren wir `ns`, scheitern wir
  * mit „Konstanten fehlen“, obwohl WASM korrekt geladen ist.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-import sodiumImport from "libsodium-wrappers";
+import sodiumImport from "libsodium-wrappers-sumo";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sodium = any;
@@ -21,7 +24,7 @@ function apiRoot(): Sodium {
   if (inner && typeof inner.ready?.then === "function") return inner;
   if (m && typeof m.ready?.then === "function") return m;
   throw new Error(
-    "libsodium-wrappers: kein Objekt mit .ready gefunden (Interop kaputt)."
+    "libsodium-wrappers-sumo: kein Objekt mit .ready gefunden (Interop kaputt)."
   );
 }
 
