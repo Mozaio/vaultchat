@@ -57,13 +57,17 @@ function validate(s: Sodium): void {
     "crypto_secretbox_NONCEBYTES",
     "crypto_pwhash_OPSLIMIT_INTERACTIVE",
     "crypto_pwhash_MEMLIMIT_INTERACTIVE",
-    "crypto_pwhash_ALG_ARGON2ID",
     "crypto_box_PUBLICKEYBYTES",
     "crypto_aead_xchacha20poly1305_ietf_KEYBYTES",
     "crypto_aead_xchacha20poly1305_ietf_NPUBBYTES",
     "crypto_aead_xchacha20poly1305_ietf_ABYTES",
   ] as const;
   const missing = required.filter((k) => typeof s[k] !== "number");
+  const hasPwhashAlg =
+    typeof s.crypto_pwhash_ALG_ARGON2ID === "number" ||
+    typeof s.crypto_pwhash_ALG_ARGON2ID13 === "number" ||
+    typeof s.crypto_pwhash_ALG_DEFAULT === "number";
+  if (!hasPwhashAlg) missing.push("crypto_pwhash_ALG_(ARGON2ID|ARGON2ID13|DEFAULT)");
   if (missing.length > 0) {
     throw new Error(
       "libsodium nach ready() unvollständig: " +
