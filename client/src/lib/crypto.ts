@@ -15,6 +15,21 @@ export type WrappedSecret = {
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
+function pwhashAlg(sodium: {
+  crypto_pwhash_ALG_ARGON2ID?: number;
+  crypto_pwhash_ALG_ARGON2ID13?: number;
+  crypto_pwhash_ALG_DEFAULT?: number;
+}): number {
+  const alg =
+    sodium.crypto_pwhash_ALG_ARGON2ID ??
+    sodium.crypto_pwhash_ALG_ARGON2ID13 ??
+    sodium.crypto_pwhash_ALG_DEFAULT;
+  if (typeof alg !== "number") {
+    throw new Error("argon2_algorithm_unavailable");
+  }
+  return alg;
+}
+
 export async function generateBoxKeypair(): Promise<KeyPair> {
   await sodiumReady();
   const sodium = getSodium();
@@ -44,7 +59,7 @@ export async function wrapSecretKey(
     salt,
     sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
     sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_ALG_ARGON2ID
+    pwhashAlg(sodium)
   );
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
   const cipher = sodium.crypto_secretbox_easy(secretKey, nonce, key);
@@ -71,7 +86,7 @@ export async function unwrapSecretKey(
     salt,
     sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
     sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_ALG_ARGON2ID
+    pwhashAlg(sodium)
   );
   const sk = sodium.crypto_secretbox_open_easy(cipher, nonce, key);
   sodium.memzero(key);
