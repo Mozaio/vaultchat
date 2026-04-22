@@ -108,6 +108,7 @@ export function ChatShell({
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const [isMobile, setIsMobile] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -136,6 +137,18 @@ export function ChatShell({
   tokenRef.current = session.token;
 
   const voice = useVoiceRecorder();
+
+  useEffect(() => {
+    const mq = window.matchMedia?.("(max-width: 768px)");
+    if (!mq) return;
+    const apply = () => setIsMobile(Boolean(mq.matches));
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => mq.removeEventListener?.("change", apply);
+  }, []);
+
+  const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
+  const showSidebar = !isMobile || !showConversation;
 
   const resolveUser = useCallback(
     async (userId: string): Promise<api.ApiUser | null> => {
@@ -910,21 +923,41 @@ export function ChatShell({
     };
   }
 
-  const peerList = useMemo(
-    () =>
-      users.map((u) => (
+  const lastDmPreviewByPeer = useMemo(() => {
+    const out = new Map<string, { text: string; at: number }>();
+    for (const [pid, msgs] of rawDmRef.current.entries()) {
+      const last = msgs[msgs.length - 1];
+      if (!last) continue;
+      const plain = last.plainJson;
+      let text = "";
+      try {
+        const p = JSON.parse(plain) as PlainPayload;
+        text = previewForPayload(p);
+      } catch {
+        text = "";
+      }
+      out.set(pid, { text, at: last.at });
+    }
+    return out;
+  }, [messages.length, users.length]);
+
+  const peerList = useMemo(() => {
+    return users.map((u) => {
+      const prev = lastDmPreviewByPeer.get(u.id);
+      return (
         <PeerRow
           key={u.id}
           u={u}
+          subtitle={prev?.text ?? "Keine Nachrichten"}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
             setPeer(u);
           }}
         />
-      )),
-    [users, peer, tab]
-  );
+      );
+    });
+  }, [users, peer, tab, lastDmPreviewByPeer]);
 
   const groupList = useMemo(
     () =>
@@ -962,7 +995,7 @@ export function ChatShell({
       )}
 
       <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-900/70 shadow-[0_24px_80px_-30px_rgba(16,185,129,0.4)] backdrop-blur md:rounded-3xl">
-      <aside className="flex w-full flex-col border-zinc-800/80 bg-zinc-950/45 md:w-84 md:border-r">
+      <aside className={`${showSidebar ? "flex" : "hidden"} w-full flex-col border-zinc-800/80 bg-zinc-950/45 md:flex md:w-84 md:border-r`}>
         <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
           <div>
             <p className="text-sm font-medium text-white">
@@ -995,7 +1028,7 @@ export function ChatShell({
         <div className="flex gap-2 border-b border-zinc-800/80 p-2.5">
           <button
             type="button"
-            className={`flex-1 rounded-lg py-2 text-sm ${
+            className={`flex-1 rounded-xl py-2 text-sm font-medium ${
               tab === "dm"
                 ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
                 : "text-zinc-400 hover:bg-zinc-800/60"
@@ -1006,7 +1039,7 @@ export function ChatShell({
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-lg py-2 text-sm ${
+            className={`flex-1 rounded-xl py-2 text-sm font-medium ${
               tab === "group"
                 ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
                 : "text-zinc-400 hover:bg-zinc-800/60"
@@ -1020,7 +1053,7 @@ export function ChatShell({
         {tab === "dm" && (
           <>
             <div className="border-b border-zinc-800/80 px-3 py-2">
-              <p className="text-xs uppercase tracking-wide text-zinc-500">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
                 Kontakte
               </p>
             </div>
@@ -1092,7 +1125,7 @@ export function ChatShell({
         </div>
       </aside>
 
-      <main className="flex min-h-0 flex-1 flex-col bg-zinc-950/55">
+      <main className={`${showSidebar ? "hidden" : "flex"} min-h-0 flex-1 flex-col bg-zinc-950/55 md:flex`}>
         {incomingOffer && (
           <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
             <span>Anruf von {incomingOffer.from.username}</span>
@@ -1130,20 +1163,40 @@ export function ChatShell({
         )}
 
         {tab === "dm" && !peer && (
-          <div className="flex flex-1 items-center justify-center text-zinc-500">
-            Kontakt wählen. Historie nur lokal (verschlüsselte IndexedDB).
+          <div className="flex flex-1 items-center justify-center px-6 text-center text-zinc-500">
+            <div className="max-w-sm">
+              <p className="text-sm font-medium text-zinc-200">Wähle einen Kontakt</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Nachrichten-Historie liegt nur lokal (verschlüsselte IndexedDB).
+              </p>
+            </div>
           </div>
         )}
 
         {tab === "dm" && peer && (
           <>
-            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-4 py-3">
+            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-3 py-3 md:px-4">
               <div className="flex items-center justify-between gap-2">
-                <div>
+                <div className="flex items-center gap-2">
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={() => setPeer(null)}
+                      className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                      title="Zurück"
+                    >
+                      ←
+                    </button>
+                  )}
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-emerald-900/40 text-sm font-semibold text-emerald-200">
+                    {peer.username.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div>
                   <p className="font-medium text-white">{peer.username}</p>
                   <p className="font-mono text-xs text-emerald-600/80">
                     Fingerprint: {peerFp ?? "…"}
                   </p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <select
@@ -1232,7 +1285,7 @@ export function ChatShell({
               )}
             </div>
 
-            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3">
+            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
@@ -1316,20 +1369,40 @@ export function ChatShell({
         )}
 
         {tab === "group" && !group && (
-          <div className="flex flex-1 items-center justify-center text-zinc-500">
-            Gruppe wählen oder neu erstellen.
+          <div className="flex flex-1 items-center justify-center px-6 text-center text-zinc-500">
+            <div className="max-w-sm">
+              <p className="text-sm font-medium text-zinc-200">Wähle eine Gruppe</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Oder erstelle oben links eine neue Gruppe.
+              </p>
+            </div>
           </div>
         )}
 
         {tab === "group" && group && (
           <>
-            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-4 py-3">
+            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-3 py-3 md:px-4">
               <div className="flex items-center justify-between gap-2">
-                <div>
+                <div className="flex items-center gap-2">
+                  {isMobile && (
+                    <button
+                      type="button"
+                      onClick={() => setGroup(null)}
+                      className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                      title="Zurück"
+                    >
+                      ←
+                    </button>
+                  )}
+                  <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-200">
+                    {group.name.slice(0, 1).toUpperCase()}
+                  </div>
+                  <div>
                   <p className="font-medium text-white">{group.name}</p>
                   <p className="text-xs text-zinc-500">
                     E2EE symmetrisch · {group.memberIds.length} Mitglieder
                   </p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <select
@@ -1450,7 +1523,7 @@ export function ChatShell({
                 />
               ))}
             </div>
-            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3">
+            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyGroup && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
@@ -1494,6 +1567,34 @@ export function ChatShell({
           </>
         )}
       </main>
+      {isMobile && !showConversation && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/80 p-2 backdrop-blur">
+          <div className="mx-auto flex max-w-md gap-2">
+            <button
+              type="button"
+              onClick={() => setTab("dm")}
+              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${
+                tab === "dm"
+                  ? "bg-emerald-600 text-white"
+                  : "border border-zinc-800 text-zinc-300"
+              }`}
+            >
+              Direkt
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("group")}
+              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${
+                tab === "group"
+                  ? "bg-emerald-600 text-white"
+                  : "border border-zinc-800 text-zinc-300"
+              }`}
+            >
+              Gruppen
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
@@ -1501,10 +1602,12 @@ export function ChatShell({
 
 function PeerRow({
   u,
+  subtitle,
   selected,
   onSelect,
 }: {
   u: api.ApiUser;
+  subtitle?: string;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -1516,23 +1619,34 @@ function PeerRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
+      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left ${
         selected
-          ? "bg-emerald-900/40 text-emerald-100"
-          : "text-zinc-300 hover:bg-zinc-800"
+          ? "bg-emerald-900/35 text-emerald-100"
+          : "text-zinc-200 hover:bg-zinc-800/60"
       }`}
     >
-      <span>{u.username}</span>
-      {pin?.state === "mismatch" && (
-        <span className="rounded border border-red-700 px-1 text-[10px] text-red-300">
-          ⚠
-        </span>
-      )}
-      {pin?.state === "verified" && (
-        <span className="rounded border border-emerald-600 px-1 text-[10px] text-emerald-300">
-          ✓
-        </span>
-      )}
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-100">
+          {u.username.slice(0, 1).toUpperCase()}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">{u.username}</span>
+            {pin?.state === "mismatch" && (
+              <span className="rounded-md border border-red-700/70 bg-red-950/30 px-1.5 py-0.5 text-[10px] text-red-200">
+                ⚠
+              </span>
+            )}
+            {pin?.state === "verified" && (
+              <span className="rounded-md border border-emerald-600/70 bg-emerald-950/20 px-1.5 py-0.5 text-[10px] text-emerald-200">
+                ✓
+              </span>
+            )}
+          </div>
+          <p className="truncate text-xs text-zinc-500">{subtitle ?? ""}</p>
+        </div>
+      </div>
+      <span className="text-[10px] text-zinc-500">›</span>
     </button>
   );
 }
