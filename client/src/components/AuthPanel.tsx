@@ -12,7 +12,7 @@ import {
 } from "../lib/localIdentity";
 import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
-import { useTheme } from "../lib/theme.tsx";
+import { ThemeToggle } from "./ThemeToggle";
 
 type Mode = "unlock" | "login" | "register" | "import";
 
@@ -39,7 +39,6 @@ export function AuthPanel({
 }: {
   onSession: (s: Session, local: LocalIdentity) => void | Promise<void>;
 }) {
-  const { theme, toggle } = useTheme();
   const hasLocal = useMemo(
     () => Boolean(loadToken() && loadLocalIdentity()),
     []
@@ -188,14 +187,7 @@ export function AuthPanel({
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
                 {hasLocal ? "Willkommen zurück" : "Los geht’s"}
               </p>
-              <button
-                type="button"
-                onClick={toggle}
-                className="rounded-xl border border-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800/60"
-                title="Theme umschalten"
-              >
-                {theme === "dark" ? "Light" : "Dark"}
-              </button>
+              <ThemeToggle />
             </div>
 
         {hasLocal && (

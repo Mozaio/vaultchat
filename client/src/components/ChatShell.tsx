@@ -48,7 +48,9 @@ import {
 } from "../lib/chatReducer";
 import { SafetyNumberDialog } from "./SafetyNumberDialog";
 import { useVoiceRecorder } from "../lib/useVoiceRecorder";
-import { useTheme } from "../lib/theme.tsx";
+import { ThemeToggle } from "./ThemeToggle";
+import { useShortcuts } from "../lib/shortcuts";
+import { SearchPanel } from "./SearchPanel";
 import {
   IconInfo,
   IconMic,
@@ -88,7 +90,6 @@ export function ChatShell({
   onLogout: () => void;
   onLock: () => void;
 }) {
-  const { theme, toggle } = useTheme();
   const [users, setUsers] = useState<api.ApiUser[]>([]);
   const [groups, setGroups] = useState<api.ApiGroup[]>([]);
   const [tab, setTab] = useState<Tab>("dm");
@@ -126,6 +127,7 @@ export function ChatShell({
   const [sideTab, setSideTab] = useState<"direct" | "groups" | "fav">("direct");
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -152,6 +154,18 @@ export function ChatShell({
   groupRef.current = group;
   usersRef.current = users;
   tokenRef.current = session.token;
+
+  useShortcuts({
+    onSearch: () => setSearchOpen(true),
+    onEscape: () => {
+      setSearchOpen(false);
+      setEmojiOpen(false);
+      setSafetyOpen(false);
+      setInfoOpen(false);
+      setGroupPanelOpen(false);
+    },
+    onLock: () => onLock(),
+  });
 
   const voice = useVoiceRecorder();
 
@@ -1088,6 +1102,27 @@ export function ChatShell({
 
   return (
     <div className="flex h-full w-full flex-col bg-zinc-950 p-2 md:p-4">
+      {searchOpen && (
+        <SearchPanel
+          users={users.map((u) => ({ id: u.id, username: u.username }))}
+          groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+          onClose={() => setSearchOpen(false)}
+          onSelect={(type, id) => {
+            if (type === "dm") {
+              const u = usersRef.current.find((x) => x.id === id) ?? null;
+              setTab("dm");
+              setGroup(null);
+              setPeer(u);
+            } else {
+              const g = groups.find((x) => x.id === id) ?? null;
+              setTab("group");
+              setPeer(null);
+              setGroup(g);
+            }
+            setSearchOpen(false);
+          }}
+        />
+      )}
       {safetyOpen && peer && (
         <SafetyNumberDialog
           peerId={peer.id}
@@ -1107,14 +1142,7 @@ export function ChatShell({
             <p className="text-xs text-zinc-500">Secure Messenger</p>
           </div>
           <div className="flex gap-1">
-            <button
-              type="button"
-              onClick={toggle}
-              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 transition hover:bg-zinc-800"
-              title="Theme umschalten"
-            >
-              {theme === "dark" ? "Light" : "Dark"}
-            </button>
+            <ThemeToggle />
             <button
               type="button"
               onClick={onLock}

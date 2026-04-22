@@ -175,6 +175,45 @@ export async function idbListDm(peerId: string): Promise<StoredDmMessage[]> {
   return results.sort((a, b) => a.at - b.at);
 }
 
+export async function idbListAllDm(): Promise<StoredDmMessage[]> {
+  assertKey();
+  const db = await openDb();
+  const records = await new Promise<DmRecord[]>((resolve, reject) => {
+    const out: DmRecord[] = [];
+    const tx = db.transaction("dm", "readonly");
+    const req = tx.objectStore("dm").openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(out);
+        return;
+      }
+      out.push(c.value as DmRecord);
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  const now = Date.now();
+  const alive = records.filter((r) => !r.expiresAt || r.expiresAt > now);
+  const results: StoredDmMessage[] = [];
+  for (const r of alive) {
+    try {
+      const plainJson = await decryptToString(r.payloadCipher);
+      results.push({
+        id: r.id,
+        peerId: r.peerId,
+        fromMe: r.fromMe,
+        plainJson,
+        at: r.at,
+        expiresAt: r.expiresAt,
+      });
+    } catch {
+      /* skip corrupted */
+    }
+  }
+  return results;
+}
+
 export async function idbPurgeExpired(): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
@@ -295,6 +334,45 @@ export async function idbListGroup(
     }
   }
   return results.sort((a, b) => a.at - b.at);
+}
+
+export async function idbListAllGroupMsgs(): Promise<StoredGroupMessage[]> {
+  assertKey();
+  const db = await openDb();
+  const records = await new Promise<GroupRecord[]>((resolve, reject) => {
+    const out: GroupRecord[] = [];
+    const tx = db.transaction("groupMsg", "readonly");
+    const req = tx.objectStore("groupMsg").openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(out);
+        return;
+      }
+      out.push(c.value as GroupRecord);
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  const now = Date.now();
+  const alive = records.filter((r) => !r.expiresAt || r.expiresAt > now);
+  const results: StoredGroupMessage[] = [];
+  for (const r of alive) {
+    try {
+      const plainJson = await decryptToString(r.payloadCipher);
+      results.push({
+        id: r.id,
+        groupId: r.groupId,
+        fromUserId: r.fromUserId,
+        plainJson,
+        at: r.at,
+        expiresAt: r.expiresAt,
+      });
+    } catch {
+      /* skip corrupted */
+    }
+  }
+  return results;
 }
 
 export async function metaGet(key: string): Promise<string | null> {
