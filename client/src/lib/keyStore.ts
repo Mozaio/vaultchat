@@ -45,7 +45,7 @@ export async function generateKeyMaterial(
   const sodium = getSodium();
   const signedPreKeyKp = sodium.crypto_box_keypair();
   const signSeed = sodium.crypto_generichash(
-    64,
+    32,
     identitySk,
     enc.encode("vaultchat-sign-seed")
   );
