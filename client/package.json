@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "libsodium-wrappers": "^0.7.15",
+    "libsodium-wrappers-sumo": "^0.7.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
