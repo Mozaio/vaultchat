@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-declare module "libsodium-wrappers" {
+declare module "libsodium-wrappers-sumo" {
   const sodium: unknown;
   export default sodium;
 }
