@@ -1,17 +1,22 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { createRequire } from "node:module";
 import { defineConfig } from "vite";
 import { vaultchatSri } from "./vite-plugin-sri";
+
+// libsodium-wrappers 0.7.x liefert einen kaputten ESM-Entry aus (./libsodium.mjs
+// fehlt). Wir zwingen Vite deshalb auf den CJS-Build, den das Package unter der
+// "require"-Condition korrekt exportiert. require.resolve liefert uns den
+// absoluten Pfad — funktioniert auch bei npm-Workspaces, wo node_modules in
+// den Repo-Root gehoistet wird.
+const nodeRequire = createRequire(import.meta.url);
+const libsodiumCjsPath = nodeRequire.resolve("libsodium-wrappers");
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), vaultchatSri()],
   resolve: {
     alias: {
-      // libsodium-wrappers 0.7.x liefert einen kaputten ESM-Entry aus, der
-      // auf eine nicht existierende ./libsodium.mjs verweist. Wir zwingen
-      // Rollup deshalb explizit auf den funktionierenden CJS-Build.
-      "libsodium-wrappers":
-        "libsodium-wrappers/dist/modules/libsodium-wrappers.js",
+      "libsodium-wrappers": libsodiumCjsPath,
     },
   },
   optimizeDeps: {
