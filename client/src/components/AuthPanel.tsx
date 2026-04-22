@@ -144,10 +144,15 @@ export function AuthPanel({
   }
 
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-zinc-950 px-4 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900/80 p-8 shadow-2xl shadow-emerald-950/20 backdrop-blur">
+    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-zinc-950 px-4 py-10">
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-emerald-600/20 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
+      <div className="relative w-full max-w-md rounded-3xl border border-zinc-800/80 bg-zinc-900/75 p-8 shadow-[0_20px_80px_-24px_rgba(16,185,129,0.45)] backdrop-blur-xl">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-white">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
+            Secure Messenger
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-white">
             VaultChat
           </h1>
           <p className="mt-2 text-sm text-zinc-400">
@@ -156,12 +161,12 @@ export function AuthPanel({
         </div>
 
         {hasLocal && (
-          <div className="mb-6 flex gap-2 rounded-lg bg-zinc-950 p-1">
+          <div className="mb-6 flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 p-1">
             <button
               type="button"
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
                 mode === "unlock"
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-900/50"
                   : "text-zinc-400 hover:text-white"
               }`}
               onClick={() => setMode("unlock")}
@@ -172,7 +177,7 @@ export function AuthPanel({
               type="button"
               className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
                 mode === "login"
-                  ? "bg-emerald-600 text-white"
+                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-900/50"
                   : "text-zinc-400 hover:text-white"
               }`}
               onClick={() => setMode("login")}
@@ -189,7 +194,7 @@ export function AuthPanel({
               <input
                 type="password"
                 autoComplete="current-password"
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white outline-none ring-emerald-500/30 focus:ring-2"
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -198,7 +203,7 @@ export function AuthPanel({
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
             >
               {busy ? "…" : "Entsperren"}
             </button>
@@ -206,20 +211,20 @@ export function AuthPanel({
               <button
                 type="button"
                 onClick={showFingerprint}
-                className="w-full text-sm text-zinc-500 hover:text-zinc-300"
+                className="w-full text-sm text-zinc-500 transition hover:text-zinc-300"
               >
                 Meinen Schlüsselfingerprint anzeigen
               </button>
               <button
                 type="button"
                 onClick={exportBackup}
-                className="w-full text-sm text-emerald-500/90 hover:text-emerald-400"
+                className="w-full text-sm text-emerald-500/90 transition hover:text-emerald-400"
               >
                 Backup (JSON) herunterladen
               </button>
             </div>
             {fp && (
-              <p className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-center font-mono text-sm text-emerald-400">
+              <p className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-center font-mono text-sm text-emerald-400">
                 {fp}
               </p>
             )}
@@ -231,7 +236,7 @@ export function AuthPanel({
             <label className="block text-sm text-zinc-300">
               Benutzername
               <input
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white outline-none ring-emerald-500/30 focus:ring-2"
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
@@ -242,7 +247,7 @@ export function AuthPanel({
               Passwort
               <input
                 type="password"
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white outline-none ring-emerald-500/30 focus:ring-2"
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
@@ -252,7 +257,7 @@ export function AuthPanel({
             <label className="block text-sm text-zinc-300">
               Backup importieren (JSON, neues Gerät)
               <textarea
-                className="mt-1 min-h-[80px] w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 focus:ring-2"
+                className="mt-1 min-h-[92px] w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
                 value={importJson}
                 onChange={(e) => setImportJson(e.target.value)}
                 placeholder='{"userId":"…","username":"…","publicKey":"…","wrapped":{…}}'
@@ -261,7 +266,7 @@ export function AuthPanel({
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
             >
               {busy ? "…" : "Anmelden"}
             </button>
@@ -273,7 +278,7 @@ export function AuthPanel({
             <label className="block text-sm text-zinc-300">
               Benutzername
               <input
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white outline-none ring-emerald-500/30 focus:ring-2"
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
@@ -284,7 +289,7 @@ export function AuthPanel({
               Passwort (min. 10 Zeichen)
               <input
                 type="password"
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-white outline-none ring-emerald-500/30 focus:ring-2"
+                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
@@ -295,7 +300,7 @@ export function AuthPanel({
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-lg bg-emerald-600 py-2.5 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
             >
               {busy ? "…" : "Konto erstellen"}
             </button>
@@ -303,7 +308,7 @@ export function AuthPanel({
         )}
 
         {!hasLocal && (
-          <div className="mt-6 flex gap-2 text-sm">
+          <div className="mt-6 flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 p-1 text-sm">
             <button
               type="button"
               className={`flex-1 rounded-lg py-2 ${
@@ -330,7 +335,7 @@ export function AuthPanel({
         )}
 
         {error && (
-          <p className="mt-4 rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+          <p className="mt-4 rounded-xl border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
             {error}
           </p>
         )}
