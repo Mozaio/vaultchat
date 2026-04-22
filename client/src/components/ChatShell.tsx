@@ -47,7 +47,7 @@ import {
 } from "../lib/chatReducer";
 import { SafetyNumberDialog } from "./SafetyNumberDialog";
 import { useVoiceRecorder } from "../lib/useVoiceRecorder";
-import { useTheme } from "../lib/theme";
+import { useTheme } from "../lib/theme.tsx";
 import {
   IconInfo,
   IconMic,

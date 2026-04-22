@@ -12,7 +12,7 @@ import {
 } from "../lib/localIdentity";
 import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
-import { useTheme } from "../lib/theme";
+import { useTheme } from "../lib/theme.tsx";
 
 type Mode = "unlock" | "login" | "register" | "import";
 
