@@ -1,19 +1,25 @@
 function inferRenderServerOrigin(): string {
   const host = location.host;
-  // Beispiel: vaultchat-client.onrender.com -> vaultchat-server.onrender.com
-  const m = host.match(/^(.*)-client(\.onrender\.com)$/i);
-  if (m) return `https://${m[1]}-server${m[2]}`;
-  if (host === "vaultchat-client.onrender.com") {
-    return "https://vaultchat-server.onrender.com";
+  // Beispiele:
+  //   vaultchat-client.onrender.com       -> vaultchat-server.onrender.com
+  //   vaultchat-client-g0p2.onrender.com  -> vaultchat-server-g0p2.onrender.com
+  const m = host.match(/^(.*)-client(-[a-z0-9]+)?(\.onrender\.com)$/i);
+  if (m) return `https://${m[1]}-server${m[2] ?? ""}${m[3]}`;
+  if (host === "vaultchat-client.onrender.com" || host === "vaultchat-client-g0p2.onrender.com") {
+    return "https://vaultchat-server-g0p2.onrender.com";
   }
   return "";
 }
 
 const base = () => {
   const explicit = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/$/, "");
-  if (explicit) return explicit;
+  // Historischer Platzhalter aus älteren Blueprints -> bewusst ignorieren.
+  if (explicit && explicit !== "https://vaultchat-server.onrender.com") return explicit;
   const wsLike = (import.meta.env.VITE_WS_URL ?? "").trim().replace(/\/$/, "");
-  if (wsLike) return wsLike.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+  if (wsLike) {
+    const asHttp = wsLike.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+    if (asHttp !== "https://vaultchat-server.onrender.com") return asHttp;
+  }
   return inferRenderServerOrigin();
 };
 
