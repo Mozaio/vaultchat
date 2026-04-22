@@ -102,16 +102,16 @@ export function MessageBubble({
         <div
           className={`relative rounded-2xl border px-4 py-2.5 text-sm shadow-sm ${
             msg.fromMe
-              ? "border-emerald-700/40 bg-emerald-800/45 text-emerald-50"
-              : "border-zinc-700/80 bg-zinc-800/90 text-zinc-100"
-          } ${msg.deleted ? "italic text-zinc-500" : ""}`}
+              ? "text-[color:var(--bubble-me-fg)] border-[color:var(--bubble-me-border)] bg-[color:var(--bubble-me-bg)]"
+              : "text-[color:var(--bubble-them-fg)] border-[color:var(--bubble-them-border)] bg-[color:var(--bubble-them-bg)]"
+          } ${msg.deleted ? "italic app-muted-2" : ""}`}
         >
           {msg.deleted ? (
             <span>Nachricht gelöscht</span>
           ) : editing ? (
             <div className="flex items-center gap-2">
               <input
-                className="w-full rounded-md border border-emerald-500/40 bg-zinc-950 px-2 py-1 text-white"
+                className="app-input w-full rounded-md border border-[color:var(--border)] px-2 py-1"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 autoFocus
@@ -130,7 +130,7 @@ export function MessageBubble({
               />
               <button
                 type="button"
-                className="text-xs text-zinc-400 hover:text-white"
+                className="text-xs app-muted hover:app-fg"
                 onClick={() => {
                   setEditing(false);
                   setEditValue(body);
@@ -158,7 +158,7 @@ export function MessageBubble({
             <p className="whitespace-pre-wrap break-words">{body}</p>
           )}
 
-          <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-400">
+            <div className="mt-1 flex items-center gap-2 text-[10px] app-muted">
             <span>
               {new Date(msg.at).toLocaleTimeString(undefined, {
                 hour: "2-digit",

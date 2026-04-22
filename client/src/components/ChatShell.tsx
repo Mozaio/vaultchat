@@ -124,6 +124,7 @@ export function ChatShell({
   const [query, setQuery] = useState("");
   const [sideTab, setSideTab] = useState<"direct" | "groups" | "fav">("direct");
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
+  const [emojiOpen, setEmojiOpen] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -165,6 +166,39 @@ export function ChatShell({
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
   const showSidebar = !isMobile || !showConversation;
   const showInfo = !isMobile && showConversation;
+
+  // Purge expired messages continuously so they disappear "live".
+  useEffect(() => {
+    const h = setInterval(() => {
+      void (async () => {
+        await idbPurgeExpired().catch(() => {});
+        const now = Date.now();
+        let changed = false;
+        if (peerRef.current) {
+          const pid = peerRef.current.id;
+          const arr = rawDmRef.current.get(pid) ?? [];
+          const next = arr.filter((m) => !m.expiresAt || m.expiresAt > now);
+          if (next.length !== arr.length) {
+            rawDmRef.current.set(pid, next);
+            changed = true;
+            rebuildDm(pid);
+          }
+        }
+        if (groupRef.current) {
+          const gid = groupRef.current.id;
+          const arr = rawGroupRef.current.get(gid) ?? [];
+          const next = arr.filter((m) => !m.expiresAt || m.expiresAt > now);
+          if (next.length !== arr.length) {
+            rawGroupRef.current.set(gid, next);
+            changed = true;
+            rebuildGroup(gid);
+          }
+        }
+        if (!changed) return;
+      })();
+    }, 1000);
+    return () => clearInterval(h);
+  }, [rebuildDm, rebuildGroup]);
 
   const resolveUser = useCallback(
     async (userId: string): Promise<api.ApiUser | null> => {
@@ -1106,7 +1140,7 @@ export function ChatShell({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Suchen…"
-              className="w-full bg-transparent text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
+              className="app-input w-full rounded-lg bg-transparent text-sm outline-none"
             />
           </div>
         </div>
@@ -1424,17 +1458,34 @@ export function ChatShell({
                   </button>
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="relative flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setSafetyOpen(true)}
+                  onClick={() => setEmojiOpen((v) => !v)}
                   className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
-                  title="Emoji / Reaktionen (coming soon)"
+                  title="Emoji"
                 >
                   🙂
                 </button>
+                {emojiOpen && (
+                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border border-zinc-800 bg-zinc-950/90 p-2 text-lg shadow-xl backdrop-blur">
+                    {["😀","😂","😍","👍","🔥","🎉","😮","😢","🙏","✅"].map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        className="rounded px-1.5 py-1 hover:bg-zinc-800"
+                        onClick={() => {
+                          setText((t) => (t ? t + e : e));
+                          setEmojiOpen(false);
+                        }}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <input
-                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2"
+                  className="app-input flex-1 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm outline-none ring-[color:var(--shadow)]/30 transition focus:ring-2"
                   placeholder={
                     voice.recording ? "🎙️ Aufnahme läuft…" : "Nachricht…"
                   }

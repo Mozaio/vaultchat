@@ -30,6 +30,17 @@ body {
   --danger: #ef4444;
   --shadow: rgba(16, 185, 129, 0.35);
 
+  /* Bubbles / inputs */
+  --bubble-me-bg: rgba(16, 185, 129, 0.18);
+  --bubble-me-border: rgba(16, 185, 129, 0.35);
+  --bubble-me-fg: #ecfdf5;
+  --bubble-them-bg: rgba(24, 24, 27, 0.88);
+  --bubble-them-border: rgba(63, 63, 70, 0.65);
+  --bubble-them-fg: #f4f4f5;
+  --input-bg: rgba(9, 9, 11, 0.55);
+  --input-fg: #f4f4f5;
+  --input-placeholder: rgba(161, 161, 170, 0.75);
+
   --app-bg: radial-gradient(1000px 600px at 75% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
             radial-gradient(700px 500px at -10% 100%, rgba(6, 182, 212, 0.08), transparent 60%),
             #09090b;
@@ -46,6 +57,16 @@ body {
   --brand-2: #10b981;
   --danger: #dc2626;
   --shadow: rgba(14, 165, 168, 0.25);
+
+  --bubble-me-bg: rgba(14, 165, 168, 0.14);
+  --bubble-me-border: rgba(14, 165, 168, 0.30);
+  --bubble-me-fg: #042f2e;
+  --bubble-them-bg: rgba(255, 255, 255, 0.92);
+  --bubble-them-border: rgba(15, 23, 42, 0.12);
+  --bubble-them-fg: #0b1220;
+  --input-bg: rgba(255, 255, 255, 0.92);
+  --input-fg: #0b1220;
+  --input-placeholder: rgba(100, 116, 139, 0.85);
 
   --app-bg: radial-gradient(1100px 650px at 85% -15%, rgba(14, 165, 168, 0.16), transparent 60%),
             radial-gradient(900px 600px at -10% 105%, rgba(16, 185, 129, 0.14), transparent 60%),
@@ -72,6 +93,19 @@ body {
 }
 .app-muted-2 {
   color: var(--muted-2);
+}
+
+.app-fg {
+  color: var(--app-fg);
+}
+
+.app-input {
+  background: var(--input-bg);
+  color: var(--input-fg);
+}
+
+.app-input::placeholder {
+  color: var(--input-placeholder);
 }
 
 * {
