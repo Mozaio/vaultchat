@@ -46,6 +46,7 @@ export function AuthPanel({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [importJson, setImportJson] = useState("");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [fp, setFp] = useState<string | null>(null);
@@ -147,18 +148,40 @@ export function AuthPanel({
     <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-zinc-950 px-4 py-10">
       <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-emerald-600/20 blur-3xl" />
       <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
-      <div className="relative w-full max-w-md rounded-3xl border border-zinc-800/80 bg-zinc-900/75 p-8 shadow-[0_20px_80px_-24px_rgba(16,185,129,0.45)] backdrop-blur-xl">
-        <div className="mb-8 text-center">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
-            Secure Messenger
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-white">
-            VaultChat
-          </h1>
-          <p className="mt-2 text-sm text-zinc-400">
-            Ende-zu-Ende verschlüsselt. Der Server sieht keinen Klartext.
-          </p>
-        </div>
+      <div className="relative w-full max-w-5xl">
+        <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
+          <div className="hidden rounded-3xl border border-zinc-800/70 bg-zinc-900/30 p-8 backdrop-blur-xl md:block">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
+              Secure Messenger
+            </p>
+            <h1 className="text-4xl font-semibold tracking-tight text-white">
+              VaultChat
+            </h1>
+            <p className="mt-3 text-sm text-zinc-400">
+              Ende‑zu‑Ende verschlüsselt. Sealed‑Sender. Double‑Ratchet v4.
+            </p>
+            <div className="mt-6 space-y-3 text-sm text-zinc-300">
+              <Feature title="Sealed Sender" desc="Der Server sieht keinen Absender in DMs." />
+              <Feature title="TOFU + Safety Number" desc="Warnung bei Key‑Wechsel, Verifikation wie Signal." />
+              <Feature title="Auto‑Lock" desc="Schlüssel werden nach Inaktivität aus dem Speicher entfernt." />
+            </div>
+            <p className="mt-8 text-xs text-zinc-500">
+              Tipp: Exportiere nach der Registrierung sofort dein JSON‑Backup.
+            </p>
+          </div>
+
+          <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/75 p-7 shadow-[0_20px_80px_-24px_rgba(16,185,129,0.45)] backdrop-blur-xl md:p-8">
+            <div className="mb-7 text-center md:hidden">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
+                Secure Messenger
+              </p>
+              <h1 className="text-3xl font-semibold tracking-tight text-white">
+                VaultChat
+              </h1>
+              <p className="mt-2 text-sm text-zinc-400">
+                Ende‑zu‑Ende verschlüsselt. Der Server sieht keinen Klartext.
+              </p>
+            </div>
 
         {hasLocal && (
           <div className="mb-6 flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 p-1">
@@ -254,15 +277,29 @@ export function AuthPanel({
                 required
               />
             </label>
-            <label className="block text-sm text-zinc-300">
-              Backup importieren (JSON, neues Gerät)
-              <textarea
-                className="mt-1 min-h-[92px] w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
-                value={importJson}
-                onChange={(e) => setImportJson(e.target.value)}
-                placeholder='{"userId":"…","username":"…","publicKey":"…","wrapped":{…}}'
-              />
-            </label>
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-3">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="flex w-full items-center justify-between text-sm text-zinc-300"
+              >
+                <span>Neues Gerät? Backup importieren</span>
+                <span className="text-zinc-500">{showAdvanced ? "–" : "+"}</span>
+              </button>
+              {showAdvanced && (
+                <div className="mt-3">
+                  <textarea
+                    className="min-h-[92px] w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+                    value={importJson}
+                    onChange={(e) => setImportJson(e.target.value)}
+                    placeholder='{"userId":"…","username":"…","publicKey":"…","wrapped":{…}}'
+                  />
+                  <p className="mt-2 text-xs text-zinc-500">
+                    Import nur nötig, wenn du dieses Konto auf einem neuen Gerät entsperren willst.
+                  </p>
+                </div>
+              )}
+            </div>
             <button
               type="submit"
               disabled={busy}
@@ -345,6 +382,20 @@ export function AuthPanel({
           das Bedrohungsmodell schwächer als bei nativen Apps. Details siehe{" "}
           <code className="text-zinc-500">THREAT_MODEL.md</code>.
         </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Feature({ title, desc }: { title: string; desc: string }) {
+  return (
+    <div className="flex gap-3">
+      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400/80" />
+      <div>
+        <p className="font-medium text-white">{title}</p>
+        <p className="text-xs text-zinc-400">{desc}</p>
       </div>
     </div>
   );
