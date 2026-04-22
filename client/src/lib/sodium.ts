@@ -1,62 +1,50 @@
 /**
- * Robuster libsodium-Loader.
+ * libsodium-wrappers (CJS) hängt nach await ready() alle crypto_* APIs an
+ * module.exports — in Vite/Rollup erscheint das als **default export**.
  *
- * Hintergrund: libsodium-wrappers ist ein CJS-Modul, das nach dem Laden der
- * WASM-Runtime seine Konstanten (z. B. crypto_pwhash_SALTBYTES) dynamisch an
- * den Namespace haengt. Rollup-basierte Bundler (Vite Build) koennen je nach
- * commonjs-Konfiguration statt der "lebendigen" Referenz eine frozen copy
- * ausliefern — dann sind die Konstanten beim Aufruf undefined und libsodium
- * wirft "length cannot be null or undefined".
- *
- * Dieser Wrapper:
- *   1. holt die korrekte Namespace-Referenz aus allen moeglichen Interop-Shapes,
- *   2. await'ed `.ready`,
- *   3. validiert am Ende, dass die wichtigsten Konstanten gesetzt sind,
- *   4. liefert klare Fehler, falls nicht.
+ * `import * as ns from "libsodium-wrappers"` liefert dagegen oft ein synthetisches
+ * Namespace-Objekt: `.ready` ist erreichbar, aber die später hinzugefügten
+ * crypto_*-Member liegen nur auf `ns.default`. Validieren wir `ns`, scheitern wir
+ * mit „Konstanten fehlen“, obwohl WASM korrekt geladen ist.
  */
 
-import * as sodiumNamespace from "libsodium-wrappers";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+import sodiumImport from "libsodium-wrappers";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sodium = any;
 
-function pickNamespace(): Sodium {
-  const mod: Sodium = sodiumNamespace;
-  // Verschiedene Interop-Varianten (CJS-default, doppelt gewrappt, namespace).
-  const candidates: Sodium[] = [
-    mod,
-    mod?.default,
-    mod?.default?.default,
-  ].filter(Boolean);
-  for (const c of candidates) {
-    if (c && typeof c.ready?.then === "function") return c;
-  }
+/** Das Objekt, auf dem libsodium nach `ready` die API mountet. */
+function apiRoot(): Sodium {
+  const m = sodiumImport as Sodium;
+  const inner = m?.default;
+  if (inner && typeof inner.ready?.then === "function") return inner;
+  if (m && typeof m.ready?.then === "function") return m;
   throw new Error(
-    "libsodium-wrappers: .ready not found on any import shape. " +
-      "Bundler-Interop moeglicherweise defekt."
+    "libsodium-wrappers: kein Objekt mit .ready gefunden (Interop kaputt)."
   );
 }
 
-const _sodium: Sodium = pickNamespace();
+const _root = apiRoot();
 
 let readyPromise: Promise<void> | null = null;
 
 export function sodiumReady(): Promise<void> {
   if (!readyPromise) {
-    readyPromise = (_sodium.ready as Promise<void>).then(() => {
-      validate(_sodium);
+    readyPromise = (_root.ready as Promise<void>).then(() => {
+      validate(_root);
     });
   }
   return readyPromise;
 }
 
 export function getSodium(): Sodium {
-  if (!_sodium || typeof _sodium.randombytes_buf !== "function") {
+  if (!_root || typeof _root.randombytes_buf !== "function") {
     throw new Error(
-      "libsodium nicht initialisiert. Hast du sodiumReady() vor der Benutzung awaited?"
+      "libsodium nicht initialisiert. sodiumReady() vorher aufrufen."
     );
   }
-  return _sodium;
+  return _root;
 }
 
 function validate(s: Sodium): void {
@@ -73,33 +61,12 @@ function validate(s: Sodium): void {
     "crypto_aead_xchacha20poly1305_ietf_ABYTES",
   ] as const;
   const missing = required.filter((k) => typeof s[k] !== "number");
-  if (missing.length === 0) return;
-
-  // Fallback: wenn das Modul ein nicht-live Snapshot ist, versuchen wir per
-  // Property-Lookup auf dem globalen window.sodium (falls libsodium es dort
-  // hinterlegt) zu referenzieren. Viele libsodium-Builds setzen globalThis.sodium
-  // beim WASM-Init.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const g = (globalThis as any).sodium;
-  if (g && typeof g.crypto_pwhash_SALTBYTES === "number") {
-    // Lebende Referenz ins eigene Objekt hineinkopieren (Properties zuweisen,
-    // damit sich alle bereits gecachten Referenzen auf _sodium weiterhin
-    // auflosen lassen).
-    for (const k of Object.getOwnPropertyNames(g)) {
-      try {
-        (s as Record<string, unknown>)[k] = (g as Record<string, unknown>)[k];
-      } catch {
-        /* ignore */
-      }
-    }
-    const stillMissing = required.filter((k) => typeof s[k] !== "number");
-    if (stillMissing.length === 0) return;
+  if (missing.length > 0) {
+    throw new Error(
+      "libsodium nach ready() unvollständig: " +
+        missing.join(", ") +
+        ". Keys: " +
+        Object.getOwnPropertyNames(s).slice(0, 40).join(", ")
+    );
   }
-
-  throw new Error(
-    "libsodium-Konstanten nicht verfuegbar nach ready(): " +
-      missing.join(", ") +
-      ". Build-Interop kaputt — siehe vite.config.ts. Vorhandene Keys: " +
-      Object.getOwnPropertyNames(s).slice(0, 20).join(", ")
-  );
 }
