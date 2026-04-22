@@ -27,11 +27,12 @@ services:
         value: "20"
       - key: VAULTCHAT_JWT_SECRET
         generateValue: true
-      # Nur Anfragen vom eigenen Client zulassen.
-      # Feste URL, weil Render bei "fromService" nur "host"/"port" liefert,
-      # CORS aber das vollstaendige "https://..."-Origin erwartet.
+      # Optional: wenn gesetzt, nur diese Origin erlauben.
+      # Wenn leer/ungueltig, faellt der Server auf `true` (alle Origins) zurueck.
+      # Fuer einen schnellen Start auf Free-Tier besser leer lassen; spaeter
+      # auf die exakte Client-URL setzen.
       - key: VAULTCHAT_CORS_ORIGIN
-        value: https://vaultchat-client.onrender.com
+        sync: false
       # ALLE folgenden Variablen sind OPTIONAL.
       # Leer lassen -> STUN-Fallback (Google) wird verwendet.
       # Nur setzen, wenn du Calls hinter strikten Firewalls / symmetric NAT
