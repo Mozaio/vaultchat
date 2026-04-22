@@ -31,8 +31,9 @@ import { sealSender } from "../lib/sealedSender";
 import {
   outboxAdd,
   outboxList,
+  outboxGetMeta,
   outboxRemove,
-  outboxTouch,
+  outboxAttempt,
 } from "../lib/outbox";
 import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import {
@@ -455,11 +456,16 @@ export function ChatShell({
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const pending = await outboxList();
     for (const row of pending) {
-      if (row.attempts > 50) {
-        await outboxRemove(row.cid);
+      const meta = await outboxGetMeta(row.cid).catch(() => null);
+      if (meta?.nextAttemptAt && Date.now() < meta.nextAttemptAt) continue;
+      const { shouldRetry, attempts } = await outboxAttempt(row.cid);
+      if (!shouldRetry) {
+        // Give up: message permanently failed.
+        // Keep UI simple; it disappears from outbox.
+        // eslint-disable-next-line no-console
+        console.error(`[vaultchat] Message ${row.cid} failed after ${attempts} attempts`);
         continue;
       }
-      await outboxTouch(row.cid);
       ws.send(
         JSON.stringify({
           type: "dm",

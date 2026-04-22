@@ -84,6 +84,7 @@ export async function startCall(
     },
     candidate: async (p) => {
       if (p.type !== "candidate") return;
+      if (relayOnly && p.candidate.type && p.candidate.type !== "relay") return;
       try {
         await pc.addIceCandidate(p.candidate);
       } catch {
@@ -146,6 +147,7 @@ export async function acceptCall(
     pc,
     localStream: stream,
     addIce: async (c: RTCIceCandidateInit) => {
+      if (relayOnly && c.type && c.type !== "relay") return;
       try {
         await pc.addIceCandidate(c);
       } catch {

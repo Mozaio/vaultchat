@@ -69,8 +69,15 @@ export async function drDecryptJson(
   const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
   const wire = uint8FromBase64(wireB64);
   const { state, plaintext } = await drDecrypt(st, myIdentitySk, wire);
-  await saveState(state);
-  return dec.decode(unpad(plaintext));
+  // IMPORTANT: save state only after successful decode+unpad,
+  // otherwise we risk ratchet desync on malformed padding/encoding.
+  try {
+    const result = dec.decode(unpad(plaintext));
+    await saveState(state);
+    return result;
+  } catch (e) {
+    throw e;
+  }
 }
 
 export function isDrCiphertext(b64: string): boolean {

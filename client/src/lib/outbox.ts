@@ -11,6 +11,12 @@ import { hasLocalKey, encryptString, decryptToString } from "./localKey";
 const DB = "vaultchat";
 const VER = 4;
 
+const MAX_ATTEMPTS = 10;
+const RETRY_DELAYS_MS = [
+  1000, 2000, 5000, 10000, 30000,
+  60000, 120000, 300000, 600000, 1800000,
+];
+
 type OutboxRecord = {
   cid: string;
   toUserId: string;
@@ -18,6 +24,7 @@ type OutboxRecord = {
   createdAt: number;
   attempts: number;
   lastAttempt: number;
+  nextAttemptAt?: number;
 };
 
 function openDb(): Promise<IDBDatabase> {
@@ -107,19 +114,63 @@ export async function outboxList(): Promise<
   return decoded;
 }
 
-export async function outboxTouch(cid: string): Promise<void> {
+export async function outboxAttempt(
+  cid: string
+): Promise<{ shouldRetry: boolean; attempts: number; nextDelayMs: number }> {
   const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const tx = db.transaction("outbox", "readwrite");
     const req = tx.objectStore("outbox").get(cid);
     req.onsuccess = () => {
       const rec = req.result as OutboxRecord | undefined;
-      if (!rec) return;
-      rec.attempts += 1;
+      if (!rec) {
+        resolve({ shouldRetry: false, attempts: 0, nextDelayMs: 0 });
+        return;
+      }
+
+      const newAttempts = rec.attempts + 1;
+      if (newAttempts >= MAX_ATTEMPTS) {
+        tx.objectStore("outbox").delete(cid);
+        resolve({ shouldRetry: false, attempts: newAttempts, nextDelayMs: 0 });
+        return;
+      }
+
+      rec.attempts = newAttempts;
       rec.lastAttempt = Date.now();
+      const nextDelayMs =
+        RETRY_DELAYS_MS[Math.min(newAttempts - 1, RETRY_DELAYS_MS.length - 1)]!;
+      rec.nextAttemptAt = rec.lastAttempt + nextDelayMs;
       tx.objectStore("outbox").put(rec);
+
+      resolve({ shouldRetry: true, attempts: newAttempts, nextDelayMs });
     };
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function outboxGetMeta(cid: string): Promise<{
+  attempts: number;
+  lastAttempt: number;
+  nextAttemptAt: number;
+} | null> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("outbox", "readonly");
+    const req = tx.objectStore("outbox").get(cid);
+    req.onsuccess = () => {
+      const rec = req.result as OutboxRecord | undefined;
+      if (!rec) {
+        resolve(null);
+        return;
+      }
+      resolve({
+        attempts: rec.attempts,
+        lastAttempt: rec.lastAttempt,
+        nextAttemptAt: rec.nextAttemptAt ?? 0,
+      });
+    };
+    req.onerror = () => reject(req.error);
+    tx.onerror = () => reject(tx.error);
   });
 }

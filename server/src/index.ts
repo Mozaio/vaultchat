@@ -390,9 +390,7 @@ wss.on("connection", (ws, req) => {
 
     const Ping = z.object({ type: z.literal("ping") });
 
-    const parsed = z
-      .discriminatedUnion("type", [Dm, Typing, Group, Rtc, Ping])
-      .safeParse(msg);
+    const parsed = z.union([Dm, Typing, Group, Rtc, Ping]).safeParse(msg);
     if (!parsed.success) return;
 
     if (parsed.data.type === "ping") {
