@@ -167,39 +167,6 @@ export function ChatShell({
   const showSidebar = !isMobile || !showConversation;
   const showInfo = !isMobile && showConversation;
 
-  // Purge expired messages continuously so they disappear "live".
-  useEffect(() => {
-    const h = setInterval(() => {
-      void (async () => {
-        await idbPurgeExpired().catch(() => {});
-        const now = Date.now();
-        let changed = false;
-        if (peerRef.current) {
-          const pid = peerRef.current.id;
-          const arr = rawDmRef.current.get(pid) ?? [];
-          const next = arr.filter((m) => !m.expiresAt || m.expiresAt > now);
-          if (next.length !== arr.length) {
-            rawDmRef.current.set(pid, next);
-            changed = true;
-            rebuildDm(pid);
-          }
-        }
-        if (groupRef.current) {
-          const gid = groupRef.current.id;
-          const arr = rawGroupRef.current.get(gid) ?? [];
-          const next = arr.filter((m) => !m.expiresAt || m.expiresAt > now);
-          if (next.length !== arr.length) {
-            rawGroupRef.current.set(gid, next);
-            changed = true;
-            rebuildGroup(gid);
-          }
-        }
-        if (!changed) return;
-      })();
-    }, 1000);
-    return () => clearInterval(h);
-  }, [rebuildDm, rebuildGroup]);
-
   const resolveUser = useCallback(
     async (userId: string): Promise<api.ApiUser | null> => {
       const local = usersRef.current.find((u) => u.id === userId);
@@ -289,6 +256,35 @@ export function ChatShell({
     const raw = rawGroupRef.current.get(groupId) ?? [];
     setGroupMessages(reduceChatMessages(raw));
   }, []);
+
+  // Purge expired messages continuously so they disappear "live".
+  useEffect(() => {
+    const h = setInterval(() => {
+      void (async () => {
+        await idbPurgeExpired().catch(() => {});
+        const now = Date.now();
+        if (peerRef.current) {
+          const pid = peerRef.current.id;
+          const arr = rawDmRef.current.get(pid) ?? [];
+          const next = arr.filter((m) => !m.expiresAt || m.expiresAt > now);
+          if (next.length !== arr.length) {
+            rawDmRef.current.set(pid, next);
+            rebuildDm(pid);
+          }
+        }
+        if (groupRef.current) {
+          const gid = groupRef.current.id;
+          const arr = rawGroupRef.current.get(gid) ?? [];
+          const next = arr.filter((m) => !m.expiresAt || m.expiresAt > now);
+          if (next.length !== arr.length) {
+            rawGroupRef.current.set(gid, next);
+            rebuildGroup(gid);
+          }
+        }
+      })();
+    }, 1000);
+    return () => clearInterval(h);
+  }, [rebuildDm, rebuildGroup]);
 
   const loadDmLocal = useCallback(
     async (p: api.ApiUser) => {
