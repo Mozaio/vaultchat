@@ -12,6 +12,7 @@ import {
 } from "../lib/localIdentity";
 import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
+import { useTheme } from "../lib/theme";
 
 type Mode = "unlock" | "login" | "register";
 
@@ -38,6 +39,7 @@ export function AuthPanel({
 }: {
   onSession: (s: Session, local: LocalIdentity) => void | Promise<void>;
 }) {
+  const { theme, toggle } = useTheme();
   const hasLocal = useMemo(
     () => Boolean(loadToken() && loadLocalIdentity()),
     []
@@ -170,7 +172,7 @@ export function AuthPanel({
             </p>
           </div>
 
-          <div className="rounded-3xl border border-zinc-800/80 bg-zinc-900/75 p-7 shadow-[0_20px_80px_-24px_rgba(16,185,129,0.45)] backdrop-blur-xl md:p-8">
+          <div className="app-surface rounded-3xl p-7 md:p-8">
             <div className="mb-7 text-center md:hidden">
               <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
                 Secure Messenger
@@ -181,6 +183,19 @@ export function AuthPanel({
               <p className="mt-2 text-sm text-zinc-400">
                 Ende‑zu‑Ende verschlüsselt. Der Server sieht keinen Klartext.
               </p>
+            </div>
+            <div className="mb-5 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
+                {hasLocal ? "Willkommen zurück" : "Los geht’s"}
+              </p>
+              <button
+                type="button"
+                onClick={toggle}
+                className="rounded-xl border border-zinc-800 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-800/60"
+                title="Theme umschalten"
+              >
+                {theme === "dark" ? "Light" : "Dark"}
+              </button>
             </div>
 
         {hasLocal && (

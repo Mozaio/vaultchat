@@ -47,6 +47,7 @@ import {
 } from "../lib/chatReducer";
 import { SafetyNumberDialog } from "./SafetyNumberDialog";
 import { useVoiceRecorder } from "../lib/useVoiceRecorder";
+import { useTheme } from "../lib/theme";
 
 type Tab = "dm" | "group";
 
@@ -77,6 +78,7 @@ export function ChatShell({
   onLogout: () => void;
   onLock: () => void;
 }) {
+  const { theme, toggle } = useTheme();
   const [users, setUsers] = useState<api.ApiUser[]>([]);
   const [groups, setGroups] = useState<api.ApiGroup[]>([]);
   const [tab, setTab] = useState<Tab>("dm");
@@ -109,6 +111,9 @@ export function ChatShell({
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [sideTab, setSideTab] = useState<"direct" | "groups" | "fav">("direct");
 
   const callRef = useRef<{
     close: () => void;
@@ -149,6 +154,7 @@ export function ChatShell({
 
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
   const showSidebar = !isMobile || !showConversation;
+  const showInfo = !isMobile && showConversation;
 
   const resolveUser = useCallback(
     async (userId: string): Promise<api.ApiUser | null> => {
@@ -941,8 +947,14 @@ export function ChatShell({
     return out;
   }, [messages.length, users.length]);
 
+  const filteredUsers = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => u.username.toLowerCase().includes(q));
+  }, [users, query]);
+
   const peerList = useMemo(() => {
-    return users.map((u) => {
+    return filteredUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
       return (
         <PeerRow
@@ -957,7 +969,7 @@ export function ChatShell({
         />
       );
     });
-  }, [users, peer, tab, lastDmPreviewByPeer]);
+  }, [filteredUsers, peer, tab, lastDmPreviewByPeer]);
 
   const groupList = useMemo(
     () =>
@@ -994,19 +1006,22 @@ export function ChatShell({
         />
       )}
 
-      <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-900/70 shadow-[0_24px_80px_-30px_rgba(16,185,129,0.4)] backdrop-blur md:rounded-3xl">
+      <div className="app-surface flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl md:rounded-3xl">
       <aside className={`${showSidebar ? "flex" : "hidden"} w-full flex-col border-zinc-800/80 bg-zinc-950/45 md:flex md:w-84 md:border-r`}>
         <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
           <div>
-            <p className="text-sm font-medium text-white">
-              {session.user.username}
-            </p>
-            <p className="text-xs text-zinc-500">
-              {connected ? "Verbunden" : "Offline"} · Sealed-Sender · DR v4
-              {pendingCount > 0 && ` · ${pendingCount} offen`}
-            </p>
+            <p className="text-sm font-semibold text-white">VaultChat</p>
+            <p className="text-xs text-zinc-500">Secure Messenger</p>
           </div>
           <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={toggle}
+              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 transition hover:bg-zinc-800"
+              title="Theme umschalten"
+            >
+              {theme === "dark" ? "Light" : "Dark"}
+            </button>
             <button
               type="button"
               onClick={onLock}
@@ -1025,28 +1040,58 @@ export function ChatShell({
           </div>
         </div>
 
-        <div className="flex gap-2 border-b border-zinc-800/80 p-2.5">
+        <div className="px-3 pt-3">
+          <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2">
+            <span className="text-zinc-500">⌕</span>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Suchen…"
+              className="w-full bg-transparent text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-2 border-b border-zinc-800/80 p-3">
           <button
             type="button"
-            className={`flex-1 rounded-xl py-2 text-sm font-medium ${
-              tab === "dm"
+            className={`flex-1 rounded-2xl py-2 text-xs font-semibold ${
+              sideTab === "direct"
                 ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
                 : "text-zinc-400 hover:bg-zinc-800/60"
             }`}
-            onClick={() => setTab("dm")}
+            onClick={() => {
+              setSideTab("direct");
+              setTab("dm");
+            }}
           >
             Direkt
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-xl py-2 text-sm font-medium ${
-              tab === "group"
+            className={`flex-1 rounded-2xl py-2 text-xs font-semibold ${
+              sideTab === "groups"
                 ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
                 : "text-zinc-400 hover:bg-zinc-800/60"
             }`}
-            onClick={() => setTab("group")}
+            onClick={() => {
+              setSideTab("groups");
+              setTab("group");
+            }}
           >
             Gruppen
+          </button>
+          <button
+            type="button"
+            className={`flex-1 rounded-2xl py-2 text-xs font-semibold ${
+              sideTab === "fav"
+                ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
+                : "text-zinc-400 hover:bg-zinc-800/60"
+            }`}
+            onClick={() => setSideTab("fav")}
+            title="Favoriten (coming soon)"
+          >
+            Favoriten
           </button>
         </div>
 
@@ -1199,6 +1244,14 @@ export function ChatShell({
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInfoOpen((v) => !v)}
+                    className="rounded-xl border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
+                    title="Info"
+                  >
+                    Info
+                  </button>
                   <select
                     value={ttlDm}
                     onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
@@ -1405,6 +1458,14 @@ export function ChatShell({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInfoOpen((v) => !v)}
+                    className="rounded-xl border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
+                    title="Info"
+                  >
+                    Info
+                  </button>
                   <select
                     value={ttlGroup}
                     onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
@@ -1567,6 +1628,79 @@ export function ChatShell({
           </>
         )}
       </main>
+
+      {/* Right info panel (desktop) */}
+      {showInfo && (
+        <aside className="hidden w-80 shrink-0 border-l border-zinc-800/80 bg-zinc-950/40 md:flex">
+          <InfoPanel
+            mode={tab}
+            peer={peer}
+            group={group}
+            peerFp={peerFp}
+            onSafety={() => setSafetyOpen(true)}
+            onClearChat={async () => {
+              if (peer) {
+                const rows = rawDmRef.current.get(peer.id) ?? [];
+                for (const r of rows) await idbDeleteDm(r.id).catch(() => {});
+                rawDmRef.current.set(peer.id, []);
+                rebuildDm(peer.id);
+              }
+              if (group) {
+                const rows = rawGroupRef.current.get(group.id) ?? [];
+                for (const r of rows) await idbDeleteGroupMsg(r.id).catch(() => {});
+                rawGroupRef.current.set(group.id, []);
+                rebuildGroup(group.id);
+              }
+            }}
+          />
+        </aside>
+      )}
+
+      {/* Mobile info drawer */}
+      {isMobile && infoOpen && showConversation && (
+        <div className="fixed inset-0 z-50 bg-black/50 p-3" onClick={() => setInfoOpen(false)}>
+          <div
+            className="app-surface ml-auto h-full w-full max-w-sm overflow-y-auto rounded-2xl p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Details</p>
+              <button
+                type="button"
+                onClick={() => setInfoOpen(false)}
+                className="rounded-lg border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+              >
+                ✕
+              </button>
+            </div>
+            <InfoPanel
+              mode={tab}
+              peer={peer}
+              group={group}
+              peerFp={peerFp}
+              onSafety={() => {
+                setInfoOpen(false);
+                setSafetyOpen(true);
+              }}
+              onClearChat={async () => {
+                setInfoOpen(false);
+                if (peer) {
+                  const rows = rawDmRef.current.get(peer.id) ?? [];
+                  for (const r of rows) await idbDeleteDm(r.id).catch(() => {});
+                  rawDmRef.current.set(peer.id, []);
+                  rebuildDm(peer.id);
+                }
+                if (group) {
+                  const rows = rawGroupRef.current.get(group.id) ?? [];
+                  for (const r of rows) await idbDeleteGroupMsg(r.id).catch(() => {});
+                  rawGroupRef.current.set(group.id, []);
+                  rebuildGroup(group.id);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
       {isMobile && !showConversation && (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/80 p-2 backdrop-blur">
           <div className="mx-auto flex max-w-md gap-2">
@@ -1647,6 +1781,97 @@ function PeerRow({
         </div>
       </div>
       <span className="text-[10px] text-zinc-500">›</span>
+    </button>
+  );
+}
+
+function InfoPanel({
+  mode,
+  peer,
+  group,
+  peerFp,
+  onSafety,
+  onClearChat,
+}: {
+  mode: "dm" | "group";
+  peer: api.ApiUser | null;
+  group: api.ApiGroup | null;
+  peerFp: string | null;
+  onSafety: () => void;
+  onClearChat: () => void | Promise<void>;
+}) {
+  const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
+  const initials = (title.slice(0, 1) || "•").toUpperCase();
+  const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
+
+  return (
+    <div className="flex h-full w-full flex-col p-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-emerald-900/30 text-sm font-semibold text-emerald-200">
+            {initials}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-white">{title}</p>
+            <p className="text-xs text-zinc-500">{status}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] text-zinc-300">
+        <QuickAction label="Profil" />
+        <QuickAction label="Suchen" />
+        <QuickAction label="Stumm" />
+        <QuickAction label="Mehr" />
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3">
+          <p className="text-xs font-semibold text-emerald-300">Sicherheit</p>
+          <p className="mt-1 text-xs text-zinc-400">
+            Deine Nachrichten und Anrufe sind Ende‑zu‑Ende verschlüsselt.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onSafety}
+          className="w-full rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3 text-left transition hover:bg-zinc-900/40"
+        >
+          <p className="text-xs font-semibold text-white">Sicherheitsnummer</p>
+          <p className="mt-1 font-mono text-[11px] text-emerald-300">
+            {peerFp ?? "…"}
+          </p>
+        </button>
+
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3">
+          <p className="text-xs font-semibold text-white">Geteilte Medien</p>
+          <p className="mt-1 text-xs text-zinc-500">Kommt als nächstes (Galerie/Links).</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void onClearChat()}
+          className="w-full rounded-2xl border border-red-900/40 bg-red-950/20 p-3 text-left text-red-200 transition hover:bg-red-950/30"
+        >
+          Chat löschen
+        </button>
+      </div>
+
+      <div className="mt-auto pt-4 text-[11px] text-zinc-500">
+        Hinweis: Historie ist lokal gespeichert (verschlüsselte IndexedDB).
+      </div>
+    </div>
+  );
+}
+
+function QuickAction({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 py-2 text-center text-[11px] text-zinc-200 hover:bg-zinc-900/40"
+    >
+      {label}
     </button>
   );
 }

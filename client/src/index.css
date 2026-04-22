@@ -12,11 +12,66 @@ body,
 
 body {
   margin: 0;
-  background:
-    radial-gradient(1000px 600px at 75% -10%, rgba(16, 185, 129, 0.1), transparent 60%),
-    radial-gradient(700px 500px at -10% 100%, rgba(6, 182, 212, 0.08), transparent 60%),
-    #09090b;
-  color: #f4f4f5;
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+/* Theme tokens (semantic colors) */
+:root {
+  --app-bg: #0a0a0f;
+  --app-fg: #f4f4f5;
+  --surface: rgba(24, 24, 27, 0.72);
+  --surface-2: rgba(9, 9, 11, 0.6);
+  --border: rgba(39, 39, 42, 0.9);
+  --muted: rgba(161, 161, 170, 0.9);
+  --muted-2: rgba(113, 113, 122, 0.9);
+  --brand: #10b981;
+  --brand-2: #22c55e;
+  --danger: #ef4444;
+  --shadow: rgba(16, 185, 129, 0.35);
+
+  --app-bg: radial-gradient(1000px 600px at 75% -10%, rgba(16, 185, 129, 0.10), transparent 60%),
+            radial-gradient(700px 500px at -10% 100%, rgba(6, 182, 212, 0.08), transparent 60%),
+            #09090b;
+}
+
+:root[data-theme="light"] {
+  --app-fg: #0b1220;
+  --surface: rgba(255, 255, 255, 0.80);
+  --surface-2: rgba(255, 255, 255, 0.62);
+  --border: rgba(15, 23, 42, 0.12);
+  --muted: rgba(51, 65, 85, 0.85);
+  --muted-2: rgba(100, 116, 139, 0.85);
+  --brand: #0ea5a8;
+  --brand-2: #10b981;
+  --danger: #dc2626;
+  --shadow: rgba(14, 165, 168, 0.25);
+
+  --app-bg: radial-gradient(1100px 650px at 85% -15%, rgba(14, 165, 168, 0.16), transparent 60%),
+            radial-gradient(900px 600px at -10% 105%, rgba(16, 185, 129, 0.14), transparent 60%),
+            #f8fafc;
+}
+
+/* Small set of semantic utility classes (used by components) */
+.app-surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 24px 80px -30px var(--shadow);
+  backdrop-filter: blur(16px);
+}
+.app-surface-2 {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(14px);
+}
+.app-border {
+  border-color: var(--border);
+}
+.app-muted {
+  color: var(--muted);
+}
+.app-muted-2 {
+  color: var(--muted-2);
 }
 
 * {

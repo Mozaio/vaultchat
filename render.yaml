@@ -61,13 +61,13 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # Feste URLs, weil Renders "fromService.property" fuer Web-Services
-      # nur "host"/"port" liefert, nicht den vollen "https://..."-String.
-      # Falls du andere Servicenamen oder eine Custom Domain nutzt, hier anpassen.
+      # Diese beiden Variablen MUESSEN in Render auf die echte Server-URL
+      # gesetzt werden (z. B. https://<dein-server>.onrender.com).
+      # Wir lassen sie bewusst leer, damit kein falscher Default deployed wird.
       - key: VITE_API_BASE
-        value: https://vaultchat-server.onrender.com
+        sync: false
       - key: VITE_WS_URL
-        value: https://vaultchat-server.onrender.com
+        sync: false
     routes:
       # SPA-Fallback: alle unbekannten Pfade -> index.html
       - type: rewrite
