@@ -369,10 +369,17 @@ app.post("/api/keys", async (req, res) => {
 });
 
 const server = createServer(app);
+/**
+ * E2E-DM: base64(Envelope) / Gruppen-ciphertext. Zod-Maxlänge = erlaubter Umschlag.
+ * WebSocket-Frame etwas größer (JSON-Metadaten um `envelope` herum).
+ */
+const MAX_B64_CIPHERTEXT = 128 * 1024 * 1024;
+const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 2 * 1024 * 1024;
+
 const wss = new WebSocketServer({
   server,
   path: "/ws",
-  maxPayload: 8 * 1024 * 1024,
+  maxPayload: WS_MAX_FRAME_BYTES,
 });
 
 /**
@@ -417,7 +424,7 @@ wss.on("connection", (ws, req) => {
   const allow = createBucket();
 
   ws.on("message", (data) => {
-    if ((data as Buffer).length > 8 * 1024 * 1024) return;
+    if ((data as Buffer).length > WS_MAX_FRAME_BYTES) return;
     if (!jwtUser) {
       let first: { type?: string; token?: string };
       try {
@@ -452,13 +459,11 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
-    const MAX_CT = 6 * 1024 * 1024;
-
     const Dm = z.object({
       type: z.literal("dm"),
       toUserId: z.string().uuid(),
       /** Sealed-Sender-Envelope: Server sieht weder Absender noch Inhalt. */
-      envelope: z.string().min(1).max(MAX_CT),
+      envelope: z.string().min(1).max(MAX_B64_CIPHERTEXT),
       /** Client-generierte Envelope-ID, damit Sender Delivery-Acks zuordnen kann. */
       cid: z.string().min(1).max(128),
     });
@@ -472,7 +477,7 @@ wss.on("connection", (ws, req) => {
     const Group = z.object({
       type: z.literal("group"),
       groupId: z.string().uuid(),
-      ciphertext: z.string().min(1).max(MAX_CT),
+      ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
     });
 
     const Rtc = z.object({

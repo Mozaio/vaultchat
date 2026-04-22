@@ -736,6 +736,15 @@ export function ChatShell({
 
   async function sendDmFile(file: File) {
     if (!peer) return;
+    /** Server: 128 MB verschlüsselter Umschlag; Data-URL + DR + Seal wachsen ~1,4–1,5×. */
+    const e2eMaxB64 = 128 * 1024 * 1024;
+    const maxFile = Math.floor(e2eMaxB64 / 1.5);
+    if (file.size > maxFile) {
+      setError(
+        `Datei zu groß: Der E2E-Server-Rahmen beträgt 128 MB (Umschlag). Wegen Data-URL und Verschlüsselung bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB.`
+      );
+      return;
+    }
     const body = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result ?? ""));
