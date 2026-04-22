@@ -100,10 +100,10 @@ export function MessageBubble({
         )}
 
         <div
-          className={`relative rounded-2xl px-4 py-2 text-sm ${
+          className={`relative rounded-2xl border px-4 py-2.5 text-sm shadow-sm ${
             msg.fromMe
-              ? "bg-emerald-800/50 text-emerald-50"
-              : "bg-zinc-800 text-zinc-100"
+              ? "border-emerald-700/40 bg-emerald-800/45 text-emerald-50"
+              : "border-zinc-700/80 bg-zinc-800/90 text-zinc-100"
           } ${msg.deleted ? "italic text-zinc-500" : ""}`}
         >
           {msg.deleted ? (
@@ -184,7 +184,7 @@ export function MessageBubble({
               }}
               className={`absolute -top-2 ${
                 msg.fromMe ? "-left-8" : "-right-8"
-              } hidden rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-700 group-hover:block`}
+              } hidden rounded-full border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 group-hover:block`}
             >
               ⋯
             </button>
