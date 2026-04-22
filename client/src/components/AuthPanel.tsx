@@ -15,6 +15,24 @@ import type { Session } from "../lib/sessionHelpers";
 
 type Mode = "unlock" | "login" | "register";
 
+function humanError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : "unknown_error";
+  if (msg.startsWith("api_base_misconfigured:")) {
+    const b = msg.slice("api_base_misconfigured:".length);
+    return `API-Server falsch konfiguriert. Aktuelle API-Basis: ${b}. In Render beim Client bitte VITE_API_BASE auf deinen Server setzen (z. B. https://vaultchat-server.onrender.com).`;
+  }
+  if (msg === "network_error_or_cors") {
+    return "Netzwerk/CORS-Fehler. Prüfe, ob der Server erreichbar ist und VAULTCHAT_CORS_ORIGIN im Server korrekt auf die Client-URL zeigt.";
+  }
+  if (msg === "api_timeout") {
+    return "Server antwortet nicht rechtzeitig (Timeout). Auf Render Free evtl. schläft der Server gerade; versuche es nach 20-30 Sekunden erneut.";
+  }
+  if (msg === "username_taken") return "Benutzername bereits vergeben.";
+  if (msg === "invalid_body") return "Eingaben ungültig. Prüfe Benutzername/Passwort.";
+  if (msg === "invalid_credentials") return "Login fehlgeschlagen: Benutzername oder Passwort falsch.";
+  return msg;
+}
+
 export function AuthPanel({
   onSession,
 }: {
@@ -48,7 +66,7 @@ export function AuthPanel({
       );
       await onSession(session, local);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "unlock_failed");
+      setError(humanError(err));
     } finally {
       setBusy(false);
     }
@@ -74,7 +92,7 @@ export function AuthPanel({
       const session = await buildSessionFromLogin(username, password, local);
       await onSession(session, local);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "login_failed");
+      setError(humanError(err));
     } finally {
       setBusy(false);
     }
@@ -91,7 +109,7 @@ export function AuthPanel({
       );
       await onSession(session, local);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "register_failed");
+      setError(humanError(err));
     } finally {
       setBusy(false);
     }
