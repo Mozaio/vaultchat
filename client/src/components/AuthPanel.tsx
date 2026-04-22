@@ -14,7 +14,7 @@ import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
 import { useTheme } from "../lib/theme";
 
-type Mode = "unlock" | "login" | "register";
+type Mode = "unlock" | "login" | "register" | "import";
 
 function humanError(err: unknown): string {
   const msg = err instanceof Error ? err.message : "unknown_error";
@@ -292,29 +292,13 @@ export function AuthPanel({
                 required
               />
             </label>
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/50 p-3">
-              <button
-                type="button"
-                onClick={() => setShowAdvanced((v) => !v)}
-                className="flex w-full items-center justify-between text-sm text-zinc-300"
-              >
-                <span>Neues Gerät? Backup importieren</span>
-                <span className="text-zinc-500">{showAdvanced ? "–" : "+"}</span>
-              </button>
-              {showAdvanced && (
-                <div className="mt-3">
-                  <textarea
-                    className="min-h-[92px] w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
-                    value={importJson}
-                    onChange={(e) => setImportJson(e.target.value)}
-                    placeholder='{"userId":"…","username":"…","publicKey":"…","wrapped":{…}}'
-                  />
-                  <p className="mt-2 text-xs text-zinc-500">
-                    Import nur nötig, wenn du dieses Konto auf einem neuen Gerät entsperren willst.
-                  </p>
-                </div>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setMode("import")}
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/40 py-2 text-sm text-zinc-200 hover:bg-zinc-900/40"
+            >
+              Neues Gerät? Backup importieren →
+            </button>
             <button
               type="submit"
               disabled={busy}
@@ -359,7 +343,46 @@ export function AuthPanel({
           </form>
         )}
 
-        {!hasLocal && (
+        {mode === "import" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setMode("login");
+              void handleLogin(e);
+            }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-white">Backup importieren</p>
+              <button
+                type="button"
+                onClick={() => setMode("login")}
+                className="rounded-lg border border-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800/60"
+              >
+                Zurück
+              </button>
+            </div>
+            <textarea
+              className="min-h-[140px] w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+              value={importJson}
+              onChange={(e) => setImportJson(e.target.value)}
+              placeholder='{"userId":"…","username":"…","publicKey":"…","wrapped":{…}}'
+            />
+            <p className="text-xs text-zinc-500">
+              Danach meldest du dich mit Benutzername + Passwort an. Das Backup stellt deinen lokalen Schlüssel wieder her.
+            </p>
+            <button
+              type="button"
+              disabled={busy || !importJson.trim()}
+              onClick={(e) => void handleLogin(e as unknown as React.FormEvent)}
+              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {busy ? "…" : "Importieren & anmelden"}
+            </button>
+          </form>
+        )}
+
+        {!hasLocal && mode !== "import" && (
           <div className="mt-6 flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 p-1 text-sm">
             <button
               type="button"

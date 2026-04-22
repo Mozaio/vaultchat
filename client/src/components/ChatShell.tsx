@@ -947,6 +947,21 @@ export function ChatShell({
     return out;
   }, [messages.length, users.length]);
 
+  const fmtListTime = useCallback((at?: number) => {
+    if (!at) return "";
+    const d = new Date(at);
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+    if (sameDay) {
+      return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    }
+    // Weekday short
+    return d.toLocaleDateString(undefined, { weekday: "short" });
+  }, []);
+
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return users;
@@ -961,6 +976,8 @@ export function ChatShell({
           key={u.id}
           u={u}
           subtitle={prev?.text ?? "Keine Nachrichten"}
+          metaRight={fmtListTime(prev?.at)}
+          unread={0}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
@@ -1247,10 +1264,10 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setInfoOpen((v) => !v)}
-                    className="rounded-xl border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
-                    title="Info"
+                    className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
+                    title="Details"
                   >
-                    Info
+                    ⋯
                   </button>
                   <select
                     value={ttlDm}
@@ -1285,7 +1302,15 @@ export function ChatShell({
                     onClick={() => void beginCall()}
                     className="rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
                   >
-                    Anruf
+                    📞
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInfoOpen(true)}
+                    className="hidden rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:inline-flex"
+                    title="Details"
+                  >
+                    ℹ
                   </button>
                 </div>
               </div>
@@ -1358,6 +1383,14 @@ export function ChatShell({
                 </div>
               )}
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSafetyOpen(true)}
+                  className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+                  title="Emoji / Reaktionen (coming soon)"
+                >
+                  🙂
+                </button>
                 <input
                   className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2"
                   placeholder={
@@ -1385,8 +1418,8 @@ export function ChatShell({
                     }
                   }}
                 />
-                <label className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800">
-                  Datei
+                <label className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800" title="Datei anhängen">
+                  📎
                   <input
                     type="file"
                     className="hidden"
@@ -1406,7 +1439,7 @@ export function ChatShell({
                       : "border-zinc-700 text-zinc-300 transition hover:bg-zinc-800"
                   }`}
                 >
-                  {voice.recording ? "■ Stop" : "🎤"}
+                  {voice.recording ? "■" : "🎤"}
                 </button>
                 <button
                   type="button"
@@ -1414,7 +1447,7 @@ export function ChatShell({
                   disabled={voice.recording || !text.trim()}
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40"
                 >
-                  Senden
+                  ➤
                 </button>
               </div>
             </footer>
@@ -1737,11 +1770,15 @@ export function ChatShell({
 function PeerRow({
   u,
   subtitle,
+  metaRight,
+  unread,
   selected,
   onSelect,
 }: {
   u: api.ApiUser;
   subtitle?: string;
+  metaRight?: string;
+  unread?: number;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -1780,7 +1817,16 @@ function PeerRow({
           <p className="truncate text-xs text-zinc-500">{subtitle ?? ""}</p>
         </div>
       </div>
-      <span className="text-[10px] text-zinc-500">›</span>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className="text-[10px] text-zinc-500">{metaRight ?? ""}</span>
+        {unread && unread > 0 ? (
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+            {unread > 99 ? "99+" : unread}
+          </span>
+        ) : (
+          <span className="text-[10px] text-zinc-500">›</span>
+        )}
+      </div>
     </button>
   );
 }
