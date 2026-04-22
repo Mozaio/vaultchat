@@ -20,6 +20,9 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    // esbuild pre-bundled libsodium-wrappers (Dev-Server). Produziert ein
+    // ESM-Modul, in dem der CJS-Namespace als lebende Referenz durchreicht,
+    // nicht als snapshot — Konstanten sind dadurch nach .ready sichtbar.
     include: ["libsodium-wrappers"],
   },
   server: {
@@ -34,8 +37,16 @@ export default defineConfig({
   build: {
     sourcemap: true,
     commonjsOptions: {
-      // libsodium-wrappers ist CJS; Rollup muss Named-Exports draus ziehen.
+      // Wichtig: der Default-Import ist der komplette module.exports
+      // (nicht {default: exports}). Ohne das liefert Rollup ein doppelt
+      // gewrapptes Objekt, auf dem libsodium-Konstanten nicht sichtbar sind.
+      defaultIsModuleExports: true,
+      // Libsodium mutiert seine Exports nach dem Laden. Rollup muss sie
+      // als "dynamic require" behandeln, damit die Binding live bleibt.
       transformMixedEsModules: true,
+      // Wichtige Schraube gegen den Frozen-Copy-Bug: bei require liefert der
+      // Plugin die Namespace-Referenz direkt, nicht einen statischen Snapshot.
+      requireReturnsDefault: "namespace",
     },
   },
 });
