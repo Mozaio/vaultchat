@@ -27,8 +27,16 @@ async function req<T>(
     headers: { ...headers, ...init?.headers },
   });
   if (!r.ok) {
-    const err = await r.text();
-    throw new Error(err || r.statusText);
+    const raw = await r.text();
+    let msg = raw || r.statusText;
+    try {
+      const j = JSON.parse(raw) as { error?: string; message?: string };
+      if (typeof j.error === "string") msg = j.error;
+      else if (typeof j.message === "string") msg = j.message;
+    } catch {
+      /* Body ist kein JSON — msg bleibt raw. */
+    }
+    throw new Error(msg);
   }
   return r.json() as Promise<T>;
 }
