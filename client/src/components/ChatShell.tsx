@@ -949,7 +949,7 @@ export function ChatShell({
   );
 
   return (
-    <div className="flex h-full flex-col bg-zinc-950 md:flex-row">
+    <div className="flex h-full w-full flex-col bg-zinc-950 p-2 md:p-4">
       {safetyOpen && peer && (
         <SafetyNumberDialog
           peerId={peer.id}
@@ -961,8 +961,9 @@ export function ChatShell({
         />
       )}
 
-      <aside className="flex w-full flex-col border-zinc-800 md:w-80 md:border-r">
-        <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+      <div className="flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-900/70 shadow-[0_24px_80px_-30px_rgba(16,185,129,0.4)] backdrop-blur md:rounded-3xl">
+      <aside className="flex w-full flex-col border-zinc-800/80 bg-zinc-950/45 md:w-84 md:border-r">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
           <div>
             <p className="text-sm font-medium text-white">
               {session.user.username}
@@ -976,7 +977,7 @@ export function ChatShell({
             <button
               type="button"
               onClick={onLock}
-              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 transition hover:bg-zinc-800"
               title="Sofort sperren (LDK aus dem Speicher entfernen)"
             >
               Sperren
@@ -984,18 +985,20 @@ export function ChatShell({
             <button
               type="button"
               onClick={onLogout}
-              className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 transition hover:bg-zinc-800"
             >
               Abmelden
             </button>
           </div>
         </div>
 
-        <div className="flex gap-1 border-b border-zinc-800 p-2">
+        <div className="flex gap-2 border-b border-zinc-800/80 p-2.5">
           <button
             type="button"
             className={`flex-1 rounded-lg py-2 text-sm ${
-              tab === "dm" ? "bg-zinc-800 text-white" : "text-zinc-500"
+              tab === "dm"
+                ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
+                : "text-zinc-400 hover:bg-zinc-800/60"
             }`}
             onClick={() => setTab("dm")}
           >
@@ -1004,7 +1007,9 @@ export function ChatShell({
           <button
             type="button"
             className={`flex-1 rounded-lg py-2 text-sm ${
-              tab === "group" ? "bg-zinc-800 text-white" : "text-zinc-500"
+              tab === "group"
+                ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
+                : "text-zinc-400 hover:bg-zinc-800/60"
             }`}
             onClick={() => setTab("group")}
           >
@@ -1014,7 +1019,7 @@ export function ChatShell({
 
         {tab === "dm" && (
           <>
-            <div className="border-b border-zinc-800 px-3 py-2">
+            <div className="border-b border-zinc-800/80 px-3 py-2">
               <p className="text-xs uppercase tracking-wide text-zinc-500">
                 Kontakte
               </p>
@@ -1025,16 +1030,16 @@ export function ChatShell({
 
         {tab === "group" && (
           <>
-            <div className="space-y-2 border-b border-zinc-800 p-3">
+            <div className="space-y-2 border-b border-zinc-800/80 p-3">
               <input
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-white"
+                className="w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-2.5 py-2 text-sm text-white outline-none ring-emerald-500/20 focus:ring-2"
                 placeholder="Gruppenname"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
               />
               <select
                 multiple
-                className="h-24 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+                className="h-24 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200 outline-none ring-emerald-500/20 focus:ring-2"
                 value={newGroupMembers}
                 onChange={(e) => {
                   const o = [...e.target.selectedOptions].map((x) => x.value);
@@ -1050,12 +1055,12 @@ export function ChatShell({
               <button
                 type="button"
                 onClick={() => void createGroup()}
-                className="w-full rounded-lg bg-emerald-700 py-1.5 text-sm text-white hover:bg-emerald-600"
+                className="w-full rounded-xl bg-emerald-700 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
               >
                 Gruppe erstellen
               </button>
             </div>
-            <div className="border-b border-zinc-800 px-3 py-2">
+            <div className="border-b border-zinc-800/80 px-3 py-2">
               <p className="text-xs uppercase tracking-wide text-zinc-500">
                 Deine Gruppen
               </p>
@@ -1064,7 +1069,7 @@ export function ChatShell({
           </>
         )}
 
-        <div className="space-y-1 border-t border-zinc-800 p-3 text-xs text-zinc-500">
+        <div className="space-y-1 border-t border-zinc-800/80 p-3 text-xs text-zinc-500">
           <p className="font-mono text-emerald-600/90">Du: {myFp ?? "…"}</p>
           <label className="flex items-center gap-2">
             <input
@@ -1087,7 +1092,7 @@ export function ChatShell({
         </div>
       </aside>
 
-      <main className="flex min-h-0 flex-1 flex-col">
+      <main className="flex min-h-0 flex-1 flex-col bg-zinc-950/55">
         {incomingOffer && (
           <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
             <span>Anruf von {incomingOffer.from.username}</span>
@@ -1132,7 +1137,7 @@ export function ChatShell({
 
         {tab === "dm" && peer && (
           <>
-            <header className="border-b border-zinc-800 px-4 py-3">
+            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="font-medium text-white">{peer.username}</p>
@@ -1188,7 +1193,7 @@ export function ChatShell({
 
             <div
               ref={dmScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4"
             >
               {messages.map((m) => (
                 <MessageBubble
@@ -1227,7 +1232,7 @@ export function ChatShell({
               )}
             </div>
 
-            <footer className="border-t border-zinc-800 p-3">
+            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
@@ -1248,7 +1253,7 @@ export function ChatShell({
               )}
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 focus:ring-2"
+                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2"
                   placeholder={
                     voice.recording ? "🎙️ Aufnahme läuft…" : "Nachricht…"
                   }
@@ -1274,7 +1279,7 @@ export function ChatShell({
                     }
                   }}
                 />
-                <label className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800">
+                <label className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800">
                   Datei
                   <input
                     type="file"
@@ -1292,7 +1297,7 @@ export function ChatShell({
                   className={`rounded-xl border px-3 py-2 text-xs ${
                     voice.recording
                       ? "border-red-500 bg-red-700/60 text-white"
-                      : "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                      : "border-zinc-700 text-zinc-300 transition hover:bg-zinc-800"
                   }`}
                 >
                   {voice.recording ? "■ Stop" : "🎤"}
@@ -1301,7 +1306,7 @@ export function ChatShell({
                   type="button"
                   onClick={() => void sendDmText()}
                   disabled={voice.recording || !text.trim()}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40"
                 >
                   Senden
                 </button>
@@ -1318,7 +1323,7 @@ export function ChatShell({
 
         {tab === "group" && group && (
           <>
-            <header className="border-b border-zinc-800 px-4 py-3">
+            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <div>
                   <p className="font-medium text-white">{group.name}</p>
@@ -1410,7 +1415,7 @@ export function ChatShell({
             </header>
             <div
               ref={groupScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4"
             >
               {groupMessages.map((m) => (
                 <MessageBubble
@@ -1445,7 +1450,7 @@ export function ChatShell({
                 />
               ))}
             </div>
-            <footer className="border-t border-zinc-800 p-3">
+            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyGroup && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
@@ -1466,7 +1471,7 @@ export function ChatShell({
               )}
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 focus:ring-2"
+                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2"
                   placeholder="Gruppennachricht…"
                   value={groupText}
                   onChange={(e) => setGroupText(e.target.value)}
@@ -1480,7 +1485,7 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => void sendGroupText()}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500"
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
                 >
                   Senden
                 </button>
@@ -1489,6 +1494,7 @@ export function ChatShell({
           </>
         )}
       </main>
+      </div>
     </div>
   );
 }
