@@ -48,6 +48,15 @@ import {
 import { SafetyNumberDialog } from "./SafetyNumberDialog";
 import { useVoiceRecorder } from "../lib/useVoiceRecorder";
 import { useTheme } from "../lib/theme";
+import {
+  IconInfo,
+  IconMic,
+  IconMore,
+  IconPaperclip,
+  IconPhone,
+  IconSearch,
+  IconSend,
+} from "./Icons";
 
 type Tab = "dm" | "group";
 
@@ -114,6 +123,7 @@ export function ChatShell({
   const [infoOpen, setInfoOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sideTab, setSideTab] = useState<"direct" | "groups" | "fav">("direct");
+  const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
 
   const callRef = useRef<{
     close: () => void;
@@ -181,6 +191,19 @@ export function ChatShell({
       } catch {
         /* ignore */
       }
+    }
+    // Refresh unread counters (best-effort).
+    try {
+      const next: Record<string, number> = {};
+      for (const u of others) {
+        const seenRaw = await metaGet(`seen:dm:${u.id}`);
+        const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
+        const rows = rawDmRef.current.get(u.id) ?? [];
+        next[u.id] = rows.filter((r) => !r.fromMe && r.at > seenAt).length;
+      }
+      setUnreadByPeer(next);
+    } catch {
+      /* ignore */
     }
   }, [session.token, session.user.id]);
 
@@ -267,6 +290,8 @@ export function ChatShell({
     void (async () => {
       await ensureDrSession(session.secretKey, peer.id, peer.publicKey);
       await loadDmLocal(peer);
+      await metaSet(`seen:dm:${peer.id}`, String(Date.now())).catch(() => {});
+      setUnreadByPeer((m) => ({ ...m, [peer.id]: 0 }));
     })();
   }, [peer, session.secretKey, loadDmLocal]);
 
@@ -523,6 +548,21 @@ export function ChatShell({
             });
             rawDmRef.current.set(peerUser.id, arr);
             if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
+            // Update unread (if chat not currently open).
+            if (peerRef.current?.id !== peerUser.id) {
+              void (async () => {
+                const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
+                  () => null
+                );
+                const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
+                if (createdAt > seenAt) {
+                  setUnreadByPeer((m) => ({
+                    ...m,
+                    [peerUser.id]: (m[peerUser.id] ?? 0) + 1,
+                  }));
+                }
+              })();
+            }
 
             if (plain.kind !== "receipt" && plain.cid) {
               const receipt: PlainPayload = {
@@ -977,7 +1017,7 @@ export function ChatShell({
           u={u}
           subtitle={prev?.text ?? "Keine Nachrichten"}
           metaRight={fmtListTime(prev?.at)}
-          unread={0}
+          unread={unreadByPeer[u.id] ?? 0}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
@@ -986,7 +1026,7 @@ export function ChatShell({
         />
       );
     });
-  }, [filteredUsers, peer, tab, lastDmPreviewByPeer]);
+  }, [filteredUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer]);
 
   const groupList = useMemo(
     () =>
@@ -1059,7 +1099,9 @@ export function ChatShell({
 
         <div className="px-3 pt-3">
           <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2">
-            <span className="text-zinc-500">⌕</span>
+            <span className="text-zinc-500">
+              <IconSearch size={16} />
+            </span>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -1267,7 +1309,7 @@ export function ChatShell({
                     className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
                     title="Details"
                   >
-                    ⋯
+                    <IconMore size={16} />
                   </button>
                   <select
                     value={ttlDm}
@@ -1302,7 +1344,7 @@ export function ChatShell({
                     onClick={() => void beginCall()}
                     className="rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
                   >
-                    📞
+                    <IconPhone size={16} />
                   </button>
                   <button
                     type="button"
@@ -1310,7 +1352,7 @@ export function ChatShell({
                     className="hidden rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:inline-flex"
                     title="Details"
                   >
-                    ℹ
+                    <IconInfo size={16} />
                   </button>
                 </div>
               </div>
@@ -1418,8 +1460,11 @@ export function ChatShell({
                     }
                   }}
                 />
-                <label className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800" title="Datei anhängen">
-                  📎
+                <label
+                  className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"
+                  title="Datei anhängen"
+                >
+                  <IconPaperclip size={16} />
                   <input
                     type="file"
                     className="hidden"
@@ -1439,7 +1484,7 @@ export function ChatShell({
                       : "border-zinc-700 text-zinc-300 transition hover:bg-zinc-800"
                   }`}
                 >
-                  {voice.recording ? "■" : "🎤"}
+                  {voice.recording ? "■" : <IconMic size={16} />}
                 </button>
                 <button
                   type="button"
@@ -1447,7 +1492,7 @@ export function ChatShell({
                   disabled={voice.recording || !text.trim()}
                   className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40"
                 >
-                  ➤
+                  <IconSend size={16} />
                 </button>
               </div>
             </footer>
@@ -1892,7 +1937,9 @@ function InfoPanel({
 
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3">
           <p className="text-xs font-semibold text-white">Geteilte Medien</p>
-          <p className="mt-1 text-xs text-zinc-500">Kommt als nächstes (Galerie/Links).</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Dateien &amp; Voice findest du direkt im Chat. Links/Galerie kommt als nächstes.
+          </p>
         </div>
 
         <button
