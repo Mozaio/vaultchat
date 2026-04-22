@@ -1,5 +1,21 @@
-const base = () =>
-  (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+function inferRenderServerOrigin(): string {
+  const host = location.host;
+  // Beispiel: vaultchat-client.onrender.com -> vaultchat-server.onrender.com
+  const m = host.match(/^(.*)-client(\.onrender\.com)$/i);
+  if (m) return `https://${m[1]}-server${m[2]}`;
+  if (host === "vaultchat-client.onrender.com") {
+    return "https://vaultchat-server.onrender.com";
+  }
+  return "";
+}
+
+const base = () => {
+  const explicit = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/$/, "");
+  if (explicit) return explicit;
+  const wsLike = (import.meta.env.VITE_WS_URL ?? "").trim().replace(/\/$/, "");
+  if (wsLike) return wsLike.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
+  return inferRenderServerOrigin();
+};
 
 export type ApiUser = {
   id: string;
@@ -22,10 +38,23 @@ async function req<T>(
     "Content-Type": "application/json",
   };
   if (init?.token) headers.Authorization = `Bearer ${init.token}`;
-  const r = await fetch(`${base()}${path}`, {
-    ...init,
-    headers: { ...headers, ...init?.headers },
-  });
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20_000);
+  let r: Response;
+  try {
+    r = await fetch(`${base()}${path}`, {
+      ...init,
+      signal: ctrl.signal,
+      headers: { ...headers, ...init?.headers },
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("api_timeout");
+    }
+    throw new Error("network_error_or_cors");
+  } finally {
+    clearTimeout(t);
+  }
   if (!r.ok) {
     const raw = await r.text();
     let msg = raw || r.statusText;
@@ -35,6 +64,9 @@ async function req<T>(
       else if (typeof j.message === "string") msg = j.message;
     } catch {
       /* Body ist kein JSON — msg bleibt raw. */
+    }
+    if (msg.includes("Cannot POST /api/") || msg.includes("Cannot GET /api/")) {
+      throw new Error(`api_base_misconfigured:${base() || "(same-origin)"}`);
     }
     throw new Error(msg);
   }
