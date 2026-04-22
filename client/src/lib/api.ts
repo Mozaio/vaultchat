@@ -166,3 +166,32 @@ export type RtcConfig = {
 export async function getRtcConfig(token: string) {
   return req<RtcConfig>("/api/rtc/config", { token });
 }
+
+/** Pre-Key-Bundle (für künftigen X3DH-Handshakes). */
+export type PreKeyBundle = {
+  identityKey: string;
+  signedPreKey: {
+    keyId: number;
+    publicKey: string;
+    signature: string;
+  };
+  oneTimePreKey: { keyId: number; publicKey: string } | null;
+};
+
+export async function getPreKeyBundle(token: string, userId: string) {
+  return req<PreKeyBundle>(`/api/keys/${userId}`, { token });
+}
+
+export async function uploadPreKeys(
+  token: string,
+  body: {
+    signedPreKey: { keyId: number; publicKey: string; signature: string };
+    oneTimePreKeys: { keyId: number; publicKey: string }[];
+  }
+) {
+  return req<{ ok: true; remaining: number }>("/api/keys", {
+    method: "POST",
+    body: JSON.stringify(body),
+    token,
+  });
+}

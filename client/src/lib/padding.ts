@@ -4,6 +4,12 @@
  */
 const BUCKETS = [64, 256, 1024, 4096, 16_384, 65_536, 262_144, 1_048_576];
 
+/** Für optionales Cover-Traffic: zufällige Puffergröße. */
+export function randomBucketSize(): number {
+  const b = BUCKETS[Math.floor(Math.random() * BUCKETS.length)] ?? 256;
+  return b;
+}
+
 function nextBucket(size: number): number {
   for (const b of BUCKETS) if (b >= size) return b;
   return Math.ceil(size / 1_048_576) * 1_048_576;

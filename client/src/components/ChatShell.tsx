@@ -37,6 +37,12 @@ import {
 } from "../lib/outbox";
 import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import {
+  generateKeyMaterial,
+  loadKeyMaterial,
+  saveKeyMaterial,
+  toUploadBody,
+} from "../lib/keyStore";
+import {
   MessageBubble,
   previewForPayload,
   type ChatMsg,
@@ -243,6 +249,23 @@ export function ChatShell({
     void idbPurgeExpired().catch(() => {});
     void refreshPendingCount();
   }, [loadUsers, loadGroups, refreshPendingCount]);
+
+  /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
+  useEffect(() => {
+    void (async () => {
+      try {
+        let km = await loadKeyMaterial();
+        if (!km) {
+          km = await generateKeyMaterial(session.secretKey);
+          await saveKeyMaterial(km);
+        }
+        await api.uploadPreKeys(session.token, toUploadBody(km));
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("[vaultchat] prekey upload", e);
+      }
+    })();
+  }, [session.token, session.secretKey]);
 
   useEffect(() => {
     void (async () => {

@@ -8,7 +8,9 @@
  *    Ratchet-Pub, Counter) — verhindert Header-Manipulation.
  *  - Bootstrap-Flag löst Asymmetrie bei erster Nachricht.
  *
- * Nicht implementiert: vollständiges X3DH / one-time prekeys. Siehe THREAT_MODEL.md.
+ * X3DH/Pre-Keys: Server-API und `drInitFromX3DH` sind vorbereitet; der
+ * laufende Messenger baut Sitzungen weiter per `drInit` (Identitäts-DH), bis
+ * Responder-Handshake und Rotation sauber integriert sind.
  */
 import { base64FromUint8, uint8FromBase64 } from "./b64";
 import { publicKeyFromBase64 } from "./crypto";
@@ -72,6 +74,36 @@ export async function drInit(
   const peerPk = publicKeyFromBase64(peerIdentityPkB64);
   const ss = sodium.crypto_scalarmult(myIdentitySk, peerPk);
   const root = sodium.crypto_generichash(32, enc.encode("vaultchat-dr-v4-root"), ss);
+  return {
+    v: 4,
+    peerId,
+    peerIdentityPk: peerIdentityPkB64,
+    root: base64FromUint8(root),
+    myRatchet: null,
+    peerRatchetPub: peerIdentityPkB64,
+    ckSend: null,
+    ckRecv: null,
+    nSend: 0,
+    nRecv: 0,
+  };
+}
+
+/**
+ * Wird für einen zukünftigen X3DH-Initialisator verwendet (KDF-Label
+ * abweichend von `drInit`, damit Roots nicht kollidieren).
+ */
+export async function drInitFromX3DH(
+  sharedSecret: Uint8Array,
+  peerId: string,
+  peerIdentityPkB64: string
+): Promise<DRState> {
+  await sodiumReady();
+  const sodium = getSodium();
+  const root = sodium.crypto_generichash(
+    32,
+    enc.encode("vaultchat-dr-v4-root-x3dh"),
+    sharedSecret
+  );
   return {
     v: 4,
     peerId,

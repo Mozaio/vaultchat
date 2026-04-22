@@ -20,6 +20,12 @@ import {
 } from "./memoryStore.js";
 import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
 import { registerClient, sendToUser } from "./wsHub.js";
+import {
+  getPreKeyBundle,
+  getRemainingPreKeyCount,
+  initPreKeyBundle,
+  uploadOneTimePreKeys,
+} from "./prekeyStore.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 8787);
@@ -310,6 +316,58 @@ app.get("/api/rtc/config", async (req, res) => {
   });
 });
 
+app.get("/api/keys/:userId", async (req, res) => {
+  const t = bearer(req);
+  if (!t || !verifyToken(t)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const bundle = getPreKeyBundle(req.params.userId);
+  if (!bundle) {
+    res.status(404).json({ error: "no_keys" });
+    return;
+  }
+  res.json(bundle);
+});
+
+const PreKeyUploadBody = z.object({
+  signedPreKey: z.object({
+    keyId: z.number(),
+    publicKey: z.string(),
+    signature: z.string(),
+  }),
+  oneTimePreKeys: z
+    .array(z.object({ keyId: z.number(), publicKey: z.string() }))
+    .max(200),
+});
+
+app.post("/api/keys", async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = PreKeyUploadBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const user = findUserById(jwtUser.userId);
+  if (!user) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  initPreKeyBundle(
+    jwtUser.userId,
+    user.publicKey,
+    parsed.data.signedPreKey.publicKey,
+    parsed.data.signedPreKey.signature
+  );
+  uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
+  res.json({ ok: true, remaining: getRemainingPreKeyCount(jwtUser.userId) });
+});
+
 const server = createServer(app);
 const wss = new WebSocketServer({
   server,
@@ -339,19 +397,54 @@ function createBucket() {
 
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url ?? "", "http://localhost");
-  const token = url.searchParams.get("token");
-  const jwtUser = token ? verifyToken(token) : null;
-  if (!jwtUser) {
-    ws.close(4401, "unauthorized");
-    return;
+  const urlToken = url.searchParams.get("token");
+  const verifiedFromUrl = urlToken ? verifyToken(urlToken) : null;
+  let jwtUser: { userId: string; username: string } | null = verifiedFromUrl;
+  let authTimer: ReturnType<typeof setTimeout> | null = null;
+
+  if (urlToken) {
+    if (!jwtUser) {
+      ws.close(4401, "unauthorized");
+      return;
+    }
+    registerClient(jwtUser.userId, ws);
+  } else {
+    authTimer = setTimeout(() => {
+      if (!jwtUser) ws.close(4401, "auth_timeout");
+    }, 5000);
   }
-  registerClient(jwtUser.userId, ws);
 
   const allow = createBucket();
 
   ws.on("message", (data) => {
-    if (!allow()) return;
     if ((data as Buffer).length > 8 * 1024 * 1024) return;
+    if (!jwtUser) {
+      let first: { type?: string; token?: string };
+      try {
+        first = JSON.parse(data.toString()) as { type?: string; token?: string };
+      } catch {
+        return;
+      }
+      if (first.type !== "auth" || typeof first.token !== "string") {
+        ws.close(4401, "auth_required");
+        return;
+      }
+      const u = verifyToken(first.token);
+      if (!u) {
+        ws.close(4401, "unauthorized");
+        return;
+      }
+      jwtUser = u;
+      if (authTimer) {
+        clearTimeout(authTimer);
+        authTimer = null;
+      }
+      registerClient(u.userId, ws);
+      ws.send(JSON.stringify({ type: "auth_ok" }));
+      return;
+    }
+
+    if (!allow()) return;
     let msg: unknown;
     try {
       msg = JSON.parse(data.toString());
@@ -401,7 +494,7 @@ wss.on("connection", (ws, req) => {
     if (parsed.data.type === "typing") {
       sendToUser(parsed.data.toUserId, {
         type: "typing",
-        fromUserId: jwtUser.userId,
+        fromUserId: jwtUser!.userId,
         state: parsed.data.state,
       });
       return;
@@ -412,7 +505,7 @@ wss.on("connection", (ws, req) => {
       if (!peer) return;
       sendToUser(parsed.data.toUserId, {
         type: "rtc",
-        fromUserId: jwtUser.userId,
+        fromUserId: jwtUser!.userId,
         payload: parsed.data.payload,
       });
       return;
@@ -420,7 +513,7 @@ wss.on("connection", (ws, req) => {
 
     if (parsed.data.type === "group") {
       const g = getGroup(parsed.data.groupId);
-      if (!g || !g.memberIds.includes(jwtUser.userId)) return;
+      if (!g || !g.memberIds.includes(jwtUser!.userId)) return;
       const id = randomUUID();
       const createdAt = Date.now();
       /**
@@ -431,7 +524,7 @@ wss.on("connection", (ws, req) => {
        */
       let delivered = 0;
       for (const mid of g.memberIds) {
-        if (mid === jwtUser.userId) continue;
+        if (mid === jwtUser!.userId) continue;
         const n = sendToUser(mid, {
           type: "group",
           id,
@@ -486,6 +579,10 @@ wss.on("connection", (ws, req) => {
         createdAt,
       })
     );
+  });
+
+  ws.on("close", () => {
+    if (authTimer) clearTimeout(authTimer);
   });
 });
 

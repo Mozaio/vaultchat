@@ -5,6 +5,10 @@
  * (über metaGet/metaSet) und bietet encrypt/decrypt für DM-Payloads.
  * Verwendet Längen-Padding, damit Ciphertext-Größen nichts über die echte
  * Nachrichtenlänge verraten.
+ *
+ * Hintergrund: `x3dh.ts` + `POST /api/keys` (keyStore) bereiten vollwertigen
+ * X3DH vor; Sitzungsstart in Produktion nutzt derzeit `drInit`/`ensureDrSession`
+ * (kompatibel mit Empfängern, bis X3DH Ende-zu-Ende ausgerollt ist).
  */
 import { base64FromUint8, uint8FromBase64 } from "./b64";
 import {
