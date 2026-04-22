@@ -1,0 +1,90 @@
+# Render Blueprint fuer VaultChat — Server + Client in einem Rutsch.
+# Nutzung:  Render Dashboard -> "New +" -> "Blueprint" -> Repo waehlen.
+#
+# Kostenlos:
+#   - Web Service  "vaultchat-server"   : Free Plan (schlaeft nach 15 min Inaktivitaet)
+#   - Static Site  "vaultchat-client"   : Free Plan (schlaeft NIE, global per CDN)
+#
+# Die Cross-URLs sind **fest verdrahtet** auf die Render-Default-Hostnamen
+# (<service-name>.onrender.com). Wenn du die Services umbenennst oder eine
+# Custom Domain nutzt, musst du VITE_API_BASE, VITE_WS_URL und
+# VAULTCHAT_CORS_ORIGIN entsprechend anpassen.
+
+services:
+  # --- BACKEND: Node + WebSocket ---
+  - type: web
+    name: vaultchat-server
+    env: node
+    plan: free
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/index.js
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: JWT_SECRET
+        generateValue: true
+      # Nur Anfragen vom eigenen Client zulassen.
+      # Feste URL, weil Render bei "fromService" nur "host"/"port" liefert,
+      # CORS aber das vollstaendige "https://..."-Origin erwartet.
+      - key: VAULTCHAT_CORS_ORIGIN
+        value: https://vaultchat-client.onrender.com
+      # ALLE folgenden Variablen sind OPTIONAL.
+      # Leer lassen -> STUN-Fallback (Google) wird verwendet.
+      # Nur setzen, wenn du Calls hinter strikten Firewalls / symmetric NAT
+      # erzwingen willst und einen eigenen/gemieteten TURN-Server hast.
+      - key: VAULTCHAT_TURN_URL
+        sync: false
+      - key: VAULTCHAT_TURN_USER
+        sync: false
+      - key: VAULTCHAT_TURN_PASS
+        sync: false
+      # "1" -> zwingt Client in iceTransportPolicy:"relay" (keine IP-Leaks,
+      # aber Calls funktionieren dann nur mit gesetztem TURN-Server).
+      - key: VAULTCHAT_FORCE_RELAY
+        sync: false
+
+  # --- FRONTEND: Vite-SPA statisch ---
+  # Static Sites werden global ueber Renders CDN ausgeliefert und akzeptieren
+  # daher KEIN `region`- und KEIN `plan`-Feld.
+  - type: web
+    name: vaultchat-client
+    env: static
+    rootDir: client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Feste URLs, weil Renders "fromService.property" fuer Web-Services
+      # nur "host"/"port" liefert, nicht den vollen "https://..."-String.
+      # Falls du andere Servicenamen oder eine Custom Domain nutzt, hier anpassen.
+      - key: VITE_API_BASE
+        value: https://vaultchat-server.onrender.com
+      - key: VITE_WS_URL
+        value: https://vaultchat-server.onrender.com
+    routes:
+      # SPA-Fallback: alle unbekannten Pfade -> index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=63072000; includeSubDomains; preload
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(self), microphone=(self), geolocation=()

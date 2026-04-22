@@ -1,0 +1,109 @@
+import { randomUUID } from "node:crypto";
+
+/** Volatile in-memory directory. Keine Persistenz — Neustart = leer. */
+
+export type StoredUser = {
+  id: string;
+  username: string;
+  passwordHash: string;
+  publicKey: string;
+  createdAt: number;
+};
+
+export type StoredGroup = {
+  id: string;
+  name: string;
+  memberIds: string[];
+  createdAt: number;
+};
+
+const users = new Map<string, StoredUser>();
+const usersByName = new Map<string, string>();
+const groups = new Map<string, StoredGroup>();
+
+export function findUserByUsername(username: string) {
+  const id = usersByName.get(username.toLowerCase());
+  return id ? users.get(id) : undefined;
+}
+
+export function findUserById(id: string) {
+  return users.get(id);
+}
+
+export function createUser(input: {
+  username: string;
+  passwordHash: string;
+  publicKey: string;
+}): StoredUser | null {
+  if (usersByName.has(input.username.toLowerCase())) return null;
+  const user: StoredUser = {
+    id: randomUUID(),
+    username: input.username,
+    passwordHash: input.passwordHash,
+    publicKey: input.publicKey,
+    createdAt: Date.now(),
+  };
+  users.set(user.id, user);
+  usersByName.set(user.username.toLowerCase(), user.id);
+  return user;
+}
+
+export function listUsersSafe() {
+  return [...users.values()].map((u) => ({
+    id: u.id,
+    username: u.username,
+    publicKey: u.publicKey,
+    createdAt: u.createdAt,
+  }));
+}
+
+export function createGroup(input: {
+  name: string;
+  memberIds: string[];
+}): StoredGroup {
+  const g: StoredGroup = {
+    id: randomUUID(),
+    name: input.name,
+    memberIds: [...new Set(input.memberIds)],
+    createdAt: Date.now(),
+  };
+  groups.set(g.id, g);
+  return g;
+}
+
+export function getGroup(id: string) {
+  return groups.get(id);
+}
+
+export function listGroupsForUser(userId: string) {
+  return [...groups.values()].filter((g) => g.memberIds.includes(userId));
+}
+
+export function addGroupMember(groupId: string, actorId: string, memberId: string) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (!g.memberIds.includes(actorId)) return null;
+  if (!users.get(memberId)) return null;
+  if (!g.memberIds.includes(memberId)) g.memberIds.push(memberId);
+  return g;
+}
+
+export function removeGroupMember(
+  groupId: string,
+  actorId: string,
+  memberId: string
+) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (!g.memberIds.includes(actorId)) return null;
+  g.memberIds = g.memberIds.filter((id) => id !== memberId);
+  if (g.memberIds.length === 0) {
+    groups.delete(groupId);
+    return { id: groupId, name: g.name, memberIds: [], createdAt: g.createdAt };
+  }
+  return g;
+}
+
+export function leaveGroup(groupId: string, userId: string) {
+  return removeGroupMember(groupId, userId, userId);
+}

@@ -1,0 +1,9 @@
+services:
+  vaultchat:
+    build: .
+    ports:
+      - "8787:8787"
+    environment:
+      VAULTCHAT_JWT_SECRET: ${VAULTCHAT_JWT_SECRET:-change-me-use-openssl-rand-base64-48-min-32-chars}
+      VAULTCHAT_SERVE_SPA: "1"
+      PORT: "8787"

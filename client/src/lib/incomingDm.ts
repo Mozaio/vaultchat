@@ -1,0 +1,65 @@
+import type { ApiUser } from "./api";
+import { openPayload, type PlainPayload } from "./crypto";
+import { drDecryptJson, isDrCiphertext } from "./drSession";
+import { openSealedEnvelope } from "./sealedSender";
+import type { Session } from "./sessionHelpers";
+
+export type DecryptedDm = {
+  senderUserId: string;
+  plain: PlainPayload;
+};
+
+/**
+ * Entschlüsselt eine eingehende Sealed-Sender-DM.
+ *
+ * 1. Öffnet den Sealed-Envelope → extrahiert senderUserId und inneren Ciphertext
+ * 2. Sucht den Peer-Record (für dessen Identity-Public-Key) in der aktuellen Liste
+ * 3. Entschlüsselt den inneren Ciphertext via Double Ratchet (oder sealed-box
+ *    bei Group-Key-Distribution, wenn der innere Frame kein DR-Wire ist)
+ *
+ * Wenn der Sender unbekannt ist (noch nicht in `knownUsers`), wird eine
+ * Peer-Lookup-Routine vom Aufrufer bereitgestellt.
+ */
+export async function decryptIncomingSealedDm(
+  envelopeB64: string,
+  session: Session,
+  resolvePeer: (userId: string) => Promise<ApiUser | null>
+): Promise<DecryptedDm | null> {
+  let senderUserId: string;
+  let innerB64: string;
+  try {
+    const opened = await openSealedEnvelope(
+      envelopeB64,
+      session.user.publicKey,
+      session.secretKey
+    );
+    senderUserId = opened.senderUserId;
+    innerB64 = opened.innerB64;
+  } catch {
+    return null;
+  }
+  const peer = await resolvePeer(senderUserId);
+  if (!peer) return null;
+
+  let plain: PlainPayload;
+  try {
+    if (isDrCiphertext(innerB64)) {
+      const json = await drDecryptJson(
+        session.secretKey,
+        peer.id,
+        peer.publicKey,
+        innerB64
+      );
+      plain = JSON.parse(json) as PlainPayload;
+    } else {
+      plain = await openPayload(
+        innerB64,
+        session.user.publicKey,
+        session.secretKey
+      );
+    }
+  } catch {
+    return null;
+  }
+  return { senderUserId: peer.id, plain };
+}
