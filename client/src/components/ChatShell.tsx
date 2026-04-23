@@ -127,6 +127,8 @@ export function ChatShell({
   // Notification settings per chat
   const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
   const [mutedGroups, setMutedGroups] = useState<Set<string>>(new Set());
+  // Online status tracking
+  const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
   const [ttlGroup, setTtlGroup] = useState<number>(0);
@@ -1363,7 +1365,7 @@ export function ChatShell({
             className="text-left font-medium hover:underline"
             style={{ color: "var(--accent)" }}
             onClick={() => {
-              void loadUsers();
+              void loadContacts();
               void loadGroups();
             }}
           >
