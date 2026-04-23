@@ -44,8 +44,9 @@ export async function generateKeyMaterial(
   await sodiumReady();
   const sodium = getSodium();
   const signedPreKeyKp = sodium.crypto_box_keypair();
+  /** Ed25519-Seed muss exakt 32 Byte sein (nicht 64 — sonst invalid seed length). */
   const signSeed = sodium.crypto_generichash(
-    64,
+    32,
     identitySk,
     enc.encode("vaultchat-sign-seed")
   );
