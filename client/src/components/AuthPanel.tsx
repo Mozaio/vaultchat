@@ -16,6 +16,41 @@ import { ThemeToggle } from "./ThemeToggle";
 
 type Mode = "unlock" | "login" | "register" | "import";
 
+// Discord-like username validation
+function validateUsername(username: string): { valid: boolean; error?: string } {
+  if (!username) {
+    return { valid: false, error: "Benutzername erforderlich" };
+  }
+  if (username.length < 2) {
+    return { valid: false, error: "Mindestens 2 Zeichen" };
+  }
+  if (username.length > 32) {
+    return { valid: false, error: "Maximal 32 Zeichen" };
+  }
+  // Alphanumeric, underscore, hyphen
+  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+    return { valid: false, error: "Nur Buchstaben, Zahlen, _ und - erlaubt" };
+  }
+  // Can't start or end with underscore/hyphen
+  if (/^[_-]|[_-]$/.test(username)) {
+    return { valid: false, error: "Darf nicht mit _ oder - beginnen/enden" };
+  }
+  // No double underscore/hyphen
+  if (/__|--|-_|_-|__/.test(username)) {
+    return { valid: false, error: "Keine doppelte Zeichen wie __ oder -- erlaubt" };
+  }
+  return { valid: true };
+}
+
+// Check icon component
+function CheckIcon({ valid }: { valid: boolean }) {
+  return valid ? (
+    <span className="text-emerald-400">✓</span>
+  ) : (
+    <span className="text-zinc-500">○</span>
+  );
+}
+
 function humanError(err: unknown): string {
   const msg = err instanceof Error ? err.message : "unknown_error";
   if (msg.startsWith("api_base_misconfigured:")) {
@@ -354,14 +389,41 @@ export function AuthPanel({
         {mode === "register" && !hasLocal && (
           <form onSubmit={handleRegister} className="space-y-4">
             <div className="auth-input-group">
-              <label>Benutzername</label>
+              <label className="flex items-center justify-between">
+                <span>Benutzername</span>
+                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  Discord-like Format
+                </span>
+              </label>
               <input
                 className="auth-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
+                placeholder="z.B. cool_user123"
                 required
               />
+              {/* Username validation checklist */}
+              {username.length > 0 && (
+                <div className="mt-2 space-y-1 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-sidebar)" }}>
+                  <div className={`flex items-center gap-2 text-xs ${username.length >= 2 && username.length <= 32 ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={username.length >= 2 && username.length <= 32} />
+                    <span>2-32 Zeichen</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z0-9_-]+$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={/^[a-zA-Z0-9_-]+$/.test(username)} />
+                    <span>Nur a-z, A-Z, 0-9, _, -</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z]/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={/^[a-zA-Z]/.test(username)} />
+                    <span>Beginnt mit Buchstabe</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${!/[_-]$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={!/[_-]$/.test(username)} />
+                    <span>Endet nicht mit _ oder -</span>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="auth-input-group">
               <label>Passwort (min. 10 Zeichen)</label>
@@ -374,10 +436,15 @@ export function AuthPanel({
                 minLength={10}
                 required
               />
+              {password.length > 0 && password.length < 10 && (
+                <p className="mt-1 text-xs text-amber-500">
+                  Noch {10 - password.length} Zeichen erforderlich
+                </p>
+              )}
             </div>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !validateUsername(username).valid || password.length < 10}
               className="auth-button"
             >
               {busy ? "…" : "Konto erstellen"}

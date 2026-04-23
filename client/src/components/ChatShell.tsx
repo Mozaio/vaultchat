@@ -2111,25 +2111,42 @@ export function ChatShell({
                     setAddContactError("Bitte Username eingeben");
                     return;
                   }
-                  // Find user by username
-                  const foundUser = users.find(
-                    (u) => u.username.toLowerCase() === addContactUsername.trim().toLowerCase()
-                  );
-                  if (!foundUser) {
-                    setAddContactError("Benutzer nicht gefunden");
-                    return;
-                  }
-                  // Add to contacts and open chat
-                  setTab("dm");
-                  setPeer(foundUser);
-                  setShowAddContact(false);
-                  setAddContactUsername("");
-                  setAddContactError(null);
+                  // Search for user by username on server
+                  void (async () => {
+                    setAddContactLoading(true);
+                    setAddContactError(null);
+                    try {
+                      // First refresh all users from server
+                      const { users: allUsers } = await api.listUsers(session.token);
+                      const foundUser = allUsers.find(
+                        (u) => u.username.toLowerCase() === addContactUsername.trim().toLowerCase() && u.id !== session.user.id
+                      );
+                      if (!foundUser) {
+                        setAddContactError("Benutzer nicht gefunden. Bitte Username prüfen.");
+                        setAddContactLoading(false);
+                        return;
+                      }
+                      // Add to users list and open chat
+                      setUsers((prev) => {
+                        if (prev.find((u) => u.id === foundUser.id)) return prev;
+                        return [...prev, foundUser];
+                      });
+                      await observePeerKey(foundUser.id, foundUser.publicKey);
+                      setTab("dm");
+                      setPeer(foundUser);
+                      setShowAddContact(false);
+                      setAddContactUsername("");
+                      setAddContactError(null);
+                    } catch (err) {
+                      setAddContactError("Fehler bei der Suche. Bitte erneut versuchen.");
+                    }
+                    setAddContactLoading(false);
+                  })();
                 }}
                 className="btn btn-primary w-full"
                 disabled={addContactLoading}
               >
-                {addContactLoading ? "Suche..." : "Kontakt suchen"}
+                {addContactLoading ? "Suche..." : "🔍 Kontakt suchen"}
               </button>
 
               <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
