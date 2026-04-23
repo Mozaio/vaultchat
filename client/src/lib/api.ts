@@ -105,6 +105,19 @@ export async function listUsers(token: string) {
   return req<{ users: ApiUser[] }>("/api/users", { token });
 }
 
+/**
+ * Telegram-Style Username-Suche.
+ * Gibt nur Ergebnisse zurück wenn Query mindestens 2 Zeichen hat.
+ * Limit: 10 Ergebnisse.
+ */
+export async function searchUsers(token: string, query: string) {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) {
+    return { users: [] as ApiUser[] };
+  }
+  return req<{ users: ApiUser[] }>(`/api/users/search?q=${encodeURIComponent(q)}`, { token });
+}
+
 export async function createGroup(token: string, body: { name: string; memberIds: string[] }) {
   return req<{ group: ApiGroup }>("/api/groups", {
     method: "POST",

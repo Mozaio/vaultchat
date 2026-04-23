@@ -57,6 +57,7 @@ import { useVoiceRecorder } from "../lib/useVoiceRecorder";
 import { ThemeToggle } from "./ThemeToggle";
 import { useShortcuts } from "../lib/shortcuts";
 import { SearchPanel } from "./SearchPanel";
+import { AddContactModal } from "./AddContactModal";
 import {
   IconInfo,
   IconMic,

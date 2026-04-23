@@ -67,13 +67,36 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 ## Bedrohungen und Grenzen (Stand jetzt)
 
 1. **Kompromittierter Web-Host** *(residual)*: Der Host kann pro Aufruf neuen JS-Code liefern. SRI schützt nur vor Tampering zwischen Build und Auslieferung. Unser **Code-Hash-Pinning** mindert den Angriff (TOFU-Policy auf Bundle-Ebene), schützt aber nicht vor gezieltem Angriff auf den ersten Aufruf. Vollständige Minderung braucht reproducible builds + unabhängig veröffentlichte Hashes + idealerweise native Clients oder signierte Web Bundles.
+
+   **Verbesserung (v2)**: Code-Integrity-Pinning mit **passwortgeschütztem Hash** (`codeIntegrityEnhanced.ts`). Der Hash wird mit einem aus dem `secretKey` abgeleiteten Schlüssel verschlüsselt gespeichert. Einfaches Auslesen von localStorage reicht nicht aus — der Angreifer müsste den Browser-Prozess kontrollieren.
+
 2. **Kein auditiertes libsignal** *(residual)*: Unser Double Ratchet v4 ist konzeptionell korrekt, nutzt libsodium-Primitive (XChaCha20-Poly1305, X25519, BLAKE2b) und bindet Header per AAD. Er ist dennoch **kein** Drop-in-Ersatz für `libsignal-protocol`. Es gibt kein X3DH mit One-Time-Prekeys, keine Deniable Signatures, kein formales Audit.
+
 3. **Metadaten-Leak am Relay** *(stark reduziert)*: Der Server kennt für DMs nur `toUserId`, nicht den Absender. Dadurch kann er nicht mehr trivial die Kommunikationsgraphen rekonstruieren. Residuell bleiben: Zeitkorrelation (Sende-/Empfangszeitpunkte) sowie Gruppenmitgliedschaften (weil der Server Mitglieder routen muss).
+
 4. **MITM bei Erstkontakt** *(stark reduziert)*: TOFU-Pinning detektiert Key-Wechsel automatisch und blockiert weitere DMs, bis der Nutzer verifiziert. Safety-Number-Vergleich bleibt der Goldstandard.
+
 5. **Offline/Neues Gerät** *(teilweise gelöst)*: Sender-Outbox übernimmt Store-and-Forward-Funktion, ohne dass der Server speichert. Ein neues Gerät benötigt weiterhin den JSON-Backup-Import für die Identität.
+
 6. **Browser-Forensik** *(reduziert)*: Auto-Lock + `memzero` entfernen LDK und SK nach 10 min Inaktivität bzw. manuellem Lock. Root-Zugriff auf ein laufendes, aktives Gerät bleibt außerhalb des Modells.
-7. **Gruppenschlüssel-Rotation** *(gelöst)*: Beim Hinzufügen/Entfernen/Verlassen rotiert der aktor-Client automatisch den Gruppenschlüssel und verteilt ihn sealed-sender-DM-basiert.
-8. **WebRTC ohne TURN** *(optional lösbar)*: TURN wird über ENV konfiguriert. Relay-Only-Modus verhindert IP-Leak an den Peer.
+
+   **Verbesserung (v2)**: **Anti-Exfiltration Protection** (`exfilProtection.ts`):
+   - Periodisches Memory-Wiping mit randomisierten Intervallen (30-120s)
+   - Sofortiges Wiping bei Tab-Wechsel (visibilitychange)
+   - Zusätzlicher Schutz mit Zufallsdaten-Ersetzung
+   - Registrierung des LDK für automatisiertes Wiping
+
+7. **Nachrichten-Replay-Angriffe** *(neu, adressiert)*: Angreifer könnte gültige, bereits zugestellte Nachrichten erneut senden.
+
+   **Lösung (v2)**: **Client-seitiger Replay-Schutz** (`replayProtection.ts`):
+   - Message-ID basierte Duplicate-Detection
+   - 5-Minuten-Zeitfenster mit automatischem Cleanup
+   - Gruppenspezifische Sets für isolierte Prüfung
+   - Automatisches Reset bei Lock
+
+8. **Gruppenschlüssel-Rotation** *(gelöst)*: Beim Hinzufügen/Entfernen/Verlassen rotiert der aktor-Client automatisch den Gruppenschlüssel und verteilt ihn sealed-sender-DM-basiert.
+
+9. **WebRTC ohne TURN** *(optional lösbar)*: TURN wird über ENV konfiguriert. Relay-Only-Modus verhindert IP-Leak an den Peer.
 
 ## Reproduzierbare Builds (Empfehlung)
 

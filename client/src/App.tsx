@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { sodiumReady } from "./lib/sodium";
+import { sodiumReady, getSodium } from "./lib/sodium";
 import {
   clearLocalIdentity,
   clearToken,
@@ -17,7 +17,20 @@ import {
   pinCodeHash,
   type CodeCheck,
 } from "./lib/codeIntegrity";
-import { getSodium } from "./lib/sodium";
+// Neue Sicherheitsmodule
+import {
+  startPeriodicWipe,
+  stopPeriodicWipe,
+  registerKeyForProtection,
+  unregisterKeyForProtection,
+} from "./lib/exfilProtection";
+import {
+  checkCodeIntegrityEnhanced,
+  setVerificationKey,
+  securePinCodeHash,
+  clearVerificationKey,
+} from "./lib/codeIntegrityEnhanced";
+import { resetAllReplayProtection } from "./lib/replayProtection";
 
 export type { Session };
 
@@ -40,9 +53,27 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void checkCodeIntegrity()
-      .then(setCodeCheck)
-      .catch(() => setCodeCheck(null));
+    // Verwende enhanced Code-Integrity-Check wenn möglich
+    void checkCodeIntegrityEnhanced()
+      .then((enhancedCheck) => {
+        // Konvertiere zu altem Format für UI-Kompatibilität
+        const legacyCheck: CodeCheck = (() => {
+          switch (enhancedCheck.state) {
+            case "pinned_ok":
+              return { state: "pinned_ok", hash: enhancedCheck.hash };
+            case "pinned_mismatch":
+              return { state: "pinned_mismatch", hash: enhancedCheck.hash, pinned: enhancedCheck.pinned };
+            case "verification_key_missing":
+            case "unknown":
+              return { state: "unknown", hash: enhancedCheck.hash };
+          }
+        })();
+        setCodeCheck(legacyCheck);
+      })
+      .catch(() => {
+        // Fallback auf alten Check
+        return checkCodeIntegrity().then(setCodeCheck);
+      });
   }, []);
 
   const unlocked = useMemo(() => session !== null, [session]);
@@ -56,6 +87,10 @@ export function App() {
       }
     }
     clearLocalKey();
+    unregisterKeyForProtection();
+    stopPeriodicWipe();
+    resetAllReplayProtection();
+    clearVerificationKey();
     setSession(null);
   }, [session]);
 
@@ -123,6 +158,12 @@ export function App() {
                 saveToken(s.token);
                 saveLocalIdentity(local);
                 await setLocalKeyFromSecret(s.secretKey);
+                
+                // Neue Sicherheits-Features initialisieren
+                await setVerificationKey(s.secretKey);
+                registerKeyForProtection(s.secretKey);
+                startPeriodicWipe();
+                
                 await idbPurgeExpired().catch(() => {});
                 setSession(s);
               }}
@@ -252,8 +293,12 @@ function CodeIntegrityBanner({ check }: { check: CodeCheck }) {
         </span>
         <button
           type="button"
-          onClick={() => {
-            pinCodeHash(check.hash);
+          onClick={async () => {
+            try {
+              await securePinCodeHash(check.hash);
+            } catch {
+              pinCodeHash(check.hash);
+            }
             setDismissed(true);
           }}
           className="ml-3 rounded border border-emerald-600 px-2 py-0.5 text-emerald-300 hover:bg-emerald-900/30"
@@ -274,13 +319,17 @@ function CodeIntegrityBanner({ check }: { check: CodeCheck }) {
       <div className="mt-1 flex gap-2">
         <button
           type="button"
-          onClick={() => {
-            pinCodeHash(check.hash);
+          onClick={async () => {
+            try {
+              await securePinCodeHash(check.hash);
+            } catch {
+              pinCodeHash(check.hash);
+            }
             setDismissed(true);
           }}
           className="rounded border border-amber-600 px-2 py-0.5 text-amber-200 hover:bg-amber-900/30"
         >
-          Akzeptieren &amp; neu pinnen
+          Akzeptieren & neu pinnen
         </button>
       </div>
     </div>

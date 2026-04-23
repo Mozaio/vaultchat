@@ -2,6 +2,7 @@ import type { ApiUser } from "./api";
 import { openPayload, type PlainPayload } from "./crypto";
 import { drDecryptJson, isDrCiphertext } from "./drSession";
 import { openSealedEnvelope } from "./sealedSender";
+import { isMessageDuplicate } from "./replayProtection";
 import type { Session } from "./sessionHelpers";
 
 export type DecryptedDm = {
@@ -62,4 +63,26 @@ export async function decryptIncomingSealedDm(
     return null;
   }
   return { senderUserId: peer.id, plain };
+}
+
+/**
+ * Wrapper mit integriertem Replay-Schutz.
+ * Prüft ob die Message-ID bereits verarbeitet wurde, bevor sie akzeptiert wird.
+ */
+export async function decryptIncomingSealedDmWithReplayCheck(
+  envelopeB64: string,
+  session: Session,
+  resolvePeer: (userId: string) => Promise<ApiUser | null>
+): Promise<DecryptedDm | null> {
+  // Erst entschlüsseln
+  const result = await decryptIncomingSealedDm(envelopeB64, session, resolvePeer);
+  if (!result) return null;
+  
+  // Replay-Schutz: Prüfe Message-ID
+  if (isMessageDuplicate(result.plain.cid)) {
+    // Duplikat - verwerfen
+    return null;
+  }
+  
+  return result;
 }

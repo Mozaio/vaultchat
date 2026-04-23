@@ -184,6 +184,32 @@ app.get("/api/users", async (req, res) => {
   res.json({ users: listUsersSafe() });
 });
 
+// Username-Suche (Telegram-Style): Nur Ergebnisse bei Mindestlänge 2
+app.get("/api/users/search", async (req, res) => {
+  const t = bearer(req);
+  if (!t || !verifyToken(t)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const query = (req.query.q as string | undefined)?.trim().toLowerCase() ?? "";
+  const currentUser = verifyToken(t);
+  
+  if (!query || query.length < 2) {
+    res.json({ users: [] });
+    return;
+  }
+  
+  // Suche nach Prefix-Match, max 10 Ergebnisse
+  const results = listUsersSafe()
+    .filter((u) => 
+      u.username.toLowerCase().includes(query) && 
+      u.id !== currentUser?.userId
+    )
+    .slice(0, 10);
+  
+  res.json({ users: results });
+});
+
 app.post("/api/groups", async (req, res) => {
   const t = bearer(req);
   const jwtUser = t ? verifyToken(t) : null;
