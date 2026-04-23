@@ -44,13 +44,14 @@ export function unregisterKeyForProtection(): void {
 
 /**
  * Führt sofortiges Wiping aller sensitiven Daten durch.
- * Kann manuell oder bei Tab-Wechsel aufgerufen werden.
+ * WICHTIG: Der secretKey (_keyRef) wird NICHT gewiped, da er für die
+ * gesamte Session benötigt wird. Nur temporäre/pufferspeicher-Daten werden gewiped.
  */
 export async function immediateWipe(): Promise<void> {
   await sodiumReady();
   const sodium = getSodium();
   
-  // Wipe aller registrierten Referenzen
+  // Wipe aller registrierten Referenzen (temporäre Daten/Puffer)
   for (const { ref, name } of _sensitiveRefs) {
     if (ref && ref.length > 0) {
       sodium.memzero(ref);
@@ -61,10 +62,9 @@ export async function immediateWipe(): Promise<void> {
     }
   }
   
-  // Primären LDK wipen
-  if (_keyRef) {
-    sodium.memzero(_keyRef);
-  }
+  // HINWEIS: _keyRef (secretKey) wird NICHT gewiped!
+  // Dieser Schlüssel muss für die gesamte Session verfügbar bleiben.
+  // Bei Lock wird er separat durch clearLocalKey() in App.tsx behandelt.
 }
 
 /**
