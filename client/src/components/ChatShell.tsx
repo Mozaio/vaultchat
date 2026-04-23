@@ -97,6 +97,7 @@ export function ChatShell({
   onLock: () => void;
 }) {
   const [users, setUsers] = useState<api.ApiUser[]>([]);
+  const [searchedUsers, setSearchedUsers] = useState<api.ApiUser[]>([]);
   const [groups, setGroups] = useState<api.ApiGroup[]>([]);
   const [tab, setTab] = useState<Tab>("dm");
   const [peer, setPeer] = useState<api.ApiUser | null>(null);
@@ -213,31 +214,40 @@ export function ChatShell({
     [session.token, session.user.id]
   );
 
-  const loadUsers = useCallback(async () => {
+  // Don't load all users on start - only search on demand
+  const searchUserByUsername = useCallback(async (username: string): Promise<api.ApiUser | null> => {
+    try {
+      const { users: list } = await api.listUsers(session.token);
+      const found = list.find(
+        (u) => u.username.toLowerCase() === username.toLowerCase() && u.id !== session.user.id
+      );
+      if (found) {
+        await observePeerKey(found.id, found.publicKey);
+        return found;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [session.token, session.user.id]);
+
+  // Load only contacts from local messages (not from server)
+  const loadContacts = useCallback(async () => {
+    // Only show contacts we've exchanged messages with (from local storage)
+    const contactIds = Array.from(rawDmRef.current.keys());
     const { users: list } = await api.listUsers(session.token);
-    const others = list.filter((u) => u.id !== session.user.id);
-    setUsers(others);
-    for (const u of others) {
+    const contacts = list.filter((u) => contactIds.includes(u.id));
+    setUsers(contacts);
+    
+    // Also observe peer keys for contacts
+    for (const u of contacts) {
       try {
         await observePeerKey(u.id, u.publicKey);
       } catch {
         /* ignore */
       }
     }
-    // Refresh unread counters (best-effort).
-    try {
-      const next: Record<string, number> = {};
-      for (const u of others) {
-        const seenRaw = await metaGet(`seen:dm:${u.id}`);
-        const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
-        const rows = rawDmRef.current.get(u.id) ?? [];
-        next[u.id] = rows.filter((r) => !r.fromMe && r.at > seenAt).length;
-      }
-      setUnreadByPeer(next);
-    } catch {
-      /* ignore */
-    }
-  }, [session.token, session.user.id]);
+  }, [session.token]);
 
   const loadGroups = useCallback(async () => {
     const { groups: g } = await api.listGroups(session.token);
@@ -254,11 +264,11 @@ export function ChatShell({
   }, []);
 
   useEffect(() => {
-    void loadUsers();
+    void loadContacts();
     void loadGroups();
     void idbPurgeExpired().catch(() => {});
     void refreshPendingCount();
-  }, [loadUsers, loadGroups, refreshPendingCount]);
+  }, [loadContacts, loadGroups, refreshPendingCount]);
 
   /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
   useEffect(() => {
