@@ -118,6 +118,14 @@ export function ChatShell({
   } | null>(null);
   const [callRemote, setCallRemote] = useState<MediaStream | null>(null);
   const [replyDm, setReplyDm] = useState<ReplyTarget>(null);
+  // Contact add modal
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [addContactUsername, setAddContactUsername] = useState("");
+  const [addContactError, setAddContactError] = useState<string | null>(null);
+  const [addContactLoading, setAddContactLoading] = useState(false);
+  // Notification settings per chat
+  const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
+  const [mutedGroups, setMutedGroups] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
   const [ttlGroup, setTtlGroup] = useState<number>(0);
@@ -1264,13 +1272,21 @@ export function ChatShell({
 
         {tab === "dm" && (
           <>
-            <div className="border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+            <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
               <p
                 className="text-[10px] font-semibold uppercase tracking-wider"
                 style={{ color: "var(--text-muted)" }}
               >
                 Kontakte
               </p>
+              <button
+                type="button"
+                onClick={() => setShowAddContact(true)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition"
+                title="Kontakt hinzufügen"
+              >
+                +
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2">{peerList}</div>
           </>
@@ -1981,6 +1997,111 @@ export function ChatShell({
         </div>
       )}
       </div>
+
+      {/* Add Contact Modal */}
+      {showAddContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="app-surface w-full max-w-md rounded-2xl p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+                Kontakt hinzufügen
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddContact(false);
+                  setAddContactUsername("");
+                  setAddContactError(null);
+                }}
+                className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Tabs for different methods */}
+            <div className="mb-4 flex gap-2">
+              <button
+                type="button"
+                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-[var(--bg-hover)]"
+                style={{ borderColor: "var(--border)", color: "var(--text)" }}
+              >
+                🔤 Username
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium opacity-50"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                title="Coming soon"
+              >
+                📱 QR-Code
+              </button>
+              <button
+                type="button"
+                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium opacity-50"
+                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+                title="Coming soon"
+              >
+                🔗 Link
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+                  Username eingeben
+                </label>
+                <input
+                  type="text"
+                  value={addContactUsername}
+                  onChange={(e) => {
+                    setAddContactUsername(e.target.value);
+                    setAddContactError(null);
+                  }}
+                  placeholder="z.B. max_muster"
+                  className="app-input"
+                  autoFocus
+                />
+                {addContactError && (
+                  <p className="mt-1 text-xs text-red-500">{addContactError}</p>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!addContactUsername.trim()) {
+                    setAddContactError("Bitte Username eingeben");
+                    return;
+                  }
+                  // Find user by username
+                  const foundUser = users.find(
+                    (u) => u.username.toLowerCase() === addContactUsername.trim().toLowerCase()
+                  );
+                  if (!foundUser) {
+                    setAddContactError("Benutzer nicht gefunden");
+                    return;
+                  }
+                  // Add to contacts and open chat
+                  setTab("dm");
+                  setPeer(foundUser);
+                  setShowAddContact(false);
+                  setAddContactUsername("");
+                  setAddContactError(null);
+                }}
+                className="btn btn-primary w-full"
+                disabled={addContactLoading}
+              >
+                {addContactLoading ? "Suche..." : "Kontakt suchen"}
+              </button>
+
+              <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
+                Der Benutzer muss sich vorher registriert haben
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
