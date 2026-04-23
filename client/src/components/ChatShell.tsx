@@ -2190,6 +2190,9 @@ function InfoPanel({
   peerFp,
   onSafety,
   onClearChat,
+  mutedPeers,
+  setMutedPeers,
+  setSearchOpen,
 }: {
   mode: "dm" | "group";
   peer: api.ApiUser | null;
@@ -2197,6 +2200,9 @@ function InfoPanel({
   peerFp: string | null;
   onSafety: () => void;
   onClearChat: () => void | Promise<void>;
+  mutedPeers: Set<string>;
+  setMutedPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setSearchOpen: (open: boolean) => void;
 }) {
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
@@ -2214,11 +2220,27 @@ function InfoPanel({
         {status}
       </p>
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <QuickAction label="Profil" />
-        <QuickAction label="Suchen" />
-        <QuickAction label="Stumm" />
-        <QuickAction label="Mehr" />
+        <div className="mb-4 grid grid-cols-4 gap-2">
+        <QuickAction icon="👤" label="Profil" onClick={() => alert("Profil-Details folgen in Kürze")} />
+        <QuickAction icon="🔍" label="Suchen" onClick={() => setSearchOpen(true)} />
+        <QuickAction 
+          icon={mode === "dm" && peer && mutedPeers.has(peer.id) ? "🔔" : "🔕"} 
+          label={mode === "dm" && peer && mutedPeers.has(peer.id) ? "Stumm" : "Benachrichtigen"}
+          onClick={() => {
+            if (mode === "dm" && peer) {
+              setMutedPeers(prev => {
+                const next = new Set(prev);
+                if (next.has(peer.id)) {
+                  next.delete(peer.id);
+                } else {
+                  next.add(peer.id);
+                }
+                return next;
+              });
+            }
+          }}
+        />
+        <QuickAction icon="•••" label="Mehr" onClick={() => alert("Weitere Optionen folgen")} />
       </div>
 
       <div className="info-section !border-0 !pb-0">
@@ -2275,13 +2297,15 @@ function InfoPanel({
   );
 }
 
-function QuickAction({ label }: { label: string }) {
+function QuickAction({ icon, label, onClick }: { icon?: string; label: string; onClick?: () => void }) {
   return (
     <button
       type="button"
-      className="btn btn-secondary !py-2 !text-[11px]"
+      className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
+      onClick={onClick}
     >
-      {label}
+      <span className="text-lg">{icon}</span>
+      <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>{label}</span>
     </button>
   );
 }
