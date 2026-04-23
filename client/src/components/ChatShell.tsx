@@ -1956,6 +1956,8 @@ export function ChatShell({
                 rebuildGroup(group.id);
               }
             }}
+            mutedPeers={mutedPeers}
+            setMutedPeers={setMutedPeers}
           />
         </aside>
       )}
@@ -2001,6 +2003,8 @@ export function ChatShell({
                   rebuildGroup(group.id);
                 }
               }}
+              mutedPeers={mutedPeers}
+              setMutedPeers={setMutedPeers}
             />
           </div>
         </div>
@@ -2232,6 +2236,8 @@ function InfoPanel({
   peerFp,
   onSafety,
   onClearChat,
+  mutedPeers,
+  setMutedPeers,
 }: {
   mode: "dm" | "group";
   peer: api.ApiUser | null;
@@ -2239,28 +2245,101 @@ function InfoPanel({
   peerFp: string | null;
   onSafety: () => void;
   onClearChat: () => void | Promise<void>;
+  mutedPeers: Set<string>;
+  setMutedPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
 }) {
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
   const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
+  const isMuted = peer ? mutedPeers.has(peer.id) : false;
+
+  const toggleMute = () => {
+    if (!peer) return;
+    setMutedPeers((prev) => {
+      const next = new Set(prev);
+      if (next.has(peer.id)) {
+        next.delete(peer.id);
+      } else {
+        next.add(peer.id);
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-y-auto p-1">
-      <div className="info-avatar-large !mb-3 !mt-0 !h-20 !w-20 !text-2xl">
-        {initials}
+      {/* Profile Avatar */}
+      <div className="flex flex-col items-center">
+        <div className="info-avatar-large !mb-3 !mt-0 !h-20 !w-20 !text-2xl">
+          {initials}
+        </div>
+        <p className="text-center text-lg font-bold" style={{ color: "var(--text)" }}>
+          {title}
+        </p>
+        <p className="mb-3 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+          {status}
+        </p>
       </div>
-      <p className="text-center text-base font-semibold" style={{ color: "var(--text)" }}>
-        {title}
-      </p>
-      <p className="mb-4 text-center text-sm" style={{ color: "var(--text-muted)" }}>
-        {status}
-      </p>
+
+      {/* Quick Actions Grid */}
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
+          style={{ background: "var(--bg-elevated)" }}
+          title="Profil anzeigen"
+        >
+          <span className="text-lg">👤</span>
+          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Profil</span>
+        </button>
+        <button
+          type="button"
+          className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition ${
+            isMuted ? "border-amber-600 bg-amber-900/30" : "border-[var(--border)] hover:bg-[var(--bg-hover)]"
+          }`}
+          style={isMuted ? {} : { background: "var(--bg-elevated)" }}
+          onClick={toggleMute}
+          title={isMuted ? "Stummschaltung aufheben" : "Stummschalten"}
+        >
+          <span className="text-lg">{isMuted ? "🔔" : "🔕"}</span>
+          <span className="text-[10px]" style={{ color: isMuted ? "var(--amber)" : "var(--text-secondary)" }}>
+            {isMuted ? "Stumm" : "Benachrichtigungen"}
+          </span>
+        </button>
+        <button
+          type="button"
+          className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
+          style={{ background: "var(--bg-elevated)" }}
+          title="Suchen"
+        >
+          <span className="text-lg">🔍</span>
+          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Suchen</span>
+        </button>
+      </div>
+
+      {mode === "dm" && peer && (
+        <div className="info-section">
+          <p className="info-section-title">Benutzerinfo</p>
+          <div className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Username</span>
+              <span className="font-medium" style={{ color: "var(--text)" }}>@{peer.username}</span>
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>ID</span>
+              <span className="font-mono text-xs" style={{ color: "var(--accent)" }}>
+                {peer.id.slice(0, 16)}...
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="info-section !border-0 !pb-0">
-        <p className="info-section-title">Sicherheit</p>
+        <p className="info-section-title">🔒 Sicherheit</p>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
           Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server
-          leitet nur versiegelte Daten.
+          leitet nur versiegelte Daten. Perfect Forward Secrecy aktiv.
         </p>
       </div>
 
