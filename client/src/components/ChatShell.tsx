@@ -999,6 +999,8 @@ export function ChatShell({
     setNewGroupMembers([]);
     setGroup(g);
     setTab("group");
+    // Refresh group list immediately
+    await loadGroups();
   }
 
   async function rotateGroupKey(g: api.ApiGroup, newMembers: string[]) {
