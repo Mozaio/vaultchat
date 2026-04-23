@@ -47,7 +47,6 @@ export function AuthPanel({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [importJson, setImportJson] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [fp, setFp] = useState<string | null>(null);
@@ -146,70 +145,94 @@ export function AuthPanel({
   }
 
   return (
-    <div className="relative flex min-h-full items-center justify-center overflow-hidden bg-zinc-950 px-4 py-10">
-      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-96 -translate-x-1/2 rounded-full bg-emerald-600/20 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
-      <div className="relative w-full max-w-5xl">
-        <div className="grid gap-6 md:grid-cols-2 md:items-stretch">
-          <div className="hidden rounded-3xl border border-zinc-800/70 bg-zinc-900/30 p-8 backdrop-blur-xl md:block">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
-              Secure Messenger
-            </p>
-            <h1 className="text-4xl font-semibold tracking-tight text-white">
-              VaultChat
-            </h1>
-            <p className="mt-3 text-sm text-zinc-400">
-              Ende‑zu‑Ende verschlüsselt. Sealed‑Sender. Double‑Ratchet v4.
-            </p>
-            <div className="mt-6 space-y-3 text-sm text-zinc-300">
-              <Feature title="Sealed Sender" desc="Der Server sieht keinen Absender in DMs." />
-              <Feature title="TOFU + Safety Number" desc="Warnung bei Key‑Wechsel, Verifikation wie Signal." />
-              <Feature title="Auto‑Lock" desc="Schlüssel werden nach Inaktivität aus dem Speicher entfernt." />
+    <div className="landing-container min-h-full w-full bg-[var(--bg)]">
+      <div className="landing-hero">
+        <p
+          className="relative z-[1] mb-2 text-xs font-semibold uppercase tracking-widest"
+          style={{ color: "var(--accent)" }}
+        >
+          Secure Messenger
+        </p>
+        <h1 className="landing-title">VaultChat</h1>
+        <p className="landing-subtitle max-w-lg">
+          Ende-zu-Ende verschlüsselt. Sealed-Sender. Double-Ratchet v4.
+        </p>
+        <div className="feature-list max-w-lg">
+          <Feature
+            title="Sealed Sender"
+            desc="Der Server sieht keinen Absender in DMs."
+          />
+          <Feature
+            title="TOFU + Sicherheitsnummer"
+            desc="Hinweis bei Schlüsselwechsel, ähnlich wie bei Signal."
+          />
+          <Feature
+            title="Auto-Lock"
+            desc="Schlüssel nach Inaktivität aus dem Arbeitsspeicher entfernt."
+          />
+        </div>
+        <p
+          className="relative z-[1] mt-10 max-w-md text-sm"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Tipp: Exportiere direkt nach der Registrierung dein JSON-Backup.
+        </p>
+      </div>
+
+      <div className="flex min-h-full w-full min-w-0 items-center justify-center p-4">
+        <div className="auth-card w-full max-w-md">
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2
+                className="text-lg font-bold tracking-tight"
+                style={{ color: "var(--text)" }}
+              >
+                {hasLocal
+                  ? mode === "unlock"
+                    ? "Willkommen zurück"
+                    : "Anderes Konto"
+                  : mode === "import"
+                    ? "Backup importieren"
+                    : mode === "register"
+                      ? "Konto erstellen"
+                      : "Anmelden"}
+              </h2>
+              <p
+                className="mt-0.5 text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                {hasLocal
+                  ? "Lokale Schlüssel mit deinem Passwort nutzen."
+                  : "E2E-verschlüsselter Messenger im Browser."}
+              </p>
             </div>
-            <p className="mt-8 text-xs text-zinc-500">
-              Tipp: Exportiere nach der Registrierung sofort dein JSON‑Backup.
+            <ThemeToggle />
+          </div>
+
+          <div className="mb-6 border-b pb-5 md:hidden" style={{ borderColor: "var(--border)" }}>
+            <h3
+              className="text-2xl font-bold tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
+              VaultChat
+            </h3>
+            <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+              Sicher verschlüsselt, minimal Metadaten.
             </p>
           </div>
 
-          <div className="app-surface rounded-3xl p-7 md:p-8">
-            <div className="mb-7 text-center md:hidden">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
-                Secure Messenger
-              </p>
-              <h1 className="text-3xl font-semibold tracking-tight text-white">
-                VaultChat
-              </h1>
-              <p className="mt-2 text-sm text-zinc-400">
-                Ende‑zu‑Ende verschlüsselt. Der Server sieht keinen Klartext.
-              </p>
-            </div>
-            <div className="mb-5 flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400/90">
-                {hasLocal ? "Willkommen zurück" : "Los geht’s"}
-              </p>
-              <ThemeToggle />
-            </div>
-
-        {hasLocal && (
-          <div className="mb-6 flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 p-1">
+        {hasLocal && mode !== "import" && (
+          <div className="auth-tabs mb-5">
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
-                mode === "unlock"
-                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-900/50"
-                  : "text-zinc-400 hover:text-white"
-              }`}
+              className={mode === "unlock" ? "auth-tab active" : "auth-tab"}
               onClick={() => setMode("unlock")}
             >
               Entsperren
             </button>
             <button
               type="button"
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${
-                mode === "login"
-                  ? "bg-emerald-600 text-white shadow-sm shadow-emerald-900/50"
-                  : "text-zinc-400 hover:text-white"
-              }`}
+              className={mode === "login" ? "auth-tab active" : "auth-tab"}
               onClick={() => setMode("login")}
             >
               Anderes Konto
@@ -217,44 +240,71 @@ export function AuthPanel({
           </div>
         )}
 
+        {!hasLocal && mode !== "import" && (
+          <div className="auth-tabs mb-5">
+            <button
+              type="button"
+              className={mode === "login" ? "auth-tab active" : "auth-tab"}
+              onClick={() => setMode("login")}
+            >
+              Anmelden
+            </button>
+            <button
+              type="button"
+              className={mode === "register" ? "auth-tab active" : "auth-tab"}
+              onClick={() => setMode("register")}
+            >
+              Registrieren
+            </button>
+          </div>
+        )}
+
         {mode === "unlock" && hasLocal && (
           <form onSubmit={handleUnlock} className="space-y-4">
-            <label className="block text-sm text-zinc-300">
-              Passwort (lokale Schlüssel)
+            <div className="auth-input-group">
+              <label>Passwort (lokale Schlüssel)</label>
               <input
                 type="password"
                 autoComplete="current-password"
-                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+                className="auth-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
-            </label>
+            </div>
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              className="auth-button"
             >
               {busy ? "…" : "Entsperren"}
             </button>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 pt-1">
               <button
                 type="button"
                 onClick={showFingerprint}
-                className="w-full text-sm text-zinc-500 transition hover:text-zinc-300"
+                className="btn btn-ghost w-full !justify-start !px-0"
               >
-                Meinen Schlüsselfingerprint anzeigen
+                Fingerprint anzeigen
               </button>
               <button
                 type="button"
                 onClick={exportBackup}
-                className="w-full text-sm text-emerald-500/90 transition hover:text-emerald-400"
+                className="btn btn-ghost w-full !justify-start !px-0"
+                style={{ color: "var(--accent)" }}
               >
                 Backup (JSON) herunterladen
               </button>
             </div>
             {fp && (
-              <p className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-center font-mono text-sm text-emerald-400">
+              <p
+                className="rounded-lg border px-3 py-2 text-center font-mono text-sm"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-sidebar)",
+                  color: "var(--accent)",
+                }}
+              >
                 {fp}
               </p>
             )}
@@ -263,72 +313,72 @@ export function AuthPanel({
 
         {mode === "login" && (
           <form onSubmit={handleLogin} className="space-y-4">
-            <label className="block text-sm text-zinc-300">
-              Benutzername
+            <div className="auth-input-group">
+              <label>Benutzername</label>
               <input
-                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+                className="auth-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
                 required
               />
-            </label>
-            <label className="block text-sm text-zinc-300">
-              Passwort
+            </div>
+            <div className="auth-input-group">
+              <label>Passwort</label>
               <input
                 type="password"
-                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+                className="auth-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
                 required
               />
-            </label>
+            </div>
             <button
               type="button"
               onClick={() => setMode("import")}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950/40 py-2 text-sm text-zinc-200 hover:bg-zinc-900/40"
+              className="btn btn-secondary w-full"
             >
-              Neues Gerät? Backup importieren →
+              Neues Gerät? Backup importieren
             </button>
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              className="auth-button"
             >
               {busy ? "…" : "Anmelden"}
             </button>
           </form>
         )}
 
-        {mode === "register" && (
+        {mode === "register" && !hasLocal && (
           <form onSubmit={handleRegister} className="space-y-4">
-            <label className="block text-sm text-zinc-300">
-              Benutzername
+            <div className="auth-input-group">
+              <label>Benutzername</label>
               <input
-                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+                className="auth-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoComplete="username"
                 required
               />
-            </label>
-            <label className="block text-sm text-zinc-300">
-              Passwort (min. 10 Zeichen)
+            </div>
+            <div className="auth-input-group">
+              <label>Passwort (min. 10 Zeichen)</label>
               <input
                 type="password"
-                className="mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2.5 text-white outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+                className="auth-input"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
                 minLength={10}
                 required
               />
-            </label>
+            </div>
             <button
               type="submit"
               disabled={busy}
-              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              className="auth-button"
             >
               {busy ? "…" : "Konto erstellen"}
             </button>
@@ -345,74 +395,59 @@ export function AuthPanel({
             className="space-y-4"
           >
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Backup importieren</p>
+              <p
+                className="text-sm font-semibold"
+                style={{ color: "var(--text)" }}
+              >
+                Backup-JSON
+              </p>
               <button
                 type="button"
                 onClick={() => setMode("login")}
-                className="rounded-lg border border-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800/60"
+                className="btn btn-ghost !px-2 !py-1 text-xs"
               >
                 Zurück
               </button>
             </div>
             <textarea
-              className="min-h-[140px] w-full rounded-xl border border-zinc-700 bg-zinc-950/80 px-3 py-2 font-mono text-xs text-zinc-200 outline-none ring-emerald-500/30 transition focus:border-emerald-500/50 focus:ring-2"
+              className="auth-input min-h-[140px] font-mono text-xs"
               value={importJson}
               onChange={(e) => setImportJson(e.target.value)}
-              placeholder='{"userId":"…","username":"…","publicKey":"…","wrapped":{…}}'
+              placeholder='{"userId":"…","username":"…",…}'
             />
-            <p className="text-xs text-zinc-500">
-              Danach meldest du dich mit Benutzername + Passwort an. Das Backup stellt deinen lokalen Schlüssel wieder her.
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Danach meldest du dich mit Benutzername und Passwort an. Das
+              Backup stellt deinen lokalen Schlüssel wieder her.
             </p>
             <button
               type="button"
               disabled={busy || !importJson.trim()}
               onClick={(e) => void handleLogin(e as unknown as React.FormEvent)}
-              className="w-full rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+              className="auth-button"
             >
               {busy ? "…" : "Importieren & anmelden"}
             </button>
           </form>
         )}
 
-        {!hasLocal && mode !== "import" && (
-          <div className="mt-6 flex gap-2 rounded-xl border border-zinc-800 bg-zinc-950/80 p-1 text-sm">
-            <button
-              type="button"
-              className={`flex-1 rounded-lg py-2 ${
-                mode === "login"
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-              onClick={() => setMode("login")}
-            >
-              Anmelden
-            </button>
-            <button
-              type="button"
-              className={`flex-1 rounded-lg py-2 ${
-                mode === "register"
-                  ? "bg-zinc-800 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-              onClick={() => setMode("register")}
-            >
-              Registrieren
-            </button>
-          </div>
-        )}
-
         {error && (
-          <p className="mt-4 rounded-xl border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+          <p
+            className="mt-4 rounded-lg border px-3 py-2.5 text-sm"
+            style={{
+              borderColor: "rgba(248,113,113,0.35)",
+              background: "var(--danger-soft)",
+              color: "var(--danger)",
+            }}
+          >
             {error}
           </p>
         )}
 
-        <p className="mt-8 text-center text-xs leading-relaxed text-zinc-600">
-          Browser + fremder Server: ohne Subresource-Integrity und Audit ist
-          das Bedrohungsmodell schwächer als bei nativen Apps. Details siehe{" "}
-          <code className="text-zinc-500">THREAT_MODEL.md</code>.
+        <p className="auth-footer">
+          Browser und externer Server: Ohne vollständige Software-Audit ist das
+          Bedrohungsmodell schwächer als bei nativen Apps. Siehe THREAT_MODEL.md
+          im Repository.
         </p>
-          </div>
         </div>
       </div>
     </div>
@@ -421,11 +456,13 @@ export function AuthPanel({
 
 function Feature({ title, desc }: { title: string; desc: string }) {
   return (
-    <div className="flex gap-3">
-      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-emerald-400/80" />
-      <div>
-        <p className="font-medium text-white">{title}</p>
-        <p className="text-xs text-zinc-400">{desc}</p>
+    <div className="feature-item">
+      <div className="feature-icon" aria-hidden>
+        ✓
+      </div>
+      <div className="feature-text">
+        <h3>{title}</h3>
+        <p>{desc}</p>
       </div>
     </div>
   );

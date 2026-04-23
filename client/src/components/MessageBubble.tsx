@@ -90,21 +90,36 @@ export function MessageBubble({
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
 
   return (
-    <div className={`group flex ${msg.fromMe ? "justify-end" : "justify-start"}`}>
-      <div className={`relative max-w-[85%] ${msg.fromMe ? "items-end" : "items-start"} flex flex-col`}>
+    <div
+      className={`message-wrapper group ${
+        msg.fromMe ? "sent" : "received"
+      }`}
+    >
+      <div
+        className={`flex max-w-[min(85%,32rem)] flex-col ${
+          msg.fromMe ? "items-end" : "items-start"
+        }`}
+      >
         {replyToPreview && (
-          <div className="mb-1 rounded-t-2xl border-l-2 border-emerald-500 bg-zinc-900/70 px-3 py-1 text-xs text-zinc-300">
-            <span className="text-emerald-400">{replyToPreview.author}: </span>
+          <div
+            className="mb-1.5 max-w-full rounded-t-xl border-l-2 px-3 py-1.5 text-xs"
+            style={{
+              borderColor: "var(--accent)",
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            <span style={{ color: "var(--accent)" }}>
+              {replyToPreview.author}:{" "}
+            </span>
             {truncate(replyToPreview.text, 120)}
           </div>
         )}
 
         <div
-          className={`relative rounded-2xl border px-4 py-2.5 text-sm shadow-sm ${
-            msg.fromMe
-              ? "text-[color:var(--bubble-me-fg)] border-[color:var(--bubble-me-border)] bg-[color:var(--bubble-me-bg)]"
-              : "text-[color:var(--bubble-them-fg)] border-[color:var(--bubble-them-border)] bg-[color:var(--bubble-them-bg)]"
-          } ${msg.deleted ? "italic app-muted-2" : ""}`}
+          className={`message-bubble relative ${
+            msg.fromMe ? "sent" : "received"
+          } max-w-full ${msg.deleted ? "italic app-muted-2" : ""}`}
         >
           {msg.deleted ? (
             <span>Nachricht gelöscht</span>
@@ -141,7 +156,10 @@ export function MessageBubble({
             </div>
           ) : msg.plain.kind === "file" ? (
             <a
-              className="text-emerald-300 underline"
+              className="underline"
+              style={{
+                color: msg.fromMe ? "inherit" : "var(--accent)",
+              }}
               href={body}
               download={msg.plain.fileName}
             >
@@ -149,7 +167,10 @@ export function MessageBubble({
             </a>
           ) : msg.plain.kind === "voice" ? (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-emerald-300">
+              <span
+                className="text-xs"
+                style={{ color: msg.fromMe ? "inherit" : "var(--accent)" }}
+              >
                 🎤 {fmtDuration(msg.plain.durationMs)}
               </span>
               <audio controls src={body} className="h-8 max-w-[220px]" />

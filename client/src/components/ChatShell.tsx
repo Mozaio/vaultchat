@@ -1133,7 +1133,7 @@ export function ChatShell({
   );
 
   return (
-    <div className="flex h-full w-full flex-col bg-zinc-950 p-2 md:p-4">
+    <div className="flex h-full w-full flex-col bg-[var(--bg)] p-2 md:p-4">
       {searchOpen && (
         <SearchPanel
           users={users.map((u) => ({ id: u.id, username: u.username }))}
@@ -1167,18 +1167,24 @@ export function ChatShell({
       )}
 
       <div className="app-surface flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl md:rounded-3xl">
-      <aside className={`${showSidebar ? "flex" : "hidden"} w-full flex-col border-zinc-800/80 bg-zinc-950/45 md:flex md:w-84 md:border-r`}>
-        <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
+      <aside
+        className={`${
+          showSidebar ? "flex" : "hidden"
+        } w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
+      >
+        <div className="sidebar-header flex items-center justify-between !py-3.5">
           <div>
-            <p className="text-sm font-semibold text-white">VaultChat</p>
-            <p className="text-xs text-zinc-500">Secure Messenger</p>
+            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+              VaultChat
+            </p>
+            <p className="text-xs app-muted">Secure Messenger</p>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             <ThemeToggle />
             <button
               type="button"
               onClick={onLock}
-              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 transition hover:bg-zinc-800"
+              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
               title="Sofort sperren (LDK aus dem Speicher entfernen)"
             >
               Sperren
@@ -1186,35 +1192,32 @@ export function ChatShell({
             <button
               type="button"
               onClick={onLogout}
-              className="rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 transition hover:bg-zinc-800"
+              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
             >
               Abmelden
             </button>
           </div>
         </div>
 
-        <div className="px-3 pt-3">
-          <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-950/50 px-3 py-2">
-            <span className="text-zinc-500">
+        <div className="px-3 pt-2">
+          <div className="search-box flex items-center gap-2 !py-2">
+            <span className="app-muted" aria-hidden>
               <IconSearch size={16} />
             </span>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Suchen…"
-              className="app-input w-full rounded-lg bg-transparent text-sm outline-none"
+              className="w-full border-0 bg-transparent text-sm outline-none"
+              style={{ color: "var(--text)" }}
             />
           </div>
         </div>
 
-        <div className="flex gap-2 border-b border-zinc-800/80 p-3">
+        <div className="tab-group !mx-3 !mt-2 !mb-1">
           <button
             type="button"
-            className={`flex-1 rounded-2xl py-2 text-xs font-semibold ${
-              sideTab === "direct"
-                ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
-                : "text-zinc-400 hover:bg-zinc-800/60"
-            }`}
+            className={`tab ${sideTab === "direct" ? "active" : ""}`}
             onClick={() => {
               setSideTab("direct");
               setTab("dm");
@@ -1224,11 +1227,7 @@ export function ChatShell({
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-2xl py-2 text-xs font-semibold ${
-              sideTab === "groups"
-                ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
-                : "text-zinc-400 hover:bg-zinc-800/60"
-            }`}
+            className={`tab ${sideTab === "groups" ? "active" : ""}`}
             onClick={() => {
               setSideTab("groups");
               setTab("group");
@@ -1238,11 +1237,7 @@ export function ChatShell({
           </button>
           <button
             type="button"
-            className={`flex-1 rounded-2xl py-2 text-xs font-semibold ${
-              sideTab === "fav"
-                ? "bg-emerald-700/80 text-white shadow-sm shadow-emerald-950/40"
-                : "text-zinc-400 hover:bg-zinc-800/60"
-            }`}
+            className={`tab ${sideTab === "fav" ? "active" : ""}`}
             onClick={() => setSideTab("fav")}
             title="Favoriten (coming soon)"
           >
@@ -1252,8 +1247,11 @@ export function ChatShell({
 
         {tab === "dm" && (
           <>
-            <div className="border-b border-zinc-800/80 px-3 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+            <div className="border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <p
+                className="text-[10px] font-semibold uppercase tracking-wider"
+                style={{ color: "var(--text-muted)" }}
+              >
                 Kontakte
               </p>
             </div>
@@ -1302,30 +1300,40 @@ export function ChatShell({
           </>
         )}
 
-        <div className="space-y-1 border-t border-zinc-800/80 p-3 text-xs text-zinc-500">
-          <p className="font-mono text-emerald-600/90">Du: {myFp ?? "…"}</p>
-          <label className="flex items-center gap-2">
+        <div
+          className="space-y-1.5 border-t p-3 text-xs"
+          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+        >
+          <p className="font-mono text-[10px] leading-snug" style={{ color: "var(--accent)" }}>
+            Du: {myFp ?? "…"}
+          </p>
+          <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
               checked={relayOnly}
               onChange={(e) => setRelayOnly(e.target.checked)}
             />
-            <span>Call nur über TURN-Relay</span>
+            <span>Anruf nur über TURN (Relay)</span>
           </label>
           <button
             type="button"
-            className="mt-1 text-emerald-500 hover:text-emerald-400"
+            className="text-left font-medium hover:underline"
+            style={{ color: "var(--accent)" }}
             onClick={() => {
               void loadUsers();
               void loadGroups();
             }}
           >
-            Aktualisieren
+            Kontakte & Gruppen aktualisieren
           </button>
         </div>
       </aside>
 
-      <main className={`${showSidebar ? "hidden" : "flex"} min-h-0 flex-1 flex-col bg-zinc-950/55 md:flex`}>
+      <main
+        className={`${
+          showSidebar ? "hidden" : "flex"
+        } min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0`}
+      >
         {incomingOffer && (
           <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
             <span>Anruf von {incomingOffer.from.username}</span>
@@ -1363,38 +1371,49 @@ export function ChatShell({
         )}
 
         {tab === "dm" && !peer && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-zinc-500">
+          <div className="flex flex-1 items-center justify-center px-6 text-center app-muted">
             <div className="max-w-sm">
-              <p className="text-sm font-medium text-zinc-200">Wähle einen Kontakt</p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Nachrichten-Historie liegt nur lokal (verschlüsselte IndexedDB).
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                Wähle eine Unterhaltung
               </p>
+              <p className="mt-1 text-xs">Verlauf nur auf diesem Gerät, verschlüsselt (IndexedDB).</p>
             </div>
           </div>
         )}
 
         {tab === "dm" && peer && (
           <>
-            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-3 py-3 md:px-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+            <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
+              <div className="flex w-full items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   {isMobile && (
                     <button
                       type="button"
                       onClick={() => setPeer(null)}
-                      className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                      className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
                       title="Zurück"
                     >
                       ←
                     </button>
                   )}
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-emerald-900/40 text-sm font-semibold text-emerald-200">
+                  <div
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, var(--accent-hover), var(--accent))",
+                    }}
+                  >
                     {peer.username.slice(0, 1).toUpperCase()}
                   </div>
-                  <div>
-                  <p className="font-medium text-white">{peer.username}</p>
-                  <p className="font-mono text-xs text-emerald-600/80">
-                    Fingerprint: {peerFp ?? "…"}
+                  <div className="min-w-0">
+                  <p className="truncate font-medium" style={{ color: "var(--text)" }}>
+                    {peer.username}
+                  </p>
+                  <p
+                    className="max-w-[min(100%,14rem)] break-all font-mono text-[10px] leading-snug sm:max-w-md sm:text-[11px]"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    {peerFp ?? "…"}
                   </p>
                   </div>
                 </div>
@@ -1462,7 +1481,7 @@ export function ChatShell({
 
             <div
               ref={dmScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4"
+              className="messages-container !px-4 !py-4"
             >
               {messages.map((m) => (
                 <MessageBubble
@@ -1501,7 +1520,7 @@ export function ChatShell({
               )}
             </div>
 
-            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+            <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
@@ -1603,7 +1622,7 @@ export function ChatShell({
                   type="button"
                   onClick={() => void sendDmText()}
                   disabled={voice.recording || !text.trim()}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-40"
+                  className="btn-send disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <IconSend size={16} />
                 </button>
@@ -1775,7 +1794,7 @@ export function ChatShell({
                 />
               ))}
             </div>
-            <footer className="border-t border-zinc-800/80 bg-zinc-900/35 p-3 pb-[calc(env(safe-area-inset-bottom,0px)+12px)]">
+            <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyGroup && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
@@ -1822,7 +1841,7 @@ export function ChatShell({
 
       {/* Right info panel (desktop) */}
       {showInfo && (
-        <aside className="hidden w-80 shrink-0 border-l border-zinc-800/80 bg-zinc-950/40 md:flex">
+        <aside className="info-panel hidden w-80 min-w-0 shrink-0 md:flex">
           <InfoPanel
             mode={tab}
             peer={peer}
@@ -1948,42 +1967,43 @@ function PeerRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left ${
-        selected
-          ? "bg-emerald-900/35 text-emerald-100"
-          : "text-zinc-200 hover:bg-zinc-800/60"
-      }`}
+      className={`contact-item w-full ${
+        selected ? "active" : ""
+      } !mx-0 items-center justify-between`}
     >
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-100">
-          {u.username.slice(0, 1).toUpperCase()}
-        </div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="truncate text-sm font-medium">{u.username}</span>
+      <div className="contact-avatar !h-9 !w-9 !text-sm">
+        {u.username.slice(0, 1).toUpperCase()}
+      </div>
+      <div className="contact-info min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="contact-name">{u.username}</span>
             {pin?.state === "mismatch" && (
               <span className="rounded-md border border-red-700/70 bg-red-950/30 px-1.5 py-0.5 text-[10px] text-red-200">
                 ⚠
               </span>
             )}
             {pin?.state === "verified" && (
-              <span className="rounded-md border border-emerald-600/70 bg-emerald-950/20 px-1.5 py-0.5 text-[10px] text-emerald-200">
+              <span
+                className="rounded-md border px-1.5 py-0.5 text-[10px]"
+                style={{
+                  borderColor: "var(--accent)",
+                  color: "var(--accent)",
+                  background: "var(--accent-soft)",
+                }}
+              >
                 ✓
               </span>
             )}
-          </div>
-          <p className="truncate text-xs text-zinc-500">{subtitle ?? ""}</p>
         </div>
+        <p className="contact-preview">{subtitle ?? ""}</p>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <span className="text-[10px] text-zinc-500">{metaRight ?? ""}</span>
+      <div className="contact-meta">
+        <span className="contact-time">{metaRight ?? ""}</span>
         {unread && unread > 0 ? (
-          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-emerald-600 px-1 text-[10px] font-semibold text-white">
+          <span className="unread-badge">
             {unread > 99 ? "99+" : unread}
           </span>
-        ) : (
-          <span className="text-[10px] text-zinc-500">›</span>
-        )}
+        ) : null}
       </div>
     </button>
   );
@@ -2009,64 +2029,74 @@ function InfoPanel({
   const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
 
   return (
-    <div className="flex h-full w-full flex-col p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-full bg-emerald-900/30 text-sm font-semibold text-emerald-200">
-            {initials}
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-white">{title}</p>
-            <p className="text-xs text-zinc-500">{status}</p>
-          </div>
-        </div>
+    <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-y-auto p-1">
+      <div className="info-avatar-large !mb-3 !mt-0 !h-20 !w-20 !text-2xl">
+        {initials}
       </div>
+      <p className="text-center text-base font-semibold" style={{ color: "var(--text)" }}>
+        {title}
+      </p>
+      <p className="mb-4 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+        {status}
+      </p>
 
-      <div className="mt-4 grid grid-cols-4 gap-2 text-[11px] text-zinc-300">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <QuickAction label="Profil" />
         <QuickAction label="Suchen" />
         <QuickAction label="Stumm" />
         <QuickAction label="Mehr" />
       </div>
 
-      <div className="mt-4 space-y-2">
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3">
-          <p className="text-xs font-semibold text-emerald-300">Sicherheit</p>
-          <p className="mt-1 text-xs text-zinc-400">
-            Deine Nachrichten und Anrufe sind Ende‑zu‑Ende verschlüsselt.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={onSafety}
-          className="w-full rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3 text-left transition hover:bg-zinc-900/40"
-        >
-          <p className="text-xs font-semibold text-white">Sicherheitsnummer</p>
-          <p className="mt-1 font-mono text-[11px] text-emerald-300">
-            {peerFp ?? "…"}
-          </p>
-        </button>
-
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3">
-          <p className="text-xs font-semibold text-white">Geteilte Medien</p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Dateien &amp; Voice findest du direkt im Chat. Links/Galerie kommt als nächstes.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => void onClearChat()}
-          className="w-full rounded-2xl border border-red-900/40 bg-red-950/20 p-3 text-left text-red-200 transition hover:bg-red-950/30"
-        >
-          Chat löschen
-        </button>
+      <div className="info-section !border-0 !pb-0">
+        <p className="info-section-title">Sicherheit</p>
+        <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+          Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server
+          leitet nur versiegelte Daten.
+        </p>
       </div>
 
-      <div className="mt-auto pt-4 text-[11px] text-zinc-500">
-        Hinweis: Historie ist lokal gespeichert (verschlüsselte IndexedDB).
+      {mode === "dm" && (
+        <div className="info-section">
+          <p className="info-section-title">Sicherheitsnummer</p>
+          <button
+            type="button"
+            onClick={onSafety}
+            className="w-full rounded-xl border p-3 text-left transition hover:opacity-95"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-elevated)",
+            }}
+          >
+            <p
+              className="font-mono text-xs leading-relaxed break-all"
+              style={{ color: "var(--accent)" }}
+            >
+              {peerFp ?? "…"}
+            </p>
+            <p className="mt-1 text-[11px] app-muted">Tippen zum Prüfen / vergleichen</p>
+          </button>
+        </div>
+      )}
+
+      <div className="info-section">
+        <p className="info-section-title">Geteilte Inhalte</p>
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          Dateien und Sprachnotizen erscheinen in diesem Chat. Medienübersicht
+          folgt.
+        </p>
       </div>
+
+      <button
+        type="button"
+        onClick={() => void onClearChat()}
+        className="btn btn-danger w-full"
+      >
+        Chat-Verlauf leeren
+      </button>
+
+      <p className="mt-auto pt-4 text-center text-[11px] app-muted">
+        Verlauf nur lokal, verschlüsselt (IndexedDB).
+      </p>
     </div>
   );
 }
@@ -2075,7 +2105,7 @@ function QuickAction({ label }: { label: string }) {
   return (
     <button
       type="button"
-      className="rounded-2xl border border-zinc-800/80 bg-zinc-950/40 py-2 text-center text-[11px] text-zinc-200 hover:bg-zinc-900/40"
+      className="btn btn-secondary !py-2 !text-[11px]"
     >
       {label}
     </button>
