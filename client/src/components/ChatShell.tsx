@@ -134,6 +134,8 @@ export function ChatShell({
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [newDmMessageWaiting, setNewDmMessageWaiting] = useState(false);
+  const [newGroupMessageWaiting, setNewGroupMessageWaiting] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -372,14 +374,29 @@ export function ChatShell({
     void loadGroupLocal(group);
   }, [group, loadGroupLocal]);
 
+  // Auto-scroll: nur wenn der User bereits unten war ODER neue Nachricht reinkommt
   useEffect(() => {
-    if (!dmScrollRef.current) return;
-    dmScrollRef.current.scrollTop = dmScrollRef.current.scrollHeight;
+    const el = dmScrollRef.current;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (isAtBottom) {
+      el.scrollTop = el.scrollHeight;
+    } else {
+      // Zeige einen "neue Nachricht" Button
+      setNewDmMessageWaiting(true);
+    }
   }, [messages]);
 
+  // Auto-scroll für Gruppen
   useEffect(() => {
-    if (!groupScrollRef.current) return;
-    groupScrollRef.current.scrollTop = groupScrollRef.current.scrollHeight;
+    const el = groupScrollRef.current;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (isAtBottom) {
+      el.scrollTop = el.scrollHeight;
+    } else {
+      setNewGroupMessageWaiting(true);
+    }
   }, [groupMessages]);
 
   const sendRtc = useCallback((toUserId: string, payload: RtcPayload) => {
@@ -1481,8 +1498,20 @@ export function ChatShell({
 
             <div
               ref={dmScrollRef}
-              className="messages-container !px-4 !py-4"
+              className="messages-container !px-4 !py-4 relative"
             >
+              {newDmMessageWaiting && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    dmScrollRef.current?.scrollTo({ top: dmScrollRef.current.scrollHeight, behavior: "smooth" });
+                    setNewDmMessageWaiting(false);
+                  }}
+                  className="absolute bottom-4 right-4 z-10 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg hover:bg-emerald-500 transition-all"
+                >
+                  ↓ Neue Nachrichten
+                </button>
+              )}
               {messages.map((m) => (
                 <MessageBubble
                   key={m.plain.cid ?? m.id}
@@ -1759,8 +1788,20 @@ export function ChatShell({
             </header>
             <div
               ref={groupScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4 relative"
             >
+              {newGroupMessageWaiting && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    groupScrollRef.current?.scrollTo({ top: groupScrollRef.current.scrollHeight, behavior: "smooth" });
+                    setNewGroupMessageWaiting(false);
+                  }}
+                  className="absolute bottom-4 right-4 z-10 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg hover:bg-emerald-500 transition-all"
+                >
+                  ↓ Neue Nachrichten
+                </button>
+              )}
               {groupMessages.map((m) => (
                 <MessageBubble
                   key={m.plain.cid ?? m.id}

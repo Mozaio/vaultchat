@@ -204,7 +204,7 @@ export function MessageBubble({
                 setReactOpen(false);
               }}
               className={`absolute -top-2 ${
-                msg.fromMe ? "-left-8" : "-right-8"
+                msg.fromMe ? "-right-8" : "-left-8"
               } hidden rounded-full border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 group-hover:block`}
             >
               ⋯
@@ -214,7 +214,7 @@ export function MessageBubble({
           {menuOpen && !msg.deleted && (
             <div
               className={`absolute top-8 z-10 w-40 rounded-lg border border-zinc-700 bg-zinc-900 p-1 text-xs shadow-xl ${
-                msg.fromMe ? "left-0" : "right-0"
+                msg.fromMe ? "right-0" : "left-0"
               }`}
             >
               <button
@@ -278,7 +278,7 @@ export function MessageBubble({
           {reactOpen && !msg.deleted && (
             <div
               className={`absolute top-8 z-10 flex gap-1 rounded-lg border border-zinc-700 bg-zinc-900 p-1 text-lg shadow-xl ${
-                msg.fromMe ? "left-0" : "right-0"
+                msg.fromMe ? "right-0" : "left-0"
               }`}
             >
               {QUICK_EMOJIS.map((e) => (
