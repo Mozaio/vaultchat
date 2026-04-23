@@ -58,6 +58,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useShortcuts } from "../lib/shortcuts";
 import { SearchPanel } from "./SearchPanel";
 import { AddContactModal } from "./AddContactModal";
+import { SecuritySettings } from "./SecuritySettings";
 import {
   IconInfo,
   IconMic,
@@ -148,6 +149,7 @@ export function ChatShell({
   const [searchOpen, setSearchOpen] = useState(false);
   const [newDmMessageWaiting, setNewDmMessageWaiting] = useState(false);
   const [newGroupMessageWaiting, setNewGroupMessageWaiting] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -1212,7 +1214,9 @@ export function ChatShell({
           onTrustChanged={(pin) => setPeerPin(pin)}
         />
       )}
-
+      {securityOpen && (
+        <SecuritySettings onClose={() => setSecurityOpen(false)} />
+      )}
       <div className="app-surface flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl md:rounded-3xl">
       <aside
         className={`${
@@ -1235,6 +1239,14 @@ export function ChatShell({
               title="Sofort sperren (LDK aus dem Speicher entfernen)"
             >
               Sperren
+            </button>
+            <button
+              type="button"
+              onClick={() => setSecurityOpen(true)}
+              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
+              title="Sicherheitseinstellungen"
+            >
+              🔒
             </button>
             <button
               type="button"
