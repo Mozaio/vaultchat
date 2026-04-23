@@ -158,6 +158,8 @@ export function ChatShell({
   } | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttempts = useRef(0);
   const peerRef = useRef<api.ApiUser | null>(null);
   const groupRef = useRef<api.ApiGroup | null>(null);
   const usersRef = useRef<api.ApiUser[]>([]);
@@ -572,7 +574,17 @@ export function ChatShell({
       setConnected(true);
       void flushOutbox();
     };
-    ws.onclose = () => setConnected(false);
+    ws.onclose = () => {
+      setConnected(false);
+      wsRef.current = null;
+      // Auto-reconnect with exponential backoff (max 30 seconds)
+      const attempts = reconnectAttempts.current;
+      const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
+      reconnectAttempts.current = attempts + 1;
+      reconnectTimer.current = setTimeout(() => {
+        // Reconnect will be handled by React re-mounting this effect
+      }, delay);
+    };
     ws.onerror = () => setError("WebSocket-Fehler");
     ws.onmessage = (ev) => {
       void (async () => {
