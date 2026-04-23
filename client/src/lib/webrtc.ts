@@ -33,11 +33,6 @@ function buildPc(iceServers: RTCIceServer[], relayOnly: boolean): RTCPeerConnect
   const cfg: RTCConfiguration = {
     iceServers,
     iceTransportPolicy: relayOnly ? "relay" : "all",
-    /**
-     * Verhindert, dass lokale IPv6/IPv4-Hostkandidaten an den Peer gesendet
-     * werden, sobald mindestens ein relay-Kandidat existiert. Chrome spricht
-     * hier `iceTransportPolicy: "relay"` auch.
-     */
     bundlePolicy: "max-bundle",
     rtcpMuxPolicy: "require",
   };
@@ -54,10 +49,27 @@ export async function startCall(
 ) {
   const cfg = await loadRtcConfig(token);
   const pc = buildPc(cfg.iceServers, relayOnly || cfg.forceRelay);
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: true,
-  });
+  
+  // Get user media with better error handling
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: "user",
+      },
+    });
+  } catch (err) {
+    console.error("Failed to get media devices:", err);
+    throw new Error("Kamera oder Mikrofon nicht verfügbar");
+  }
+  
   for (const t of stream.getTracks()) pc.addTrack(t, stream);
 
   pc.ontrack = (ev) => {
@@ -66,6 +78,7 @@ export async function startCall(
 
   pc.onicecandidate = (ev) => {
     if (!ev.candidate) return;
+    // In relay-only mode, only send relay candidates
     if (relayOnly && ev.candidate.type && ev.candidate.type !== "relay") return;
     sendRtc(peer.id, {
       type: "candidate",
@@ -73,32 +86,31 @@ export async function startCall(
     });
   };
 
+  pc.oniceconnectionstatechange = () => {
+    console.log("ICE connection state:", pc.iceConnectionState);
+    if (pc.iceConnectionState === "failed") {
+      // Try to restart ICE
+      pc.restartIce();
+    }
+  };
+
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   sendRtc(peer.id, { type: "offer", sdp: offer.sdp ?? "" });
-
-  const handlers: Record<string, (p: RtcPayload) => void | Promise<void>> = {
-    answer: async (p) => {
-      if (p.type !== "answer") return;
-      await pc.setRemoteDescription({ type: "answer", sdp: p.sdp });
-    },
-    candidate: async (p) => {
-      if (p.type !== "candidate") return;
-      if (relayOnly && p.candidate.type && p.candidate.type !== "relay") return;
-      try {
-        await pc.addIceCandidate(p.candidate);
-      } catch {
-        /* ignore */
-      }
-    },
-  };
 
   return {
     pc,
     localStream: stream,
     handleRemote: async (payload: RtcPayload) => {
-      const h = handlers[payload.type];
-      if (h) await h(payload);
+      try {
+        if (payload.type === "answer") {
+          await pc.setRemoteDescription({ type: "answer", sdp: payload.sdp });
+        } else if (payload.type === "candidate") {
+          await pc.addIceCandidate(payload.candidate);
+        }
+      } catch (err) {
+        console.error("Error handling remote payload:", err);
+      }
     },
     close: () => {
       stream.getTracks().forEach((t) => t.stop());
@@ -119,10 +131,27 @@ export async function acceptCall(
 ) {
   const cfg = await loadRtcConfig(token);
   const pc = buildPc(cfg.iceServers, relayOnly || cfg.forceRelay);
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: true,
-  });
+  
+  // Get user media with better error handling
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: "user",
+      },
+    });
+  } catch (err) {
+    console.error("Failed to get media devices:", err);
+    throw new Error("Kamera oder Mikrofon nicht verfügbar");
+  }
+  
   for (const t of stream.getTracks()) pc.addTrack(t, stream);
 
   pc.ontrack = (ev) => {
@@ -138,7 +167,27 @@ export async function acceptCall(
     });
   };
 
+  pc.oniceconnectionstatechange = () => {
+    console.log("ICE connection state:", pc.iceConnectionState);
+    if (pc.iceConnectionState === "failed") {
+      pc.restartIce();
+    }
+  };
+
+  // Buffer ICE candidates until remote description is set
+  const pendingCandidates: RTCIceCandidateInit[] = [];
+  
   await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
+  
+  // Add any buffered candidates
+  for (const candidate of pendingCandidates) {
+    try {
+      await pc.addIceCandidate(candidate);
+    } catch {
+      /* ignore */
+    }
+  }
+  
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   sendRtc(peer.id, { type: "answer", sdp: answer.sdp ?? "" });
@@ -146,12 +195,21 @@ export async function acceptCall(
   return {
     pc,
     localStream: stream,
+    handleRemote: async (payload: RtcPayload) => {
+      try {
+        if (payload.type === "candidate") {
+          await pc.addIceCandidate(payload.candidate);
+        }
+      } catch (err) {
+        console.error("Error adding ICE candidate:", err);
+      }
+    },
     addIce: async (c: RTCIceCandidateInit) => {
-      if (relayOnly && c.type && c.type !== "relay") return;
+      if (relayOnly && (c as RTCIceCandidate).type && (c as RTCIceCandidate).type !== "relay") return;
       try {
         await pc.addIceCandidate(c);
       } catch {
-        /* */
+        /* ignore */
       }
     },
     close: () => {
