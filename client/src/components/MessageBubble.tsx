@@ -215,7 +215,7 @@ export function MessageBubble({
           {menuOpen && !msg.deleted && (
             <div
               className={`absolute top-6 z-30 w-40 rounded-lg border border-zinc-700 bg-zinc-900 p-1 text-xs shadow-xl ${
-                msg.fromMe ? "-left-2" : "right-0"
+                msg.fromMe ? "-right-2" : "-left-2"
               }`}
             >
               <button
