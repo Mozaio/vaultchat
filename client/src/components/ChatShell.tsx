@@ -207,8 +207,17 @@ export function ChatShell({
       if (local) return local;
       try {
         const { users: list } = await api.listUsers(session.token);
-        setUsers(list.filter((u) => u.id !== session.user.id));
-        return list.find((u) => u.id === userId) ?? null;
+        // Only add to local list if we actually need this user (for decryption)
+        // Don't replace the entire users list - this prevents showing ALL users
+        const found = list.find((u) => u.id === userId);
+        if (found) {
+          setUsers((prev) => {
+            if (prev.find((u) => u.id === found.id)) return prev;
+            return [...prev, found];
+          });
+          return found;
+        }
+        return null;
       } catch {
         return null;
       }
