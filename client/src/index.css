@@ -1140,6 +1140,68 @@ body {
 }
 
 /* ============================================================
+   VAULTCHAT SCROLL FIX — CHAT ONLY
+   ============================================================ */
+
+/* Fix: Scroll only in chat area, not whole page */
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Ensure message options are visible (right side) */
+.message-options-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 50;
+  margin-top: 4px;
+}
+
+/* Better message readability */
+.message-bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  line-height: 1.6;
+}
+
+.message-bubble p {
+  margin: 0;
+}
+
+/* Message spacing fix - prevent overlapping */
+.message-wrapper {
+  margin-bottom: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* New messages button positioning */
+.new-messages-btn {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  z-index: 30;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ============================================================
    UTILITY ANIMATIONS
    ============================================================ */
 
