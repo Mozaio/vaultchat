@@ -1429,8 +1429,12 @@ export function ChatShell({
         {tab === "dm" && peer && (
           <>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
+              {/* Connection status indicator */}
+              <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
+                <div className={`h-full transition-all duration-500 ${connected ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
+              </div>
               <div className="flex w-full items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 items-center gap-3">
                   {isMobile && (
                     <button
                       type="button"
@@ -1441,25 +1445,46 @@ export function ChatShell({
                       ←
                     </button>
                   )}
-                  <div
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, var(--accent-hover), var(--accent))",
-                    }}
-                  >
-                    {peer.username.slice(0, 1).toUpperCase()}
+                  <div className="relative">
+                    <div
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, var(--accent-hover), var(--accent))",
+                      }}
+                    >
+                      {peer.username.slice(0, 1).toUpperCase()}
+                    </div>
+                    {/* Online indicator dot */}
+                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)] ${onlinePeers.has(peer.id) ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
                   </div>
                   <div className="min-w-0">
-                  <p className="truncate font-medium" style={{ color: "var(--text)" }}>
-                    {peer.username}
-                  </p>
-                  <p
-                    className="max-w-[min(100%,14rem)] break-all font-mono text-[10px] leading-snug sm:max-w-md sm:text-[11px]"
-                    style={{ color: "var(--accent)" }}
-                  >
-                    {peerFp ?? "…"}
-                  </p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
+                        {peer.username}
+                      </p>
+                      {/* Connection status badge */}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${connected ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
+                        {connected ? 'Online' : 'Verbinden...'}
+                      </span>
+                    </div>
+                    {typing ? (
+                      <p className="text-xs text-emerald-500/80 flex items-center gap-1">
+                        <span className="flex gap-0.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '0ms'}} />
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '150ms'}} />
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '300ms'}} />
+                        </span>
+                        schreibt...
+                      </p>
+                    ) : (
+                      <p
+                        className="max-w-[min(100%,14rem)] break-all font-mono text-[10px] leading-snug opacity-60 sm:max-w-md sm:text-[11px]"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        {peerFp ? `${peerFp.slice(0, 32)}...` : "Verschlüsselt"}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
