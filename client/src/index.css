@@ -393,33 +393,39 @@ body {
 .message-bubble {
   max-width: 70%;
   min-width: 80px;
-  padding: 0.625rem 0.875rem;
-  border-radius: 18px;
+  padding: 0.75rem 1rem;
+  border-radius: 20px;
   font-size: 0.9375rem;
-  line-height: 1.55;
+  line-height: 1.6;
   word-wrap: break-word;
   position: relative;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.message-bubble:hover {
+  transform: scale(1.01);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Better text readability */
 .message-bubble p {
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .message-bubble.received {
   background: var(--bubble-them-bg);
   color: var(--bubble-them-fg);
   border: 1px solid var(--bubble-them-border);
-  border-bottom-left-radius: 4px;
+  border-bottom-left-radius: 6px;
 }
 
 .message-bubble.sent {
   background: var(--bubble-me);
   color: var(--bubble-me-text);
   border: 1px solid transparent;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 6px;
 }
 
 /* File attachment inside bubble */
