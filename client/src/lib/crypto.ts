@@ -136,6 +136,8 @@ export type PlainPayload = {
   /** Nur bei kind === "group_key" */
   groupId?: string;
   keyB64?: string;
+  /** Sender ephemeral public key für Gruppen-PFS */
+  senderEphemeral?: string;
   /**
    * Für Gruppen-Sealed-Sender: der Absender ist in der E2EE-Payload enthalten,
    * nicht im server-sichtbaren Group-Frame. Für DMs wird der Absender per
