@@ -10,8 +10,15 @@ body,
 #root {
   height: 100%;
   height: 100dvh;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure root is a flex column so the app fills viewport */
+#root {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -19,7 +26,13 @@ body,
 @supports (height: 100dvh) {
   html, body, #root {
     height: 100dvh;
+    min-height: 100dvh;
   }
+}
+
+/* Allow body scroll ONLY as a fallback if flex layout breaks */
+@supports not (display: flex) {
+  body { overflow: auto; }
 }
 
 

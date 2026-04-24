@@ -1272,7 +1272,7 @@ export function ChatShell({
   );
 
   return (
-    <div className="flex h-full w-full flex-col bg-[var(--bg)] p-2 md:p-4">
+    <div className="flex h-full w-full flex-col bg-[var(--bg)] p-0 md:p-4">
       {searchOpen && (
         <SearchPanel
           users={users.map((u) => ({ id: u.id, username: u.username }))}
