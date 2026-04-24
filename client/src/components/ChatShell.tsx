@@ -187,6 +187,7 @@ export function ChatShell({
   const [newDmMessageWaiting, setNewDmMessageWaiting] = useState(false);
   const [newGroupMessageWaiting, setNewGroupMessageWaiting] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -1664,7 +1665,26 @@ export function ChatShell({
             <div
               ref={dmScrollRef}
               className="messages-container !px-4 !py-4 relative"
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file && peer) void sendDmFile(file);
+              }}
             >
+              {dragOver && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-emerald-500/20 backdrop-blur-sm border-2 border-dashed border-emerald-400 m-2">
+                  <div className="text-center">
+                    <p className="text-2xl mb-2">📎</p>
+                    <p className="text-sm font-medium text-emerald-700">Datei hier ablegen</p>
+                  </div>
+                </div>
+              )}
               {newDmMessageWaiting && (
                 <button
                   type="button"
