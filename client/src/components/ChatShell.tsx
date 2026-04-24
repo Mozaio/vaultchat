@@ -1307,7 +1307,7 @@ export function ChatShell({
       {securityOpen && (
         <SecuritySettings onClose={() => setSecurityOpen(false)} />
       )}
-      <div className="app-surface flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl md:rounded-3xl">
+      <div className="app-surface flex min-h-0 w-full flex-1 overflow-visible rounded-2xl md:rounded-3xl">
       <aside
         className={`${
           showSidebar ? "flex" : "hidden"
@@ -1489,8 +1489,7 @@ export function ChatShell({
       <main
         className={`${
           showSidebar ? "hidden" : "flex"
-        } min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 overflow-hidden`}
-        style={{ maxHeight: "100dvh" }}
+        } min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 overflow-hidden h-full`}
       >
         {incomingOffer && (
           <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
