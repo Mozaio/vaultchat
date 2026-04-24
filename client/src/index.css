@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -11,7 +11,9 @@ body,
   height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
+
 
 /* ============================================================
    VAULTCHAT DESIGN SYSTEM — Professional UI Overhaul
@@ -62,6 +64,11 @@ body,
   --bubble-peer: #ffffff;
   --bubble-peer-text: #0f172a;
   --bubble-peer-border: #e2e8f0;
+  --bubble-peer-shadow: 0 1px 1px rgba(0,0,0,0.06);
+
+  /* Chat wallpaper */
+  --chat-wallpaper: radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 50%, rgba(16, 185, 129, 0.02) 0%, transparent 50%);
 
   /* Radius */
   --radius-sm: 8px;
@@ -110,6 +117,10 @@ body,
   --bubble-peer: #1e293b;
   --bubble-peer-text: #f1f5f9;
   --bubble-peer-border: #334155;
+  --bubble-peer-shadow: 0 1px 2px rgba(0,0,0,0.2);
+
+  --chat-wallpaper: radial-gradient(circle at 20% 50%, rgba(52, 211, 153, 0.03) 0%, transparent 50%),
+                    radial-gradient(circle at 80% 50%, rgba(52, 211, 153, 0.02) 0%, transparent 50%);
 }
 
 /* ── Body ── */
@@ -350,18 +361,19 @@ body {
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 1.25rem;
+  padding: 1rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
   scroll-behavior: smooth;
+  background: var(--chat-wallpaper), var(--bg-chat);
 }
 
 /* ── Message Wrapper ── */
 .message-wrapper {
   display: flex;
-  margin-bottom: 0.25rem;
-  animation: messageSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 0;
+  animation: messageSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .message-wrapper.sent {
@@ -373,11 +385,9 @@ body {
 }
 
 /* Group consecutive messages from same sender (WhatsApp/Telegram style) */
-.message-wrapper.sent + .message-wrapper.sent {
-  margin-top: -0.35rem;
-}
+.message-wrapper.sent + .message-wrapper.sent,
 .message-wrapper.received + .message-wrapper.received {
-  margin-top: -0.35rem;
+  margin-top: 1px;
 }
 
 /* Grouped bubbles have smaller radius and no border on inner side (Discord/Telegram style) */
@@ -445,23 +455,21 @@ body {
   }
 }
 
-/* ── Message Bubble ── */
+/* ── Message Bubble (WhatsApp/Telegram inspired) ── */
 .message-bubble {
-  max-width: 70%;
+  max-width: 65%;
   min-width: 80px;
-  padding: 0.75rem 1rem;
-  border-radius: 20px;
+  padding: 0.5rem 0.75rem 0.25rem;
+  border-radius: 12px;
   font-size: 0.9375rem;
-  line-height: 1.6;
+  line-height: 1.45;
   word-wrap: break-word;
   position: relative;
-  box-shadow: var(--shadow-md);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: box-shadow 0.15s ease;
 }
 
 .message-bubble:hover {
-  transform: scale(1.01);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 /* Better text readability */
@@ -474,14 +482,15 @@ body {
   background: var(--bubble-them-bg);
   color: var(--bubble-them-fg);
   border: 1px solid var(--bubble-them-border);
-  border-bottom-left-radius: 6px;
+  box-shadow: var(--bubble-peer-shadow);
+  border-top-left-radius: 4px;
 }
 
 .message-bubble.sent {
   background: var(--bubble-me);
   color: var(--bubble-me-text);
-  border: 1px solid transparent;
-  border-bottom-right-radius: 6px;
+  border: none;
+  border-top-right-radius: 4px;
 }
 
 /* File attachment inside bubble */
@@ -512,25 +521,29 @@ body {
   flex-shrink: 0;
 }
 
-/* Message meta */
+/* Message meta (WhatsApp style: inline at bottom-right) */
 .message-time {
   font-size: 0.6875rem;
-  opacity: 0.65;
-  margin-top: 0.375rem;
+  opacity: 0.6;
+  margin-top: 0.125rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  float: right;
+  margin-left: 0.5rem;
+  margin-bottom: 0.125rem;
+  line-height: 1;
+  position: relative;
+  top: 4px;
 }
 
-/* ── Input Area ── */
+/* ── Input Area (WhatsApp/Telegram pill style) ── */
 .chat-input-area {
-  padding: 1rem 1.5rem;
-  background: var(--bg-glass);
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  padding: 0.5rem 1rem;
+  background: var(--bg-sidebar);
   border-top: 1px solid var(--border);
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 /* ============================================================
@@ -601,17 +614,21 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-/* Contact items */
+/* Contact items (WhatsApp/Telegram style) */
 .contact-item {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 0.75rem 1rem;
-  margin: 0 0.5rem 0.125rem;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  margin: 0 0.375rem;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease;
   position: relative;
+  border: none;
+  background: transparent;
+  text-align: left;
+  width: 100%;
 }
 
 .contact-item:hover {
@@ -629,11 +646,12 @@ body {
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 1.25rem;
+  height: 60%;
   background: var(--accent);
-  border-radius: 0 4px 4px 0;
+  border-radius: 0 3px 3px 0;
 }
 
+/* Contact avatar (WhatsApp style) */
 .contact-avatar {
   width: 2.75rem;
   height: 2.75rem;
@@ -646,7 +664,6 @@ body {
   color: white;
   font-size: 0.9375rem;
   flex-shrink: 0;
-  box-shadow: var(--shadow-sm);
 }
 
 .contact-info {
@@ -687,18 +704,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Unread badge (WhatsApp style) */
 .unread-badge {
   min-width: 1.25rem;
   height: 1.25rem;
   padding: 0 0.375rem;
   background: var(--accent);
   color: white;
-  font-size: 0.6875rem;
-  font-weight: 600;
+  font-size: 0.625rem;
+  font-weight: 700;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
+  letter-spacing: -0.02em;
 }
 
 /* ============================================================
@@ -1214,14 +1233,6 @@ body {
    ============================================================ */
 
 /* Fix: Scroll only in chat area, not whole page */
-.messages-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  height: 100%;
-  min-height: 0;
-}
-
 .chat-wrapper {
   display: flex;
   flex-direction: column;
@@ -1239,20 +1250,14 @@ body {
   margin-top: 4px;
 }
 
-/* Better message readability */
+/* Better message readability - enhanced overrides */
 .message-bubble {
-  max-width: 75%;
   padding: 10px 14px;
   line-height: 1.6;
 }
 
-.message-bubble p {
-  margin: 0;
-}
-
 /* Message spacing fix - prevent overlapping */
 .message-wrapper {
-  margin-bottom: 8px;
   padding-left: 8px;
   padding-right: 8px;
 }

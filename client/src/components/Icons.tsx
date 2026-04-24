@@ -125,16 +125,18 @@ export function IconSend(props: P) {
   return (
     <Svg {...props}>
       <path
-        d="M4 12 20 4l-3.5 16L11 13l-7  -1Z"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M11 13 20 4"
+        d="M22 2L11 13"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M22 2L15 22L11 13L2 9L22 2Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </Svg>
   );

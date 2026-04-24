@@ -92,6 +92,44 @@ function newCid(): string {
   );
 }
 
+/** Discord-like deterministic avatar color from user ID */
+function userColor(userId: string): string {
+  const colors = [
+    "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#10b981",
+    "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6", "#d946ef",
+    "#f43f5e", "#14b8a6", "#0ea5e9", "#a855f7", "#ec4899",
+  ];
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const idx = Math.abs(hash) % colors.length;
+  return colors[idx];
+}
+
+function userGradient(userId: string): string {
+  const base = userColor(userId);
+  // Create a slightly darker variant for gradient
+  return `linear-gradient(135deg, ${base} 0%, ${base}dd 100%)`;
+}
+
+/** WhatsApp/Telegram style date separator label */
+function fmtDateLabel(at: number): string {
+  const d = new Date(at);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (msgDay.getTime() === today.getTime()) return "Heute";
+  if (msgDay.getTime() === yesterday.getTime()) return "Gestern";
+  return d.toLocaleDateString("de-DE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+  });
+}
+
 export function ChatShell({
   session,
   onLogout,
@@ -102,7 +140,6 @@ export function ChatShell({
   onLock: () => void;
 }) {
   const [users, setUsers] = useState<api.ApiUser[]>([]);
-  const [searchedUsers, setSearchedUsers] = useState<api.ApiUser[]>([]);
   const [groups, setGroups] = useState<api.ApiGroup[]>([]);
   const [tab, setTab] = useState<Tab>("dm");
   const [peer, setPeer] = useState<api.ApiUser | null>(null);
@@ -126,9 +163,6 @@ export function ChatShell({
   const [replyDm, setReplyDm] = useState<ReplyTarget>(null);
   // Contact add modal
   const [showAddContact, setShowAddContact] = useState(false);
-  const [addContactUsername, setAddContactUsername] = useState("");
-  const [addContactError, setAddContactError] = useState<string | null>(null);
-  const [addContactLoading, setAddContactLoading] = useState(false);
   // Notification settings per chat
   const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
   const [mutedGroups, setMutedGroups] = useState<Set<string>>(new Set());
@@ -602,7 +636,14 @@ export function ChatShell({
       const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
       reconnectAttempts.current = attempts + 1;
       reconnectTimer.current = setTimeout(() => {
-        // Reconnect will be handled by React re-mounting this effect
+        // Force effect remount by creating a new WebSocket
+        const url = getWsUrl(tokenRef.current);
+        const newWs = new WebSocket(url);
+        wsRef.current = newWs;
+        newWs.onopen = ws.onopen;
+        newWs.onclose = ws.onclose;
+        newWs.onerror = ws.onerror;
+        newWs.onmessage = ws.onmessage;
       }, delay);
     };
     ws.onerror = () => setError("WebSocket-Fehler");
@@ -1211,13 +1252,19 @@ export function ChatShell({
             setTab("group");
             setGroup(g);
           }}
-          className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
+          className={`contact-item w-full !mx-0 ${
             group?.id === g.id && tab === "group"
-              ? "bg-emerald-900/40 text-emerald-100"
-              : "text-zinc-300 hover:bg-zinc-800"
+              ? "active"
+              : ""
           }`}
         >
-          {g.name}
+          <div className="contact-avatar !h-9 !w-9 !text-sm">
+            {g.name.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="contact-info min-w-0">
+            <span className="contact-name">{g.name}</span>
+            <p className="contact-preview">{g.memberIds.length} Mitglieder</p>
+          </div>
         </button>
       )),
     [groups, group, tab]
@@ -1513,8 +1560,9 @@ export function ChatShell({
                     <div
                       className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
                       style={{
-                        background:
-                          "linear-gradient(135deg, var(--accent-hover), var(--accent))",
+                        background: peer
+                          ? userGradient(peer.id)
+                          : "linear-gradient(135deg, var(--accent-hover), var(--accent))",
                       }}
                     >
                       {peer.username.slice(0, 1).toUpperCase()}
@@ -1629,36 +1677,56 @@ export function ChatShell({
                   ↓ Neue Nachrichten
                 </button>
               )}
-              {messages.map((m) => (
-                <MessageBubble
-                  key={m.plain.cid ?? m.id}
-                  msg={m}
-                  peerLabel={peer.username}
-                  replyToPreview={
-                    m.plain.replyPreview
-                      ? {
-                          author: m.plain.replyPreview.split(":")[0] ?? "",
-                          text: m.plain.replyPreview
-                            .split(":")
-                            .slice(1)
-                            .join(":")
-                            .trim(),
-                        }
-                      : findReplyPreview(messages, m.plain.replyToCid)
-                  }
-                  onReply={(x) =>
-                    setReplyDm({
-                      cid: x.plain.cid ?? "",
-                      author: x.fromMe ? "Du" : peer.username,
-                      text: previewForPayload(x.plain),
-                    })
-                  }
-                  onReact={(x, e) => void reactDm(x, e)}
-                  onEdit={(x, body) => void editDm(x, body)}
-                  onDelete={(x) => void deleteDm(x)}
-                  onCopy={copyText}
-                />
-              ))}
+              {messages.flatMap((m, i) => {
+                const items: JSX.Element[] = [];
+                if (
+                  i === 0 ||
+                  new Date(m.at).toDateString() !==
+                    new Date(messages[i - 1].at).toDateString()
+                ) {
+                  items.push(
+                    <div key={`date-${m.id}`} className="date-separator">
+                      <span>{fmtDateLabel(m.at)}</span>
+                    </div>
+                  );
+                }
+                items.push(
+                  <MessageBubble
+                    key={m.plain.cid ?? m.id}
+                    msg={m}
+                    isGrouped={i > 0 && messages[i - 1].fromMe === m.fromMe}
+                    isLastInGroup={
+                      i === messages.length - 1 ||
+                      messages[i + 1].fromMe !== m.fromMe
+                    }
+                    peerLabel={peer.username}
+                    replyToPreview={
+                      m.plain.replyPreview
+                        ? {
+                            author: m.plain.replyPreview.split(":")[0] ?? "",
+                            text: m.plain.replyPreview
+                              .split(":")
+                              .slice(1)
+                              .join(":")
+                              .trim(),
+                          }
+                        : findReplyPreview(messages, m.plain.replyToCid)
+                    }
+                    onReply={(x) =>
+                      setReplyDm({
+                        cid: x.plain.cid ?? "",
+                        author: x.fromMe ? "Du" : peer.username,
+                        text: previewForPayload(x.plain),
+                      })
+                    }
+                    onReact={(x, e) => void reactDm(x, e)}
+                    onEdit={(x, body) => void editDm(x, body)}
+                    onDelete={(x) => void deleteDm(x)}
+                    onCopy={copyText}
+                  />
+                );
+                return items;
+              })}
               {typing && (
                 <p className="text-xs italic text-zinc-500">
                   {peer.username} schreibt…
@@ -1669,9 +1737,9 @@ export function ChatShell({
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyDm && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
+                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
-                    <span className="text-emerald-400">
+                    <span style={{ color: "var(--accent)" }}>
                       Antwort an {replyDm.author}:
                     </span>{" "}
                     {replyDm.text.slice(0, 120)}
@@ -1679,7 +1747,8 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setReplyDm(null)}
-                    className="ml-2 text-zinc-500 hover:text-white"
+                    className="ml-2 transition hover:opacity-70"
+                    style={{ color: "var(--text-muted)" }}
                   >
                     ×
                   </button>
@@ -1689,18 +1758,19 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => setEmojiOpen((v) => !v)}
-                  className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
+                  className="rounded-xl border px-3 py-2 text-xs transition hover:bg-[var(--bg-hover)]"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
                   title="Emoji"
                 >
                   🙂
                 </button>
                 {emojiOpen && (
-                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border border-zinc-800 bg-zinc-950/90 p-2 text-lg shadow-xl backdrop-blur">
+                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
                     {["😀","😂","😍","👍","🔥","🎉","😮","😢","🙏","✅"].map((e) => (
                       <button
                         key={e}
                         type="button"
-                        className="rounded px-1.5 py-1 hover:bg-zinc-800"
+                        className="rounded px-1.5 py-1 transition hover:bg-[var(--bg-hover)]"
                         onClick={() => {
                           setText((t) => (t ? t + e : e));
                           setEmojiOpen(false);
@@ -1739,7 +1809,8 @@ export function ChatShell({
                   }}
                 />
                 <label
-                  className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"
+                  className="cursor-pointer rounded-xl border px-3 py-2 text-xs transition hover:bg-[var(--bg-hover)]"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
                   title="Datei anhängen"
                 >
                   <IconPaperclip size={16} />
@@ -1756,11 +1827,12 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => void sendDmVoice()}
-                  className={`rounded-xl border px-3 py-2 text-xs ${
+                  className={`rounded-xl border px-3 py-2 text-xs transition ${
                     voice.recording
                       ? "border-red-500 bg-red-700/60 text-white"
-                      : "border-zinc-700 text-zinc-300 transition hover:bg-zinc-800"
+                      : ""
                   }`}
+                  style={voice.recording ? {} : { borderColor: "var(--border)", color: "var(--text-secondary)" }}
                 >
                   {voice.recording ? "■" : <IconMic size={16} />}
                 </button>
@@ -1778,10 +1850,10 @@ export function ChatShell({
         )}
 
         {tab === "group" && !group && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-zinc-500">
+          <div className="flex flex-1 items-center justify-center px-6 text-center">
             <div className="max-w-sm">
-              <p className="text-sm font-medium text-zinc-200">Wähle eine Gruppe</p>
-              <p className="mt-1 text-xs text-zinc-500">
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>Wähle eine Gruppe</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
                 Oder erstelle oben links eine neue Gruppe.
               </p>
             </div>
@@ -1790,25 +1862,25 @@ export function ChatShell({
 
         {tab === "group" && group && (
           <>
-            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-3 py-3 md:px-4">
-              <div className="flex items-center justify-between gap-2">
+            <header className="chat-header !px-3 !py-3 md:!px-4">
+              <div className="flex w-full items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   {isMobile && (
                     <button
                       type="button"
                       onClick={() => setGroup(null)}
-                      className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                      className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
                       title="Zurück"
                     >
                       ←
                     </button>
                   )}
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-200">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow" style={{ background: "linear-gradient(135deg, var(--accent-hover), var(--accent))" }}>
                     {group.name.slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                  <p className="font-medium text-white">{group.name}</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="font-medium" style={{ color: "var(--text)" }}>{group.name}</p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                     E2EE symmetrisch · {group.memberIds.length} Mitglieder
                   </p>
                   </div>
@@ -1817,15 +1889,15 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setInfoOpen((v) => !v)}
-                    className="rounded-xl border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
+                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden"
                     title="Info"
                   >
-                    Info
+                    <IconMore size={16} />
                   </button>
                   <select
                     value={ttlGroup}
                     onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+                    className="app-input !py-1.5 !text-xs !w-auto"
                     title="Verschwindende Nachrichten"
                   >
                     {TTL_OPTIONS.map((o) => (
@@ -1837,7 +1909,7 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setGroupPanelOpen((v) => !v)}
-                    className="rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
                   >
                     Mitglieder
                   </button>
@@ -1845,7 +1917,7 @@ export function ChatShell({
               </div>
 
               {groupPanelOpen && (
-                <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-xs text-zinc-200">
+                <div className="mt-3 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text)" }}>
                   <ul className="mb-2 space-y-1">
                     {group.memberIds.map((mid) => {
                       const u = users.find((x) => x.id === mid);
@@ -1853,16 +1925,17 @@ export function ChatShell({
                       return (
                         <li
                           key={mid}
-                          className="flex items-center justify-between rounded bg-zinc-950/60 px-2 py-1"
+                          className="flex items-center justify-between rounded px-2 py-1"
+                          style={{ background: "var(--bg-hover)" }}
                         >
                           <span>{label}</span>
                           {mid !== session.user.id && (
                             <button
                               type="button"
                               onClick={() => void removeMember(mid)}
-                              className="rounded border border-red-700 px-2 py-0.5 text-red-300 hover:bg-red-900/30"
+                              className="btn btn-danger !px-2 !py-0.5 !text-[10px]"
                             >
-                              Entfernen + Key rotieren
+                              Entfernen
                             </button>
                           )}
                         </li>
@@ -1873,7 +1946,7 @@ export function ChatShell({
                     <select
                       value={addMemberId}
                       onChange={(e) => setAddMemberId(e.target.value)}
-                      className="flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200"
+                      className="app-input flex-1 !py-1 !text-xs"
                     >
                       <option value="">— Mitglied wählen —</option>
                       {users
@@ -1888,14 +1961,14 @@ export function ChatShell({
                       type="button"
                       onClick={() => void addMember()}
                       disabled={!addMemberId}
-                      className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-40"
+                      className="btn btn-primary !px-2 !py-1 !text-[10px] disabled:opacity-40"
                     >
-                      Hinzufügen + Key rotieren
+                      Hinzufügen
                     </button>
                     <button
                       type="button"
                       onClick={() => void leaveCurrentGroup()}
-                      className="rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-900/30"
+                      className="btn btn-danger !px-2 !py-1 !text-[10px]"
                     >
                       Verlassen
                     </button>
@@ -1955,9 +2028,9 @@ export function ChatShell({
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyGroup && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
+                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
-                    <span className="text-emerald-400">
+                    <span style={{ color: "var(--accent)" }}>
                       Antwort an {replyGroup.author}:
                     </span>{" "}
                     {replyGroup.text.slice(0, 120)}
@@ -1965,7 +2038,8 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setReplyGroup(null)}
-                    className="ml-2 text-zinc-500 hover:text-white"
+                    className="ml-2 transition hover:opacity-70"
+                    style={{ color: "var(--text-muted)" }}
                   >
                     ×
                   </button>
@@ -1973,7 +2047,7 @@ export function ChatShell({
               )}
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2"
+                  className="app-input flex-1 !rounded-xl px-3 py-2 text-sm"
                   placeholder="Gruppennachricht…"
                   value={groupText}
                   onChange={(e) => setGroupText(e.target.value)}
@@ -1987,9 +2061,9 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => void sendGroupText()}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+                  className="btn-send"
                 >
-                  Senden
+                  <IconSend size={16} />
                 </button>
               </div>
             </footer>
@@ -2034,11 +2108,11 @@ export function ChatShell({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Details</p>
+              <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Details</p>
               <button
                 type="button"
                 onClick={() => setInfoOpen(false)}
-                className="rounded-lg border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                className="btn btn-secondary !px-2 !py-1 !text-xs"
               >
                 ✕
               </button>
@@ -2074,27 +2148,21 @@ export function ChatShell({
         </div>
       )}
       {isMobile && !showConversation && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/80 p-2 backdrop-blur">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t p-2 backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
           <div className="mx-auto flex max-w-md gap-2">
             <button
               type="button"
               onClick={() => setTab("dm")}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${
-                tab === "dm"
-                  ? "bg-emerald-600 text-white"
-                  : "border border-zinc-800 text-zinc-300"
-              }`}
+              className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
+              style={tab === "dm" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
               Direkt
             </button>
             <button
               type="button"
               onClick={() => setTab("group")}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${
-                tab === "group"
-                  ? "bg-emerald-600 text-white"
-                  : "border border-zinc-800 text-zinc-300"
-              }`}
+              className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
+              style={tab === "group" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
               Gruppen
             </button>
@@ -2103,127 +2171,21 @@ export function ChatShell({
       )}
       </div>
 
-      {/* Add Contact Modal */}
-      {showAddContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="app-surface w-full max-w-md rounded-2xl p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-                Kontakt hinzufügen
-              </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddContact(false);
-                  setAddContactUsername("");
-                  setAddContactError(null);
-                }}
-                className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Tabs for different methods */}
-            <div className="mb-4 flex gap-2">
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-[var(--bg-hover)]"
-                style={{ borderColor: "var(--border)", color: "var(--text)" }}
-              >
-                🔤 Username
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium opacity-50"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                title="Coming soon"
-              >
-                📱 QR-Code
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium opacity-50"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                title="Coming soon"
-              >
-                🔗 Link
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                  Username eingeben
-                </label>
-                <input
-                  type="text"
-                  value={addContactUsername}
-                  onChange={(e) => {
-                    setAddContactUsername(e.target.value);
-                    setAddContactError(null);
-                  }}
-                  placeholder="z.B. max_muster"
-                  className="app-input"
-                  autoFocus
-                />
-                {addContactError && (
-                  <p className="mt-1 text-xs text-red-500">{addContactError}</p>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!addContactUsername.trim()) {
-                    setAddContactError("Bitte Username eingeben");
-                    return;
-                  }
-                  // Search for user by username on server
-                  void (async () => {
-                    setAddContactLoading(true);
-                    setAddContactError(null);
-                    try {
-                      // First refresh all users from server
-                      const { users: allUsers } = await api.listUsers(session.token);
-                      const foundUser = allUsers.find(
-                        (u) => u.username.toLowerCase() === addContactUsername.trim().toLowerCase() && u.id !== session.user.id
-                      );
-                      if (!foundUser) {
-                        setAddContactError("Benutzer nicht gefunden. Bitte Username prüfen.");
-                        setAddContactLoading(false);
-                        return;
-                      }
-                      // Add to users list and open chat
-                      setUsers((prev) => {
-                        if (prev.find((u) => u.id === foundUser.id)) return prev;
-                        return [...prev, foundUser];
-                      });
-                      await observePeerKey(foundUser.id, foundUser.publicKey);
-                      setTab("dm");
-                      setPeer(foundUser);
-                      setShowAddContact(false);
-                      setAddContactUsername("");
-                      setAddContactError(null);
-                    } catch (err) {
-                      setAddContactError("Fehler bei der Suche. Bitte erneut versuchen.");
-                    }
-                    setAddContactLoading(false);
-                  })();
-                }}
-                className="btn btn-primary w-full"
-                disabled={addContactLoading}
-              >
-                {addContactLoading ? "Suche..." : "🔍 Kontakt suchen"}
-              </button>
-
-              <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-                Der Benutzer muss sich vorher registriert haben
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <AddContactModal
+        isOpen={showAddContact}
+        onClose={() => setShowAddContact(false)}
+        sessionToken={session.token}
+        sessionUserId={session.user.id}
+        onContactSelected={(user) => {
+          setUsers((prev) => {
+            if (prev.find((u) => u.id === user.id)) return prev;
+            return [...prev, user];
+          });
+          void observePeerKey(user.id, user.publicKey);
+          setTab("dm");
+          setPeer(user);
+        }}
+      />
     </div>
   );
 }
@@ -2255,7 +2217,10 @@ function PeerRow({
         selected ? "active" : ""
       } !mx-0 items-center justify-between`}
     >
-      <div className="contact-avatar !h-9 !w-9 !text-sm">
+      <div
+        className="contact-avatar !h-9 !w-9 !text-sm"
+        style={{ background: userGradient(u.id) }}
+      >
         {u.username.slice(0, 1).toUpperCase()}
       </div>
       <div className="contact-info min-w-0">

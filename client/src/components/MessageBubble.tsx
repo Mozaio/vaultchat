@@ -53,6 +53,8 @@ export function MessageBubble({
   msg,
   peerLabel,
   replyToPreview,
+  isGrouped,
+  isLastInGroup,
   onReply,
   onReact,
   onEdit,
@@ -62,6 +64,8 @@ export function MessageBubble({
   msg: ChatMsg;
   peerLabel: string;
   replyToPreview?: { author: string; text: string } | null;
+  isGrouped?: boolean;
+  isLastInGroup?: boolean;
   onReply: (m: ChatMsg) => void;
   onReact: (m: ChatMsg, emoji: string) => void;
   onEdit: (m: ChatMsg, newBody: string) => void;
@@ -70,6 +74,7 @@ export function MessageBubble({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
+  const wrapperRef = useState<HTMLDivElement | null>(null)[1];
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(msg.plain.body ?? "");
   const [ttlLeft, setTtlLeft] = useState<string | null>(() =>
@@ -116,11 +121,13 @@ export function MessageBubble({
           </div>
         )}
 
-        <div
-          className={`message-bubble relative ${
-            msg.fromMe ? "sent" : "received"
-          } max-w-full ${msg.deleted ? "italic app-muted-2" : ""}`}
-        >
+      <div
+        className={`message-bubble relative ${
+          msg.fromMe ? "sent" : "received"
+        } max-w-full ${msg.deleted ? "italic app-muted-2" : ""} ${
+          isGrouped ? "grouped" : ""
+        } ${isLastInGroup ? "" : ""}`}
+      >
           {msg.deleted ? (
             <span>Nachricht gelöscht</span>
           ) : editing ? (
@@ -206,7 +213,8 @@ export function MessageBubble({
               }}
               className={`absolute -top-3 ${
                 msg.fromMe ? "right-0" : "left-0"
-              } hidden rounded-full border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 group-hover:block z-20`}
+              } hidden rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs hover:bg-[var(--bg-hover)] group-hover:block z-20`}
+              style={{ color: "var(--text-secondary)" }}
             >
               ⋯
             </button>
@@ -214,13 +222,15 @@ export function MessageBubble({
 
           {menuOpen && !msg.deleted && (
             <div
-              className={`absolute top-6 z-30 w-40 rounded-lg border border-zinc-700 bg-zinc-900 p-1 text-xs shadow-xl ${
+              className={`absolute top-6 z-30 w-40 rounded-lg border p-1 text-xs shadow-xl ${
                 msg.fromMe ? "-right-2" : "-left-2"
               }`}
+              style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
             >
               <button
                 type="button"
-                className="block w-full rounded px-2 py-1.5 text-left text-zinc-200 hover:bg-zinc-800"
+                className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+                style={{ color: "var(--text)" }}
                 onClick={() => {
                   onReply(msg);
                   setMenuOpen(false);
@@ -230,7 +240,8 @@ export function MessageBubble({
               </button>
               <button
                 type="button"
-                className="block w-full rounded px-2 py-1.5 text-left text-zinc-200 hover:bg-zinc-800"
+                className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+                style={{ color: "var(--text)" }}
                 onClick={() => {
                   setReactOpen(true);
                 }}
@@ -240,7 +251,8 @@ export function MessageBubble({
               {msg.plain.kind === "text" && body && (
                 <button
                   type="button"
-                  className="block w-full rounded px-2 py-1.5 text-left text-zinc-200 hover:bg-zinc-800"
+                  className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+                  style={{ color: "var(--text)" }}
                   onClick={() => {
                     onCopy(body);
                     setMenuOpen(false);
@@ -252,7 +264,8 @@ export function MessageBubble({
               {msg.fromMe && msg.plain.kind === "text" && (
                 <button
                   type="button"
-                  className="block w-full rounded px-2 py-1.5 text-left text-zinc-200 hover:bg-zinc-800"
+                  className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+                  style={{ color: "var(--text)" }}
                   onClick={() => {
                     setEditing(true);
                     setMenuOpen(false);
@@ -264,7 +277,8 @@ export function MessageBubble({
               {msg.fromMe && (
                 <button
                   type="button"
-                  className="block w-full rounded px-2 py-1.5 text-left text-red-300 hover:bg-red-950/50"
+                  className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-red-950/50"
+                  style={{ color: "var(--danger)" }}
                   onClick={() => {
                     onDelete(msg);
                     setMenuOpen(false);
@@ -278,16 +292,17 @@ export function MessageBubble({
 
           {reactOpen && !msg.deleted && (
             <div
-              className={`absolute top-8 z-10 flex gap-1 rounded-lg border border-zinc-700 bg-zinc-900 p-1 text-lg shadow-xl ${
+              className={`absolute top-8 z-10 flex gap-1 rounded-lg border p-1 text-lg shadow-xl ${
                 msg.fromMe ? "right-0" : "left-0"
               }`}
+              style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
             >
               {QUICK_EMOJIS.map((e) => (
                 <button
                   key={e}
                   type="button"
-                  className={`rounded px-1 hover:bg-zinc-800 ${
-                    msg.myReaction === e ? "bg-emerald-900/60" : ""
+                  className={`rounded px-1 transition hover:bg-[var(--bg-hover)] ${
+                    msg.myReaction === e ? "bg-[var(--accent-soft)]" : ""
                   }`}
                   onClick={() => {
                     onReact(msg, msg.myReaction === e ? "" : e);
@@ -312,8 +327,9 @@ export function MessageBubble({
                 className={`rounded-full border px-2 py-0.5 text-xs ${
                   msg.myReaction === e
                     ? "border-emerald-500/50 bg-emerald-900/40 text-emerald-100"
-                    : "border-zinc-700 bg-zinc-900 text-zinc-300"
+                    : ""
                 }`}
+                style={msg.myReaction === e ? {} : { borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
                 title={peerLabel}
               >
                 {e} {n}
