@@ -1267,9 +1267,21 @@ body {
   }
   .messages-container {
     padding: 1rem;
+    padding-bottom: 5rem; /* Space for fixed input bar */
   }
   .message-bubble {
     max-width: 80%;
+  }
+  /* Fixed input bar on mobile — WhatsApp style */
+  .chat-input-area {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 40;
+    border-top: 1px solid var(--border);
+    background: var(--bg-sidebar);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 }
 
