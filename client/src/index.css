@@ -9,9 +9,17 @@ html,
 body,
 #root {
   height: 100%;
+  height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+}
+
+/* iOS safe-area support */
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
 }
 
 
@@ -359,7 +367,8 @@ body {
 
 /* ── Message Area ── */
 .messages-container {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 1rem 1.5rem;
   display: flex;
@@ -566,6 +575,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 /* ============================================================

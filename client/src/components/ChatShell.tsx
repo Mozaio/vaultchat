@@ -1490,6 +1490,7 @@ export function ChatShell({
         className={`${
           showSidebar ? "hidden" : "flex"
         } min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 overflow-hidden`}
+        style={{ maxHeight: "100dvh" }}
       >
         {incomingOffer && (
           <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
