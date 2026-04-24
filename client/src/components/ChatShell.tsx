@@ -73,7 +73,6 @@ import {
 } from "./Icons";
 
 type Tab = "dm" | "group";
-
 type ReplyTarget = { cid: string; author: string; text: string } | null;
 
 const TTL_OPTIONS: { label: string; ms: number }[] = [
@@ -124,15 +123,12 @@ export function ChatShell({
   } | null>(null);
   const [callRemote, setCallRemote] = useState<MediaStream | null>(null);
   const [replyDm, setReplyDm] = useState<ReplyTarget>(null);
-  // Contact add modal
   const [showAddContact, setShowAddContact] = useState(false);
   const [addContactUsername, setAddContactUsername] = useState("");
   const [addContactError, setAddContactError] = useState<string | null>(null);
   const [addContactLoading, setAddContactLoading] = useState(false);
-  // Notification settings per chat
   const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
   const [mutedGroups, setMutedGroups] = useState<Set<string>>(new Set());
-  // Online status tracking
   const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
@@ -159,7 +155,6 @@ export function ChatShell({
     handleRemote?: (p: RtcPayload) => void | Promise<void>;
     addIce?: (c: RTCIceCandidateInit) => void | Promise<void>;
   } | null>(null);
-
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
@@ -170,14 +165,11 @@ export function ChatShell({
   const seen = useRef(new Set<string>());
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
-  const rawDmRef = useRef<Map<string, ReturnType<typeof authoredFromDm>>>(
-    new Map()
-  );
-  const rawGroupRef = useRef<Map<string, ReturnType<typeof authoredFromGroup>>>(
-    new Map()
-  );
+  const rawDmRef = useRef<Map<string, ReturnType<typeof authoredFromDm>>>(new Map());
+  const rawGroupRef = useRef<Map<string, ReturnType<typeof authoredFromGroup>>>(new Map());
   const tokenRef = useRef(session.token);
   const coverRef = useRef<ReturnType<typeof startCoverTraffic> | null>(null);
+
   peerRef.current = peer;
   groupRef.current = group;
   usersRef.current = users;
@@ -216,8 +208,6 @@ export function ChatShell({
       if (local) return local;
       try {
         const { users: list } = await api.listUsers(session.token);
-        // Only add to local list if we actually need this user (for decryption)
-        // Don't replace the entire users list - this prevents showing ALL users
         const found = list.find((u) => u.id === userId);
         if (found) {
           setUsers((prev) => {
@@ -234,7 +224,6 @@ export function ChatShell({
     [session.token, session.user.id]
   );
 
-  // Don't load all users on start - only search on demand
   const searchUserByUsername = useCallback(async (username: string): Promise<api.ApiUser | null> => {
     try {
       const { users: list } = await api.listUsers(session.token);
@@ -251,15 +240,11 @@ export function ChatShell({
     }
   }, [session.token, session.user.id]);
 
-  // Load only contacts from local messages (not from server)
   const loadContacts = useCallback(async () => {
-    // Only show contacts we've exchanged messages with (from local storage)
     const contactIds = Array.from(rawDmRef.current.keys());
     const { users: list } = await api.listUsers(session.token);
     const contacts = list.filter((u) => contactIds.includes(u.id));
     setUsers(contacts);
-    
-    // Also observe peer keys for contacts
     for (const u of contacts) {
       try {
         await observePeerKey(u.id, u.publicKey);
@@ -290,7 +275,6 @@ export function ChatShell({
     void refreshPendingCount();
   }, [loadContacts, loadGroups, refreshPendingCount]);
 
-  /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
   useEffect(() => {
     void (async () => {
       try {
@@ -301,7 +285,6 @@ export function ChatShell({
         }
         await api.uploadPreKeys(session.token, toUploadBody(km));
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error("[vaultchat] prekey upload", e);
       }
     })();
@@ -335,7 +318,6 @@ export function ChatShell({
     setGroupMessages(reduceChatMessages(raw));
   }, []);
 
-  // Purge expired messages continuously so they disappear "live".
   useEffect(() => {
     const h = setInterval(() => {
       void (async () => {
@@ -412,7 +394,6 @@ export function ChatShell({
     void loadGroupLocal(group);
   }, [group, loadGroupLocal]);
 
-  // Auto-scroll: nur wenn der User bereits unten war ODER neue Nachricht reinkommt
   useEffect(() => {
     const el = dmScrollRef.current;
     if (!el) return;
@@ -420,12 +401,10 @@ export function ChatShell({
     if (isAtBottom) {
       el.scrollTop = el.scrollHeight;
     } else {
-      // Zeige einen "neue Nachricht" Button
       setNewDmMessageWaiting(true);
     }
   }, [messages]);
 
-  // Auto-scroll für Gruppen
   useEffect(() => {
     const el = groupScrollRef.current;
     if (!el) return;
@@ -441,11 +420,6 @@ export function ChatShell({
     wsRef.current?.send(JSON.stringify({ type: "rtc", toUserId, payload }));
   }, []);
 
-  /**
-   * Kernroutine fürs Senden: DR-Verschlüsselung → Sealed-Sender-Envelope →
-   * WebSocket. Wenn kein Socket oder `delivered=0`, wird die Nachricht in der
-   * Outbox geparkt und bei Reconnect/periodic erneut versendet.
-   */
   const sendDmWire = useCallback(
     async (
       toUser: api.ApiUser,
@@ -464,7 +438,6 @@ export function ChatShell({
         toUser.publicKey
       );
       const cid = newCid();
-
       const at = Date.now();
       const tmpId = `local-${newCid()}`;
       const ttl = payload.ttlMs ?? 0;
@@ -488,15 +461,11 @@ export function ChatShell({
         rawDmRef.current.set(toUser.id, arr);
         if (peerRef.current?.id === toUser.id) rebuildDm(toUser.id);
       }
-
       await outboxAdd(cid, toUser.id, envelope);
       await refreshPendingCount();
-
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(
-          JSON.stringify({ type: "dm", toUserId: toUser.id, envelope, cid })
-        );
+        ws.send(JSON.stringify({ type: "dm", toUserId: toUser.id, envelope, cid }));
       }
       return tmpId;
     },
@@ -542,7 +511,6 @@ export function ChatShell({
     [rebuildGroup, session.user.id]
   );
 
-  /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
   const flushOutbox = useCallback(async () => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return;
@@ -550,22 +518,12 @@ export function ChatShell({
     for (const row of pending) {
       const meta = await outboxGetMeta(row.cid).catch(() => null);
       if (meta?.nextAttemptAt && Date.now() < meta.nextAttemptAt) continue;
-      const { shouldRetry, attempts } = await outboxAttempt(row.cid);
+      const { shouldRetry } = await outboxAttempt(row.cid);
       if (!shouldRetry) {
-        // Give up: message permanently failed.
-        // Keep UI simple; it disappears from outbox.
-        // eslint-disable-next-line no-console
-        console.error(`[vaultchat] Message ${row.cid} failed after ${attempts} attempts`);
+        console.error(`[vaultchat] Message ${row.cid} failed`);
         continue;
       }
-      ws.send(
-        JSON.stringify({
-          type: "dm",
-          toUserId: row.toUserId,
-          envelope: row.envelopeB64,
-          cid: row.cid,
-        })
-      );
+      ws.send(JSON.stringify({ type: "dm", toUserId: row.toUserId, envelope: row.envelopeB64, cid: row.cid }));
     }
     await refreshPendingCount();
   }, [refreshPendingCount]);
@@ -577,49 +535,35 @@ export function ChatShell({
     ws.onopen = () => {
       setConnected(true);
       void flushOutbox();
-
-      // Starte Cover Traffic (Dummy-Envelopes bei Inaktivität)
-      const peerList = usersRef.current.map((u) => ({
-        id: u.id,
-        publicKey: u.publicKey,
-      }));
+      const peerList = usersRef.current.map((u) => ({ id: u.id, publicKey: u.publicKey }));
       if (peerList.length > 0) {
-        coverRef.current = startCoverTraffic(ws, peerList, () => {
-          return ws.readyState === WebSocket.OPEN && session !== null;
-        });
+        coverRef.current = startCoverTraffic(ws, peerList, () => ws.readyState === WebSocket.OPEN && session !== null);
       }
     };
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
-      // Stop cover traffic
       if (coverRef.current) {
         coverRef.current.stop();
         coverRef.current = null;
       }
-      // Auto-reconnect with exponential backoff (max 30 seconds)
       const attempts = reconnectAttempts.current;
       const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
       reconnectAttempts.current = attempts + 1;
-      reconnectTimer.current = setTimeout(() => {
-        // Reconnect will be handled by React re-mounting this effect
-      }, delay);
+      reconnectTimer.current = setTimeout(() => {}, delay);
     };
     ws.onerror = () => setError("WebSocket-Fehler");
     ws.onmessage = (ev) => {
       void (async () => {
         try {
           const data = JSON.parse(String(ev.data)) as Record<string, unknown>;
-
           if (data.type === "dm_ack") {
             const cid = typeof data.cid === "string" ? data.cid : null;
             const delivered = Number(data.delivered ?? 0);
             const id = typeof data.id === "string" ? data.id : null;
             if (id) seen.current.add(id);
             if (cid) {
-              if (delivered > 0) {
-                await outboxRemove(cid);
-              }
+              if (delivered > 0) await outboxRemove(cid);
               await refreshPendingCount();
             }
             return;
@@ -637,51 +581,30 @@ export function ChatShell({
               setIncomingOffer({ from: u, sdp: payload.sdp });
               return;
             }
-            if (callRef.current?.handleRemote) {
-              await callRef.current.handleRemote(payload);
-            }
-            if (payload.type === "candidate" && callRef.current?.addIce) {
-              await callRef.current.addIce(payload.candidate);
-            }
+            if (callRef.current?.handleRemote) await callRef.current.handleRemote(payload);
+            if (payload.type === "candidate" && callRef.current?.addIce) await callRef.current.addIce(payload.candidate);
             return;
           }
           const cur = peerRef.current;
-          if (
-            data.type === "typing" &&
-            cur &&
-            data.fromUserId === cur.id
-          ) {
+          if (data.type === "typing" && cur && data.fromUserId === cur.id) {
             setTyping(true);
             if (typingTimer.current) clearTimeout(typingTimer.current);
             typingTimer.current = setTimeout(() => setTyping(false), 2800);
             return;
           }
-          if (
-            data.type === "dm" &&
-            typeof data.id === "string" &&
-            typeof data.envelope === "string"
-          ) {
+          if (data.type === "dm" && typeof data.id === "string" && typeof data.envelope === "string") {
             const id = data.id;
             if (seen.current.has(id)) return;
             const createdAt = Number(data.createdAt ?? Date.now());
-            const dec = await decryptIncomingSealedDm(
-              data.envelope,
-              session,
-              resolveUser
-            );
+            const dec = await decryptIncomingSealedDm(data.envelope, session, resolveUser);
             if (!dec) return;
             seen.current.add(id);
-            const peerUser = usersRef.current.find(
-              (u) => u.id === dec.senderUserId
-            );
+            const peerUser = usersRef.current.find((u) => u.id === dec.senderUserId);
             if (!peerUser) return;
-
             const plain = dec.plain;
             if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
               const keyBytes = uint8FromBase64(plain.keyB64);
               await setGroupKey(plain.groupId, keyBytes);
-              // Auch PFS-Key-State initialisieren, damit encryptGroupPayload
-              // den PFS-Pfad (GC2) nutzen kann statt Legacy (GC1)
               const existingState = await getGroupKeyState(plain.groupId);
               if (!existingState) {
                 const peers = usersRef.current.map(u => u.id);
@@ -690,51 +613,21 @@ export function ChatShell({
               await loadGroups();
               return;
             }
-
             const ttl = plain.ttlMs ?? 0;
-            await idbPutDm({
-              id,
-              peerId: peerUser.id,
-              fromMe: false,
-              plainJson: JSON.stringify(plain),
-              at: createdAt,
-              ...(ttl ? { expiresAt: createdAt + ttl } : {}),
-            });
+            await idbPutDm({ id, peerId: peerUser.id, fromMe: false, plainJson: JSON.stringify(plain), at: createdAt, ...(ttl ? { expiresAt: createdAt + ttl } : {}) });
             const arr = rawDmRef.current.get(peerUser.id) ?? [];
-            arr.push({
-              id,
-              fromMe: false,
-              plainJson: JSON.stringify(plain),
-              at: createdAt,
-              ...(ttl ? { expiresAt: createdAt + ttl } : {}),
-            });
+            arr.push({ id, fromMe: false, plainJson: JSON.stringify(plain), at: createdAt, ...(ttl ? { expiresAt: createdAt + ttl } : {}) });
             rawDmRef.current.set(peerUser.id, arr);
             if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
-            // Update unread (if chat not currently open).
             if (peerRef.current?.id !== peerUser.id) {
               void (async () => {
-                const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
-                  () => null
-                );
+                const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(() => null);
                 const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
-                if (createdAt > seenAt) {
-                  setUnreadByPeer((m) => ({
-                    ...m,
-                    [peerUser.id]: (m[peerUser.id] ?? 0) + 1,
-                  }));
-                }
+                if (createdAt > seenAt) setUnreadByPeer((m) => ({ ...m, [peerUser.id]: (m[peerUser.id] ?? 0) + 1 }));
               })();
             }
-
             if (plain.kind !== "receipt" && plain.cid) {
-              const receipt: PlainPayload = {
-                v: 2,
-                cid: newCid(),
-                kind: "receipt",
-                receiptKind:
-                  peerRef.current?.id === peerUser.id ? "read" : "delivered",
-                refCid: plain.cid,
-              };
+              const receipt: PlainPayload = { v: 2, cid: newCid(), kind: "receipt", receiptKind: peerRef.current?.id === peerUser.id ? "read" : "delivered", refCid: plain.cid };
               void sendDmWire(peerUser, receipt, true);
             }
           }
@@ -753,49 +646,24 @@ export function ChatShell({
             const fromUserId = plain.senderUserId ?? "";
             const at = Number(data.createdAt);
             const ttl = plain.ttlMs ?? 0;
-            await idbPutGroupMsg({
-              id,
-              groupId: gid,
-              fromUserId,
-              plainJson: JSON.stringify(plain),
-              at,
-              ...(ttl ? { expiresAt: at + ttl } : {}),
-            });
+            await idbPutGroupMsg({ id, groupId: gid, fromUserId, plainJson: JSON.stringify(plain), at, ...(ttl ? { expiresAt: at + ttl } : {}) });
             const arr = rawGroupRef.current.get(gid) ?? [];
-            arr.push({
-              id,
-              fromMe: fromUserId === session.user.id,
-              fromUserId,
-              plainJson: JSON.stringify(plain),
-              at,
-              ...(ttl ? { expiresAt: at + ttl } : {}),
-            });
+            arr.push({ id, fromMe: fromUserId === session.user.id, fromUserId, plainJson: JSON.stringify(plain), at, ...(ttl ? { expiresAt: at + ttl } : {}) });
             rawGroupRef.current.set(gid, arr);
             if (groupRef.current?.id === gid) rebuildGroup(gid);
           }
         } catch {
-          /* ignore malformed frames */
+          /* ignore */
         }
       })();
     };
-    const interval = setInterval(() => {
-      void flushOutbox();
-    }, 15_000);
+    const interval = setInterval(() => void flushOutbox(), 15_000);
     return () => {
       ws.close();
       clearInterval(interval);
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
-  }, [
-    session,
-    loadGroups,
-    sendDmWire,
-    rebuildDm,
-    rebuildGroup,
-    resolveUser,
-    flushOutbox,
-    refreshPendingCount,
-  ]);
+  }, [session, loadGroups, sendDmWire, rebuildDm, rebuildGroup, resolveUser, flushOutbox, refreshPendingCount]);
 
   async function sendDmText() {
     if (!peer || !text.trim()) return;
@@ -804,18 +672,9 @@ export function ChatShell({
       return;
     }
     setError(null);
-    const cid = newCid();
     const payload: PlainPayload = {
-      v: 2,
-      cid,
-      kind: "text",
-      body: text.trim(),
-      ...(replyDm
-        ? {
-            replyToCid: replyDm.cid,
-            replyPreview: `${replyDm.author}: ${replyDm.text}`,
-          }
-        : {}),
+      v: 2, cid: newCid(), kind: "text", body: text.trim(),
+      ...(replyDm ? { replyToCid: replyDm.cid, replyPreview: `${replyDm.author}: ${replyDm.text}` } : {}),
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
     };
     await sendDmWire(peer, payload);
@@ -825,13 +684,10 @@ export function ChatShell({
 
   async function sendDmFile(file: File) {
     if (!peer) return;
-    /** Server: 128 MB verschlüsselter Umschlag; Data-URL + DR + Seal wachsen ~1,4–1,5×. */
     const e2eMaxB64 = 128 * 1024 * 1024;
     const maxFile = Math.floor(e2eMaxB64 / 1.5);
     if (file.size > maxFile) {
-      setError(
-        `Datei zu groß: Der E2E-Server-Rahmen beträgt 128 MB (Umschlag). Wegen Data-URL und Verschlüsselung bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB.`
-      );
+      setError(`Datei zu groß: Max ${Math.floor(maxFile / (1024 * 1024))} MB.`);
       return;
     }
     const body = await new Promise<string>((resolve, reject) => {
@@ -840,15 +696,7 @@ export function ChatShell({
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "file",
-      body,
-      fileName: file.name,
-      mime: file.type,
-      ...(ttlDm ? { ttlMs: ttlDm } : {}),
-    };
+    const payload: PlainPayload = { v: 2, cid: newCid(), kind: "file", body, fileName: file.name, mime: file.type, ...(ttlDm ? { ttlMs: ttlDm } : {}) };
     await sendDmWire(peer, payload);
   }
 
@@ -857,15 +705,7 @@ export function ChatShell({
     if (voice.recording) {
       const rec = await voice.stop();
       if (!rec) return;
-      const payload: PlainPayload = {
-        v: 2,
-        cid: newCid(),
-        kind: "voice",
-        body: rec.dataUrl,
-        mime: rec.mime,
-        durationMs: rec.durationMs,
-        ...(ttlDm ? { ttlMs: ttlDm } : {}),
-      };
+      const payload: PlainPayload = { v: 2, cid: newCid(), kind: "voice", body: rec.dataUrl, mime: rec.mime, durationMs: rec.durationMs, ...(ttlDm ? { ttlMs: ttlDm } : {}) };
       await sendDmWire(peer, payload);
     } else {
       const ok = await voice.start();
@@ -876,19 +716,7 @@ export function ChatShell({
   async function sendGroupText() {
     if (!group || !groupText.trim()) return;
     setError(null);
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "text",
-      body: groupText.trim(),
-      ...(replyGroup
-        ? {
-            replyToCid: replyGroup.cid,
-            replyPreview: `${replyGroup.author}: ${replyGroup.text}`,
-          }
-        : {}),
-      ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
-    };
+    const payload: PlainPayload = { v: 2, cid: newCid(), kind: "text", body: groupText.trim(), ...(replyGroup ? { replyToCid: replyGroup.cid, replyPreview: `${replyGroup.author}: ${replyGroup.text}` } : {}), ...(ttlGroup ? { ttlMs: ttlGroup } : {}) };
     await sendGroupWire(group, payload);
     setGroupText("");
     setReplyGroup(null);
@@ -898,73 +726,37 @@ export function ChatShell({
     if (!peer) return;
     const refCid = m.plain.cid;
     if (!refCid) return;
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "reaction",
-      refCid,
-      emoji,
-    };
-    await sendDmWire(peer, payload);
+    await sendDmWire(peer, { v: 2, cid: newCid(), kind: "reaction", refCid, emoji });
   }
 
   async function reactGroup(m: ChatMsg, emoji: string) {
     if (!group) return;
     const refCid = m.plain.cid;
     if (!refCid) return;
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "reaction",
-      refCid,
-      emoji,
-    };
-    await sendGroupWire(group, payload);
+    await sendGroupWire(group, { v: 2, cid: newCid(), kind: "reaction", refCid, emoji });
   }
 
   async function editDm(m: ChatMsg, body: string) {
     if (!peer) return;
     const refCid = m.plain.cid;
     if (!refCid) return;
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "edit",
-      refCid,
-      body,
-    };
-    await sendDmWire(peer, payload);
+    await sendDmWire(peer, { v: 2, cid: newCid(), kind: "edit", refCid, body });
   }
 
   async function editGroup(m: ChatMsg, body: string) {
     if (!group) return;
     const refCid = m.plain.cid;
     if (!refCid) return;
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "edit",
-      refCid,
-      body,
-    };
-    await sendGroupWire(group, payload);
+    await sendGroupWire(group, { v: 2, cid: newCid(), kind: "edit", refCid, body });
   }
 
   async function deleteDm(m: ChatMsg) {
     if (!peer) return;
     const refCid = m.plain.cid;
     if (!refCid) return;
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "delete",
-      refCid,
-    };
-    await sendDmWire(peer, payload);
+    await sendDmWire(peer, { v: 2, cid: newCid(), kind: "delete", refCid });
     await idbDeleteDm(m.id);
-    const arr = (rawDmRef.current.get(peer.id) ?? []).filter(
-      (x) => x.id !== m.id
-    );
+    const arr = (rawDmRef.current.get(peer.id) ?? []).filter((x) => x.id !== m.id);
     rawDmRef.current.set(peer.id, arr);
     rebuildDm(peer.id);
   }
@@ -973,17 +765,9 @@ export function ChatShell({
     if (!group) return;
     const refCid = m.plain.cid;
     if (!refCid) return;
-    const payload: PlainPayload = {
-      v: 2,
-      cid: newCid(),
-      kind: "delete",
-      refCid,
-    };
-    await sendGroupWire(group, payload);
+    await sendGroupWire(group, { v: 2, cid: newCid(), kind: "delete", refCid });
     await idbDeleteGroupMsg(m.id);
-    const arr = (rawGroupRef.current.get(group.id) ?? []).filter(
-      (x) => x.id !== m.id
-    );
+    const arr = (rawGroupRef.current.get(group.id) ?? []).filter((x) => x.id !== m.id);
     rawGroupRef.current.set(group.id, arr);
     rebuildGroup(group.id);
   }
@@ -997,14 +781,7 @@ export function ChatShell({
       if (mid === session.user.id) continue;
       const u = usersRef.current.find((x) => x.id === mid);
       if (!u) continue;
-      const p: PlainPayload = {
-        v: 2,
-        cid: newCid(),
-        kind: "group_key",
-        groupId: g.id,
-        keyB64,
-      };
-      await sendDmWire(u, p, true);
+      await sendDmWire(u, { v: 2, cid: newCid(), kind: "group_key", groupId: g.id, keyB64 }, true);
     }
   }
 
@@ -1015,10 +792,7 @@ export function ChatShell({
     }
     setError(null);
     const memberIds = [...new Set([...newGroupMembers, session.user.id])];
-    const { group: g } = await api.createGroup(session.token, {
-      name: newGroupName.trim(),
-      memberIds,
-    });
+    const { group: g } = await api.createGroup(session.token, { name: newGroupName.trim(), memberIds });
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
     await loadGroups();
@@ -1027,7 +801,6 @@ export function ChatShell({
     setNewGroupMembers([]);
     setGroup(g);
     setTab("group");
-    // Refresh group list immediately
     await loadGroups();
   }
 
@@ -1040,11 +813,7 @@ export function ChatShell({
   async function addMember() {
     if (!group || !addMemberId) return;
     try {
-      const { group: g2 } = await api.addGroupMember(
-        session.token,
-        group.id,
-        addMemberId
-      );
+      const { group: g2 } = await api.addGroupMember(session.token, group.id, addMemberId);
       setGroup(g2);
       await loadGroups();
       await rotateGroupKey(g2, g2.memberIds);
@@ -1057,11 +826,7 @@ export function ChatShell({
   async function removeMember(memberId: string) {
     if (!group) return;
     try {
-      const { group: g2 } = await api.removeGroupMember(
-        session.token,
-        group.id,
-        memberId
-      );
+      const { group: g2 } = await api.removeGroupMember(session.token, group.id, memberId);
       setGroup(g2);
       await loadGroups();
       await rotateGroupKey(g2, g2.memberIds);
@@ -1083,39 +848,14 @@ export function ChatShell({
 
   async function beginCall() {
     if (!peer) return;
-    const ctrl = await startCall(
-      peer,
-      tokenRef.current,
-      relayOnly,
-      sendRtc,
-      (s) => setCallRemote(s),
-      () => {
-        setCallRemote(null);
-        callRef.current = null;
-      }
-    );
+    const ctrl = await startCall(peer, tokenRef.current, relayOnly, sendRtc, (s) => setCallRemote(s), () => { setCallRemote(null); callRef.current = null; });
     callRef.current = ctrl;
   }
 
   async function acceptIncoming() {
     if (!incomingOffer) return;
-    const ctrl = await acceptCall(
-      incomingOffer.from,
-      incomingOffer.sdp,
-      tokenRef.current,
-      relayOnly,
-      sendRtc,
-      (s) => setCallRemote(s),
-      () => {
-        setCallRemote(null);
-        callRef.current = null;
-      }
-    );
-    callRef.current = {
-      ...ctrl,
-      handleRemote: undefined,
-      addIce: ctrl.addIce,
-    };
+    const ctrl = await acceptCall(incomingOffer.from, incomingOffer.sdp, tokenRef.current, relayOnly, sendRtc, (s) => setCallRemote(s), () => { setCallRemote(null); callRef.current = null; });
+    callRef.current = { ...ctrl, handleRemote: undefined, addIce: ctrl.addIce };
     setIncomingOffer(null);
   }
 
@@ -1129,17 +869,11 @@ export function ChatShell({
     if (group) await metaSet(`ttl:g:${group.id}`, String(ms));
   }
 
-  function findReplyPreview(
-    list: ChatMsg[],
-    cid: string | undefined
-  ): { author: string; text: string } | null {
+  function findReplyPreview(list: ChatMsg[], cid: string | undefined): { author: string; text: string } | null {
     if (!cid) return null;
     const m = list.find((x) => x.plain.cid === cid);
     if (!m) return null;
-    return {
-      author: m.fromMe ? "Du" : peer?.username ?? "Peer",
-      text: previewForPayload(m.plain),
-    };
+    return { author: m.fromMe ? "Du" : peer?.username ?? "Peer", text: previewForPayload(m.plain) };
   }
 
   const lastDmPreviewByPeer = useMemo(() => {
@@ -1147,14 +881,11 @@ export function ChatShell({
     for (const [pid, msgs] of rawDmRef.current.entries()) {
       const last = msgs[msgs.length - 1];
       if (!last) continue;
-      const plain = last.plainJson;
       let text = "";
       try {
-        const p = JSON.parse(plain) as PlainPayload;
+        const p = JSON.parse(last.plainJson) as PlainPayload;
         text = previewForPayload(p);
-      } catch {
-        text = "";
-      }
+      } catch { text = ""; }
       out.set(pid, { text, at: last.at });
     }
     return out;
@@ -1164,14 +895,8 @@ export function ChatShell({
     if (!at) return "";
     const d = new Date(at);
     const now = new Date();
-    const sameDay =
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate();
-    if (sameDay) {
-      return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-    }
-    // Weekday short
+    const sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    if (sameDay) return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
     return d.toLocaleDateString(undefined, { weekday: "short" });
   }, []);
 
@@ -1184,1247 +909,437 @@ export function ChatShell({
   const peerList = useMemo(() => {
     return filteredUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
-      return (
-        <PeerRow
-          key={u.id}
-          u={u}
-          subtitle={prev?.text ?? "Keine Nachrichten"}
-          metaRight={fmtListTime(prev?.at)}
-          unread={unreadByPeer[u.id] ?? 0}
-          selected={peer?.id === u.id && tab === "dm"}
-          onSelect={() => {
-            setTab("dm");
-            setPeer(u);
-          }}
-        />
-      );
+      return (<PeerRow key={u.id} u={u} subtitle={prev?.text ?? "Keine Nachrichten"} metaRight={fmtListTime(prev?.at)} unread={unreadByPeer[u.id] ?? 0} selected={peer?.id === u.id && tab === "dm"} onSelect={() => { setTab("dm"); setPeer(u); }} />);
     });
   }, [filteredUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer]);
 
-  const groupList = useMemo(
-    () =>
-      groups.map((g) => (
-        <button
-          key={g.id}
-          type="button"
-          onClick={() => {
-            setTab("group");
-            setGroup(g);
-          }}
-          className={`w-full rounded-lg px-3 py-2 text-left text-sm ${
-            group?.id === g.id && tab === "group"
-              ? "bg-emerald-900/40 text-emerald-100"
-              : "text-zinc-300 hover:bg-zinc-800"
-          }`}
-        >
-          {g.name}
-        </button>
-      )),
-    [groups, group, tab]
-  );
+  const groupList = useMemo(() =>
+    groups.map((g) => (
+      <button key={g.id} type="button" onClick={() => { setTab("group"); setGroup(g); }}
+        className="w-full rounded-lg px-3 py-2 text-left text-sm transition"
+        style={{ color: group?.id === g.id && tab === "group" ? 'var(--accent)' : 'var(--text-secondary)', background: group?.id === g.id && tab === "group" ? 'var(--accent-soft)' : 'transparent' }}>
+        {g.name}
+      </button>
+    )), [groups, group, tab]);
 
+  // ── Render ──
   return (
-    <div className="flex h-full w-full flex-col bg-[var(--bg)] p-2 md:p-4">
-      {searchOpen && (
-        <SearchPanel
-          users={users.map((u) => ({ id: u.id, username: u.username }))}
-          groups={groups.map((g) => ({ id: g.id, name: g.name }))}
-          onClose={() => setSearchOpen(false)}
-          onSelect={(type, id) => {
-            if (type === "dm") {
-              const u = usersRef.current.find((x) => x.id === id) ?? null;
-              setTab("dm");
-              setGroup(null);
-              setPeer(u);
-            } else {
-              const g = groups.find((x) => x.id === id) ?? null;
-              setTab("group");
-              setPeer(null);
-              setGroup(g);
-            }
-            setSearchOpen(false);
-          }}
-        />
-      )}
-      {safetyOpen && peer && (
-        <SafetyNumberDialog
-          peerId={peer.id}
-          myPublicKey={session.user.publicKey}
-          peerPublicKey={peer.publicKey}
-          peerLabel={peer.username}
-          onClose={() => setSafetyOpen(false)}
-          onTrustChanged={(pin) => setPeerPin(pin)}
-        />
-      )}
-      {securityOpen && (
-        <SecuritySettings onClose={() => setSecurityOpen(false)} />
-      )}
-      <div className="app-surface flex min-h-0 w-full flex-1 overflow-hidden rounded-2xl md:rounded-3xl">
-      <aside
-        className={`${
-          showSidebar ? "flex" : "hidden"
-        } w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
-      >
-        <div className="sidebar-header flex items-center justify-between !py-3.5">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-              VaultChat
-            </p>
-            <p className="text-xs app-muted">Secure Messenger</p>
-          </div>
-          <div className="flex gap-1.5">
-            <ThemeToggle />
-            <button
-              type="button"
-              onClick={onLock}
-              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-              title="Sofort sperren (LDK aus dem Speicher entfernen)"
-            >
-              Sperren
-            </button>
-            <button
-              type="button"
-              onClick={() => setSecurityOpen(true)}
-              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-              title="Sicherheitseinstellungen"
-            >
-              🔒
-            </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-            >
-              Abmelden
-            </button>
-          </div>
-        </div>
+    <div className="flex h-full w-full flex-col" style={{ background: 'var(--bg)' }}>
+      {searchOpen && <SearchPanel users={users.map((u) => ({ id: u.id, username: u.username }))} groups={groups.map((g) => ({ id: g.id, name: g.name }))} onClose={() => setSearchOpen(false)} onSelect={(type, id) => { if (type === "dm") { const u = usersRef.current.find((x) => x.id === id) ?? null; setTab("dm"); setGroup(null); setPeer(u); } else { const g = groups.find((x) => x.id === id) ?? null; setTab("group"); setPeer(null); setGroup(g); } setSearchOpen(false); }} />}
+      {safetyOpen && peer && <SafetyNumberDialog peerId={peer.id} myPublicKey={session.user.publicKey} peerPublicKey={peer.publicKey} peerLabel={peer.username} onClose={() => setSafetyOpen(false)} onTrustChanged={(pin) => setPeerPin(pin)} />}
+      {securityOpen && <SecuritySettings onClose={() => setSecurityOpen(false)} />}
 
-        <div className="px-3 pt-2">
-          <div className="search-box flex items-center gap-2 !py-2">
-            <span className="app-muted" aria-hidden>
-              <IconSearch size={16} />
-            </span>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Suchen…"
-              className="w-full border-0 bg-transparent text-sm outline-none"
-              style={{ color: "var(--text)" }}
-            />
-          </div>
-        </div>
-
-        <div className="tab-group !mx-3 !mt-2 !mb-1">
-          <button
-            type="button"
-            className={`tab ${sideTab === "direct" ? "active" : ""}`}
-            onClick={() => {
-              setSideTab("direct");
-              setTab("dm");
-            }}
-          >
-            Direkt
-          </button>
-          <button
-            type="button"
-            className={`tab ${sideTab === "groups" ? "active" : ""}`}
-            onClick={() => {
-              setSideTab("groups");
-              setTab("group");
-            }}
-          >
-            Gruppen
-          </button>
-          <button
-            type="button"
-            className={`tab ${sideTab === "fav" ? "active" : ""}`}
-            onClick={() => setSideTab("fav")}
-            title="Favoriten (coming soon)"
-          >
-            Favoriten
-          </button>
-        </div>
-
-        {tab === "dm" && (
-          <>
-            <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
-              <p
-                className="text-[10px] font-semibold uppercase tracking-wider"
-                style={{ color: "var(--text-muted)" }}
-              >
-                Kontakte
-              </p>
-              <button
-                type="button"
-                onClick={() => setShowAddContact(true)}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition"
-                title="Kontakt hinzufügen"
-              >
-                +
-              </button>
+      <div className="flex min-h-0 w-full flex-1 overflow-hidden" style={{ background: 'var(--bg-elevated)' }}>
+        {/* ── Sidebar ── */}
+        <aside className={`${showSidebar ? "flex" : "hidden"} w-full min-w-0 flex-col md:flex md:w-84 md:min-w-[20rem] md:border-r`}
+          style={{ background: 'var(--bg-sidebar)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between p-4" style={{ borderColor: 'var(--border)' }}>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>VaultChat</p>
+              <p className="text-xs app-muted">Secure Messenger</p>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">{peerList}</div>
-          </>
-        )}
-
-        {tab === "group" && (
-          <>
-            <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
-              <input
-                className="app-input w-full !py-2 text-sm"
-                placeholder="Gruppenname"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-              />
-              <select
-                multiple
-                className="app-input h-24 !py-1 text-xs"
-                value={newGroupMembers}
-                onChange={(e) => {
-                  const o = [...e.target.selectedOptions].map((x) => x.value);
-                  setNewGroupMembers(o);
-                }}
-              >
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.username}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => void createGroup()}
-                className="btn btn-primary w-full"
-              >
-                Gruppe erstellen
-              </button>
-            </div>
-            <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border)' }}>
-              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                Deine Gruppen
-              </p>
-            </div>
-            <div className="flex-1 overflow-y-auto p-2">{groupList}</div>
-          </>
-        )}
-
-        <div
-          className="space-y-1.5 border-t p-3 text-xs"
-          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-        >
-          <p className="font-mono text-[10px] leading-snug" style={{ color: "var(--accent)" }}>
-            Du: {myFp ?? "…"}
-          </p>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={relayOnly}
-              onChange={(e) => setRelayOnly(e.target.checked)}
-            />
-            <span>Anruf nur über TURN (Relay)</span>
-          </label>
-          <button
-            type="button"
-            className="text-left font-medium hover:underline"
-            style={{ color: "var(--accent)" }}
-            onClick={() => {
-              void loadContacts();
-              void loadGroups();
-            }}
-          >
-            Kontakte & Gruppen aktualisieren
-          </button>
-        </div>
-      </aside>
-
-      <main
-        className={`${
-          showSidebar ? "hidden" : "flex"
-        } min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 overflow-hidden`}
-      >
-        {incomingOffer && (
-          <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
-            <span>Anruf von {incomingOffer.from.username}</span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="rounded-lg bg-emerald-600 px-3 py-1"
-                onClick={() => void acceptIncoming()}
-              >
-                Annehmen
-              </button>
-              <button
-                type="button"
-                className="rounded-lg bg-zinc-700 px-3 py-1"
-                onClick={() => setIncomingOffer(null)}
-              >
-                Ablehnen
-              </button>
+            <div className="flex gap-1.5">
+              <ThemeToggle />
+              <button type="button" onClick={onLock} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs" title="Sperren">Sperren</button>
+              <button type="button" onClick={() => setSecurityOpen(true)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs" title="Sicherheit">🔒</button>
+              <button type="button" onClick={onLogout} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs">Abmelden</button>
             </div>
           </div>
-        )}
 
-        {callRemote && (
-          <div className="border-b border-zinc-800 bg-black/40 p-2">
-            <p className="text-xs text-zinc-400">Remote-Video</p>
-            <video
-              className="max-h-48 w-full rounded-lg"
-              autoPlay
-              playsInline
-              ref={(el) => {
-                if (el) el.srcObject = callRemote;
-              }}
-            />
-          </div>
-        )}
-
-        {tab === "dm" && !peer && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center app-muted">
-            <div className="max-w-sm">
-              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
-                Wähle eine Unterhaltung
-              </p>
-              <p className="mt-1 text-xs">Verlauf nur auf diesem Gerät, verschlüsselt (IndexedDB).</p>
+          <div className="px-3 pt-2">
+            <div className="search-box flex items-center gap-2 !py-2">
+              <span className="app-muted"><IconSearch size={16} /></span>
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Suchen…" className="w-full border-0 bg-transparent text-sm outline-none" style={{ color: 'var(--text)' }} />
             </div>
           </div>
-        )}
 
-        {tab === "dm" && peer && (
-          <>
+          <div className="tab-group !mx-3 !mt-2 !mb-1">
+            <button type="button" className={`tab ${sideTab === "direct" ? "active" : ""}`} onClick={() => { setSideTab("direct"); setTab("dm"); }}>Direkt</button>
+            <button type="button" className={`tab ${sideTab === "groups" ? "active" : ""}`} onClick={() => { setSideTab("groups"); setTab("group"); }}>Gruppen</button>
+            <button type="button" className={`tab ${sideTab === "fav" ? "active" : ""}`} onClick={() => setSideTab("fav")} title="Favoriten">Favoriten</button>
+          </div>
+
+          {tab === "dm" && (
+            <>
+              <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Kontakte</p>
+                <button type="button" onClick={() => setShowAddContact(true)} className="flex h-7 w-7 items-center justify-center rounded-full text-white text-xs font-bold transition"
+                  style={{ background: 'var(--accent)' }} title="Kontakt hinzufügen">+</button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">{peerList}</div>
+            </>
+          )}
+
+          {tab === "group" && (
+            <>
+              <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
+                <input className="app-input w-full !py-2 text-sm" placeholder="Gruppenname" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
+                <select multiple className="app-input h-24 !py-1 text-xs" value={newGroupMembers} onChange={(e) => { const o = [...e.target.selectedOptions].map((x) => x.value); setNewGroupMembers(o); }}>
+                  {users.map((u) => (<option key={u.id} value={u.id}>{u.username}</option>))}
+                </select>
+                <button type="button" onClick={() => void createGroup()} className="btn btn-primary w-full">Gruppe erstellen</button>
+              </div>
+              <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Deine Gruppen</p>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2">{groupList}</div>
+            </>
+          )}
+
+          <div className="space-y-1.5 border-t p-3 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+            <p className="font-mono text-[10px] leading-snug" style={{ color: 'var(--accent)' }}>Du: {myFp ?? "…"}</p>
+            <label className="flex cursor-pointer items-center gap-2">
+              <input type="checkbox" checked={relayOnly} onChange={(e) => setRelayOnly(e.target.checked)} />
+              <span>Anruf nur über TURN (Relay)</span>
+            </label>
+            <button type="button" className="text-left font-medium hover:underline" style={{ color: 'var(--accent)' }} onClick={() => { void loadContacts(); void loadGroups(); }}>Kontakte & Gruppen aktualisieren</button>
+          </div>
+        </aside>
+
+        {/* ── Main Chat Area ── */}
+        <main className={`${showSidebar ? "hidden" : "flex"} min-h-0 min-w-0 flex-1 flex-col md:flex overflow-hidden`} style={{ background: 'var(--bg-chat)' }}>
+
+          {incomingOffer && (
+            <div className="flex items-center justify-between border-b px-4 py-2 text-sm" style={{ borderColor: 'var(--border)', background: 'var(--warning)', color: 'var(--text)' }}>
+              <span>Anruf von {incomingOffer.from.username}</span>
+              <div className="flex gap-2">
+                <button type="button" className="btn btn-primary !py-1 !px-3 !text-xs" onClick={() => void acceptIncoming()}>Annehmen</button>
+                <button type="button" className="btn btn-secondary !py-1 !px-3 !text-xs" onClick={() => setIncomingOffer(null)}>Ablehnen</button>
+              </div>
+            </div>
+          )}
+
+          {callRemote && (
+            <div className="border-b p-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Remote-Video</p>
+              <video className="max-h-48 w-full rounded-lg" autoPlay playsInline ref={(el) => { if (el) el.srcObject = callRemote; }} />
+            </div>
+          )}
+
+          {tab === "dm" && !peer && (
+            <div className="flex flex-1 items-center justify-center px-6 text-center">
+              <div className="max-w-sm" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Wähle eine Unterhaltung</p>
+                <p className="mt-1 text-xs">Verlauf nur auf diesem Gerät, verschlüsselt (IndexedDB).</p>
+              </div>
+            </div>
+          )}
+
+          {tab === "dm" && peer && (<>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
-              {/* Connection status indicator */}
               <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
-                <div className={`h-full transition-all duration-500 ${connected ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
+                <div className={`h-full transition-all duration-500 ${connected ? 'w-full' : 'w-1/2 animate-pulse'}`} style={{ background: connected ? 'var(--success)' : 'var(--warning)' }} />
               </div>
               <div className="flex w-full items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-3">
-                  {isMobile && (
-                    <button
-                      type="button"
-                      onClick={() => setPeer(null)}
-                      className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-                      title="Zurück"
-                    >
-                      ←
-                    </button>
-                  )}
+                  {isMobile && <button type="button" onClick={() => setPeer(null)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs" title="Zurück">←</button>}
                   <div className="relative">
-                    <div
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, var(--accent-hover), var(--accent))",
-                      }}
-                    >
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
+                      style={{ background: 'linear-gradient(135deg, var(--accent-hover), var(--accent))' }}>
                       {peer.username.slice(0, 1).toUpperCase()}
                     </div>
-                    {/* Online indicator dot */}
-                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)] ${onlinePeers.has(peer.id) ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 ${onlinePeers.has(peer.id) ? '' : ''}`}
+                      style={{ background: onlinePeers.has(peer.id) ? 'var(--success)' : 'var(--text-muted)', borderColor: 'var(--bg)' }} />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
-                        {peer.username}
-                      </p>
-                      {/* Connection status badge */}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${connected ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
+                      <p className="truncate font-semibold text-base" style={{ color: 'var(--text)' }}>{peer.username}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: connected ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)', color: connected ? 'var(--success)' : 'var(--warning)' }}>
                         {connected ? 'Online' : 'Verbinden...'}
                       </span>
                     </div>
                     {typing ? (
-                      <p className="text-xs text-emerald-500/80 flex items-center gap-1">
+                      <p className="text-xs flex items-center gap-1" style={{ color: 'var(--accent)' }}>
                         <span className="flex gap-0.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '0ms'}} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '150ms'}} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '300ms'}} />
+                          <span className="h-1.5 w-1.5 rounded-full animate-bounce" style={{ background: 'var(--accent)', animationDelay: '0ms' }} />
+                          <span className="h-1.5 w-1.5 rounded-full animate-bounce" style={{ background: 'var(--accent)', animationDelay: '150ms' }} />
+                          <span className="h-1.5 w-1.5 rounded-full animate-bounce" style={{ background: 'var(--accent)', animationDelay: '300ms' }} />
                         </span>
                         schreibt...
                       </p>
                     ) : (
-                      <p
-                        className="max-w-[min(100%,14rem)] break-all font-mono text-[10px] leading-snug opacity-60 sm:max-w-md sm:text-[11px]"
-                        style={{ color: "var(--accent)" }}
-                      >
+                      <p className="max-w-[min(100%,14rem)] break-all font-mono text-[10px] leading-snug opacity-60 sm:max-w-md sm:text-[11px]" style={{ color: 'var(--accent)' }}>
                         {peerFp ? `${peerFp.slice(0, 32)}...` : "Verschlüsselt"}
                       </p>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setInfoOpen((v) => !v)}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden"
-                    title="Details"
-                  >
-                    <IconMore size={16} />
-                  </button>
-                  <select
-                    value={ttlDm}
-                    onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
-                    className="app-input !py-1.5 !text-xs !w-auto"
-                    title="Verschwindende Nachrichten"
-                  >
-                    {TTL_OPTIONS.map((o) => (
-                      <option key={o.ms} value={o.ms}>
-                        ⏳ {o.label}
-                      </option>
-                    ))}
+                  <button type="button" onClick={() => setInfoOpen((v) => !v)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden" title="Details"><IconMore size={16} /></button>
+                  <select value={ttlDm} onChange={(e) => void onChangeTtlDm(Number(e.target.value))} className="app-input !py-1.5 !text-xs !w-auto" title="Verschwindende Nachrichten">
+                    {TTL_OPTIONS.map((o) => (<option key={o.ms} value={o.ms}>⏳ {o.label}</option>))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => setSafetyOpen(true)}
-                    className={`btn btn-secondary !px-2.5 !py-1.5 !text-xs ${
-                      peerPin?.state === "verified"
-                        ? "!border-emerald-600 !text-emerald-500"
-                        : peerPin?.state === "mismatch"
-                          ? "!border-red-500 !text-red-500"
-                          : ""
-                    }`}
-                  >
-                    {peerPin?.state === "verified" && "✓ Verifiziert"}
-                    {peerPin?.state === "mismatch" && "⚠ Schlüssel geändert"}
-                    {(!peerPin || peerPin.state === "pinned") &&
-                      "Sicherheitsnummer"}
+                  <button type="button" onClick={() => setSafetyOpen(true)}
+                    className={`btn btn-secondary !px-2.5 !py-1.5 !text-xs ${peerPin?.state === "verified" ? "!border-emerald-600 !text-emerald-500" : peerPin?.state === "mismatch" ? "!border-red-500 !text-red-500" : ""}`}>
+                    {peerPin?.state === "verified" ? "✓ Verifiziert" : peerPin?.state === "mismatch" ? "⚠ Schlüssel geändert" : "Sicherheitsnummer"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void beginCall()}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-                  >
-                    <IconPhone size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setInfoOpen(true)}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs hidden md:inline-flex"
-                    title="Details"
-                  >
-                    <IconInfo size={16} />
-                  </button>
+                  <button type="button" onClick={() => void beginCall()} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"><IconPhone size={16} /></button>
+                  <button type="button" onClick={() => setInfoOpen(true)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs hidden md:inline-flex" title="Details"><IconInfo size={16} /></button>
                 </div>
               </div>
               {peerPin?.state === "mismatch" && (
-                <div className="mt-2 rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
-                  Der Identity-Key dieses Peers hat sich geändert. Nachrichten
-                  werden blockiert, bis du die Sicherheitsnummer neu geprüft hast.
+                <div className="mt-2 rounded-lg border px-3 py-2 text-xs" style={{ borderColor: 'var(--danger)', background: 'var(--danger-soft)', color: 'var(--danger)' }}>
+                  Der Identity-Key dieses Peers hat sich geändert. Nachrichten werden blockiert, bis du die Sicherheitsnummer neu geprüft hast.
                 </div>
               )}
             </header>
 
-            <div
-              ref={dmScrollRef}
-              className="messages-container !px-4 !py-4 relative"
-            >
+            <div ref={dmScrollRef} className="messages-container !px-4 !py-4 relative">
               {newDmMessageWaiting && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    dmScrollRef.current?.scrollTo({ top: dmScrollRef.current.scrollHeight, behavior: "smooth" });
-                    setNewDmMessageWaiting(false);
-                  }}
-                  className="absolute bottom-4 right-4 z-10 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg hover:bg-emerald-500 transition-all"
-                >
+                <button type="button" onClick={() => { dmScrollRef.current?.scrollTo({ top: dmScrollRef.current.scrollHeight, behavior: "smooth" }); setNewDmMessageWaiting(false); }}
+                  className="absolute bottom-4 right-4 z-10 rounded-full px-4 py-2 text-sm text-white shadow-lg transition-all"
+                  style={{ background: 'linear-gradient(135deg, var(--accent-hover), var(--accent))' }}>
                   ↓ Neue Nachrichten
                 </button>
               )}
-              {messages.map((m) => (
-                <MessageBubble
-                  key={m.plain.cid ?? m.id}
-                  msg={m}
-                  peerLabel={peer.username}
-                  replyToPreview={
-                    m.plain.replyPreview
-                      ? {
-                          author: m.plain.replyPreview.split(":")[0] ?? "",
-                          text: m.plain.replyPreview
-                            .split(":")
-                            .slice(1)
-                            .join(":")
-                            .trim(),
-                        }
-                      : findReplyPreview(messages, m.plain.replyToCid)
-                  }
-                  onReply={(x) =>
-                    setReplyDm({
-                      cid: x.plain.cid ?? "",
-                      author: x.fromMe ? "Du" : peer.username,
-                      text: previewForPayload(x.plain),
-                    })
-                  }
-                  onReact={(x, e) => void reactDm(x, e)}
-                  onEdit={(x, body) => void editDm(x, body)}
-                  onDelete={(x) => void deleteDm(x)}
-                  onCopy={copyText}
-                />
-              ))}
-              {typing && (
-                <p className="text-xs italic text-zinc-500">
-                  {peer.username} schreibt…
-                </p>
-              )}
+              {messages.map((m) => (<MessageBubble key={m.plain.cid ?? m.id} msg={m} peerLabel={peer.username}
+                replyToPreview={m.plain.replyPreview ? { author: m.plain.replyPreview.split(":")[0] ?? "", text: m.plain.replyPreview.split(":").slice(1).join(":").trim() } : findReplyPreview(messages, m.plain.replyToCid)}
+                onReply={(x) => setReplyDm({ cid: x.plain.cid ?? "", author: x.fromMe ? "Du" : peer.username, text: previewForPayload(x.plain) })}
+                onReact={(x, e) => void reactDm(x, e)} onEdit={(x, body) => void editDm(x, body)} onDelete={(x) => void deleteDm(x)} onCopy={copyText} />))}
+              {typing && <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>{peer.username} schreibt…</p>}
             </div>
 
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {error && <p className="mb-2 text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
               {replyDm && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
-                  <span>
-                    <span className="text-emerald-400">
-                      Antwort an {replyDm.author}:
-                    </span>{" "}
-                    {replyDm.text.slice(0, 120)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setReplyDm(null)}
-                    className="ml-2 text-zinc-500 hover:text-white"
-                  >
-                    ×
-                  </button>
+                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: 'var(--accent)', background: 'var(--bg-glass)', color: 'var(--text-secondary)' }}>
+                  <span><span style={{ color: 'var(--accent)' }}>Antwort an {replyDm.author}:</span> {replyDm.text.slice(0, 120)}</span>
+                  <button type="button" onClick={() => setReplyDm(null)} className="ml-2" style={{ color: 'var(--text-muted)' }}>×</button>
                 </div>
               )}
               <div className="relative flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEmojiOpen((v) => !v)}
-                  className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"
-                  title="Emoji"
-                >
-                  🙂
-                </button>
+                <button type="button" onClick={() => setEmojiOpen((v) => !v)} className="btn btn-secondary !px-2 !py-2 !text-sm" title="Emoji">🙂</button>
                 {emojiOpen && (
-                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border border-zinc-800 bg-zinc-950/90 p-2 text-lg shadow-xl backdrop-blur">
-                    {["😀","😂","😍","👍","🔥","🎉","😮","😢","🙏","✅"].map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        className="rounded px-1.5 py-1 hover:bg-zinc-800"
-                        onClick={() => {
-                          setText((t) => (t ? t + e : e));
-                          setEmojiOpen(false);
-                        }}
-                      >
-                        {e}
-                      </button>
-                    ))}
+                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl" style={{ borderColor: 'var(--border)', background: 'var(--bg-glass)', backdropFilter: 'blur(12px)' }}>
+                    {["😀","😂","😍","👍","🔥","🎉","😮","😢","🙏","✅"].map((e) => (<button key={e} type="button" className="rounded px-1.5 py-1" style={{ color: 'var(--text)' }} onClick={() => { setText((t) => (t ? t + e : e)); setEmojiOpen(false); }}>{e}</button>))}
                   </div>
                 )}
-                <input
-                  className="app-input flex-1 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm outline-none ring-[color:var(--shadow)]/30 transition focus:ring-2"
-                  placeholder={
-                    voice.recording ? "🎙️ Aufnahme läuft…" : "Nachricht…"
-                  }
-                  value={text}
-                  disabled={voice.recording || peerPin?.state === "mismatch"}
-                  onChange={(e) => {
-                    setText(e.target.value);
-                    const ws = wsRef.current;
-                    if (ws && ws.readyState === WebSocket.OPEN && peer) {
-                      ws.send(
-                        JSON.stringify({
-                          type: "typing",
-                          toUserId: peer.id,
-                          state: "start",
-                        })
-                      );
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void sendDmText();
-                    }
-                  }}
-                />
-                <label
-                  className="cursor-pointer rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"
-                  title="Datei anhängen"
-                >
+                <input className="app-input flex-1 !rounded-full !px-4 !py-2.5 text-sm" placeholder={voice.recording ? "🎙️ Aufnahme läuft…" : "Nachricht…"}
+                  value={text} disabled={voice.recording || peerPin?.state === "mismatch"}
+                  onChange={(e) => { setText(e.target.value); const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN && peer) ws.send(JSON.stringify({ type: "typing", toUserId: peer.id, state: "start" })); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendDmText(); } }} />
+                <label className="btn btn-secondary !px-2 !py-2 cursor-pointer" title="Datei">
                   <IconPaperclip size={16} />
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void sendDmFile(f);
-                      e.target.value = "";
-                    }}
-                  />
+                  <input type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void sendDmFile(f); e.target.value = ""; }} />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => void sendDmVoice()}
-                  className={`rounded-xl border px-3 py-2 text-xs ${
-                    voice.recording
-                      ? "border-red-500 bg-red-700/60 text-white"
-                      : "border-zinc-700 text-zinc-300 transition hover:bg-zinc-800"
-                  }`}
-                >
+                <button type="button" onClick={() => void sendDmVoice()} className="btn btn-secondary !px-2 !py-2"
+                  style={voice.recording ? { background: 'var(--danger)', color: 'white', border: 'none' } : {}}>
                   {voice.recording ? "■" : <IconMic size={16} />}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void sendDmText()}
-                  disabled={voice.recording || !text.trim()}
-                  className="btn-send disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <IconSend size={16} />
-                </button>
+                <button type="button" onClick={() => void sendDmText()} disabled={voice.recording || !text.trim()} className="btn-send disabled:opacity-40"><IconSend size={16} /></button>
               </div>
             </footer>
-          </>
-        )}
+          </>)}
 
-        {tab === "group" && !group && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center text-zinc-500">
-            <div className="max-w-sm">
-              <p className="text-sm font-medium text-zinc-200">Wähle eine Gruppe</p>
-              <p className="mt-1 text-xs text-zinc-500">
-                Oder erstelle oben links eine neue Gruppe.
-              </p>
+          {tab === "group" && !group && (
+            <div className="flex flex-1 items-center justify-center px-6 text-center">
+              <div className="max-w-sm" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Wähle eine Gruppe</p>
+                <p className="mt-1 text-xs">Oder erstelle oben links eine neue Gruppe.</p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {tab === "group" && group && (
-          <>
-            <header className="border-b border-zinc-800/80 bg-zinc-900/30 px-3 py-3 md:px-4">
+          {tab === "group" && group && (<>
+            <header className="px-3 py-3 md:px-4" style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-glass)' }}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  {isMobile && (
-                    <button
-                      type="button"
-                      onClick={() => setGroup(null)}
-                      className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-                      title="Zurück"
-                    >
-                      ←
-                    </button>
-                  )}
-                  <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-200">
+                  {isMobile && <button type="button" onClick={() => setGroup(null)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs" title="Zurück">←</button>}
+                  <div className="grid h-9 w-9 place-items-center rounded-full text-sm font-semibold" style={{ background: 'var(--bg-hover)', color: 'var(--text)' }}>
                     {group.name.slice(0, 1).toUpperCase()}
                   </div>
                   <div>
-                  <p className="font-medium text-white">{group.name}</p>
-                  <p className="text-xs text-zinc-500">
-                    E2EE symmetrisch · {group.memberIds.length} Mitglieder
-                  </p>
+                    <p className="font-medium" style={{ color: 'var(--text)' }}>{group.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>E2EE symmetrisch · {group.memberIds.length} Mitglieder</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setInfoOpen((v) => !v)}
-                    className="rounded-xl border border-zinc-700 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
-                    title="Info"
-                  >
-                    Info
-                  </button>
-                  <select
-                    value={ttlGroup}
-                    onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
-                    title="Verschwindende Nachrichten"
-                  >
-                    {TTL_OPTIONS.map((o) => (
-                      <option key={o.ms} value={o.ms}>
-                        ⏳ {o.label}
-                      </option>
-                    ))}
+                  <button type="button" onClick={() => setInfoOpen((v) => !v)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden" title="Info">Info</button>
+                  <select value={ttlGroup} onChange={(e) => void onChangeTtlGroup(Number(e.target.value))} className="app-input !py-1.5 !text-xs !w-auto" title="Verschwindende Nachrichten">
+                    {TTL_OPTIONS.map((o) => (<option key={o.ms} value={o.ms}>⏳ {o.label}</option>))}
                   </select>
-                  <button
-                    type="button"
-                    onClick={() => setGroupPanelOpen((v) => !v)}
-                    className="rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-                  >
-                    Mitglieder
-                  </button>
+                  <button type="button" onClick={() => setGroupPanelOpen((v) => !v)} className="btn btn-secondary !px-2.5 !py-1.5 !text-xs">Mitglieder</button>
                 </div>
               </div>
 
               {groupPanelOpen && (
-                <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-xs text-zinc-200">
+                <div className="mt-3 rounded-xl border p-3 text-xs" style={{ borderColor: 'var(--border)', background: 'var(--bg-glass)' }}>
                   <ul className="mb-2 space-y-1">
                     {group.memberIds.map((mid) => {
                       const u = users.find((x) => x.id === mid);
                       const label = u?.username ?? (mid === session.user.id ? "Du" : mid.slice(0, 8));
-                      return (
-                        <li
-                          key={mid}
-                          className="flex items-center justify-between rounded bg-zinc-950/60 px-2 py-1"
-                        >
-                          <span>{label}</span>
-                          {mid !== session.user.id && (
-                            <button
-                              type="button"
-                              onClick={() => void removeMember(mid)}
-                              className="rounded border border-red-700 px-2 py-0.5 text-red-300 hover:bg-red-900/30"
-                            >
-                              Entfernen + Key rotieren
-                            </button>
-                          )}
-                        </li>
-                      );
+                      return (<li key={mid} className="flex items-center justify-between rounded px-2 py-1" style={{ background: 'var(--bg-sidebar)' }}>
+                        <span style={{ color: 'var(--text)' }}>{label}</span>
+                        {mid !== session.user.id && (<button type="button" onClick={() => void removeMember(mid)} className="rounded border px-2 py-0.5 text-xs" style={{ borderColor: 'var(--danger)', color: 'var(--danger)' }}>Entfernen + Key rot.</button>)}
+                      </li>);
                     })}
                   </ul>
                   <div className="flex gap-2">
-                    <select
-                      value={addMemberId}
-                      onChange={(e) => setAddMemberId(e.target.value)}
-                      className="flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200"
-                    >
+                    <select value={addMemberId} onChange={(e) => setAddMemberId(e.target.value)} className="app-input flex-1 !py-1.5 !text-xs">
                       <option value="">— Mitglied wählen —</option>
-                      {users
-                        .filter((u) => !group.memberIds.includes(u.id))
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.username}
-                          </option>
-                        ))}
+                      {users.filter((u) => !group.memberIds.includes(u.id)).map((u) => (<option key={u.id} value={u.id}>{u.username}</option>))}
                     </select>
-                    <button
-                      type="button"
-                      onClick={() => void addMember()}
-                      disabled={!addMemberId}
-                      className="rounded border border-emerald-700 px-2 py-1 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-40"
-                    >
-                      Hinzufügen + Key rotieren
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void leaveCurrentGroup()}
-                      className="rounded border border-amber-700 px-2 py-1 text-amber-200 hover:bg-amber-900/30"
-                    >
-                      Verlassen
-                    </button>
+                    <button type="button" onClick={() => void addMember()} disabled={!addMemberId} className="btn btn-primary !py-1.5 !px-3 !text-xs disabled:opacity-40">Hinzufügen</button>
+                    <button type="button" onClick={() => void leaveCurrentGroup()} className="btn btn-danger !py-1.5 !px-3 !text-xs">Verlassen</button>
                   </div>
                 </div>
               )}
             </header>
-            <div
-              ref={groupScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4 relative"
-            >
+
+            <div ref={groupScrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4 relative" style={{ background: 'var(--bg-chat)' }}>
               {newGroupMessageWaiting && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    groupScrollRef.current?.scrollTo({ top: groupScrollRef.current.scrollHeight, behavior: "smooth" });
-                    setNewGroupMessageWaiting(false);
-                  }}
-                  className="absolute bottom-4 right-4 z-10 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg hover:bg-emerald-500 transition-all"
-                >
+                <button type="button" onClick={() => { groupScrollRef.current?.scrollTo({ top: groupScrollRef.current.scrollHeight, behavior: "smooth" }); setNewGroupMessageWaiting(false); }}
+                  className="absolute bottom-4 right-4 z-10 rounded-full px-4 py-2 text-sm text-white shadow-lg transition-all"
+                  style={{ background: 'linear-gradient(135deg, var(--accent-hover), var(--accent))' }}>
                   ↓ Neue Nachrichten
                 </button>
               )}
-              {groupMessages.map((m) => (
-                <MessageBubble
-                  key={m.plain.cid ?? m.id}
-                  msg={m}
-                  peerLabel={
-                    users.find((u) => u.id === m.fromUserId)?.username ?? group.name
-                  }
-                  replyToPreview={
-                    m.plain.replyPreview
-                      ? {
-                          author: m.plain.replyPreview.split(":")[0] ?? "",
-                          text: m.plain.replyPreview
-                            .split(":")
-                            .slice(1)
-                            .join(":")
-                            .trim(),
-                        }
-                      : findReplyPreview(groupMessages, m.plain.replyToCid)
-                  }
-                  onReply={(x) =>
-                    setReplyGroup({
-                      cid: x.plain.cid ?? "",
-                      author: x.fromMe ? "Du" : "Mitglied",
-                      text: previewForPayload(x.plain),
-                    })
-                  }
-                  onReact={(x, e) => void reactGroup(x, e)}
-                  onEdit={(x, body) => void editGroup(x, body)}
-                  onDelete={(x) => void deleteGroup(x)}
-                  onCopy={copyText}
-                />
-              ))}
+              {groupMessages.map((m) => (<MessageBubble key={m.plain.cid ?? m.id} msg={m}
+                peerLabel={users.find((u) => u.id === m.fromUserId)?.username ?? group.name}
+                replyToPreview={m.plain.replyPreview ? { author: m.plain.replyPreview.split(":")[0] ?? "", text: m.plain.replyPreview.split(":").slice(1).join(":").trim() } : findReplyPreview(groupMessages, m.plain.replyToCid)}
+                onReply={(x) => setReplyGroup({ cid: x.plain.cid ?? "", author: x.fromMe ? "Du" : "Mitglied", text: previewForPayload(x.plain) })}
+                onReact={(x, e) => void reactGroup(x, e)} onEdit={(x, body) => void editGroup(x, body)} onDelete={(x) => void deleteGroup(x)} onCopy={copyText} />))}
             </div>
+
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {error && <p className="mb-2 text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
               {replyGroup && (
-                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 border-emerald-500 bg-zinc-900 px-3 py-1 text-xs text-zinc-300">
-                  <span>
-                    <span className="text-emerald-400">
-                      Antwort an {replyGroup.author}:
-                    </span>{" "}
-                    {replyGroup.text.slice(0, 120)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setReplyGroup(null)}
-                    className="ml-2 text-zinc-500 hover:text-white"
-                  >
-                    ×
-                  </button>
+                <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: 'var(--accent)', background: 'var(--bg-glass)', color: 'var(--text-secondary)' }}>
+                  <span><span style={{ color: 'var(--accent)' }}>Antwort an {replyGroup.author}:</span> {replyGroup.text.slice(0, 120)}</span>
+                  <button type="button" onClick={() => setReplyGroup(null)} className="ml-2" style={{ color: 'var(--text-muted)' }}>×</button>
                 </div>
               )}
-              <div className="flex gap-2">
-                <input
-                  className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2 text-sm text-white outline-none ring-emerald-500/20 transition focus:border-emerald-500/50 focus:ring-2"
-                  placeholder="Gruppennachricht…"
-                  value={groupText}
-                  onChange={(e) => setGroupText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      void sendGroupText();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => void sendGroupText()}
-                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
-                >
-                  Senden
-                </button>
+              <div className="flex gap-2 w-full">
+                <input className="app-input flex-1 !rounded-full !px-4 !py-2.5 text-sm" placeholder="Gruppennachricht…"
+                  value={groupText} onChange={(e) => setGroupText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendGroupText(); } }} />
+                <button type="button" onClick={() => void sendGroupText()} className="btn btn-primary !px-4 !py-2">Senden</button>
               </div>
             </footer>
-          </>
-        )}
-      </main>
+          </>)}
+        </main>
 
-      {/* Right info panel (desktop) */}
-      {showInfo && (
-        <aside className="info-panel hidden w-80 min-w-0 shrink-0 md:flex">
-          <InfoPanel
-            mode={tab}
-            peer={peer}
-            group={group}
-            peerFp={peerFp}
-            onSafety={() => setSafetyOpen(true)}
-            onClearChat={async () => {
-              if (peer) {
-                const rows = rawDmRef.current.get(peer.id) ?? [];
-                for (const r of rows) await idbDeleteDm(r.id).catch(() => {});
-                rawDmRef.current.set(peer.id, []);
-                rebuildDm(peer.id);
-              }
-              if (group) {
-                const rows = rawGroupRef.current.get(group.id) ?? [];
-                for (const r of rows) await idbDeleteGroupMsg(r.id).catch(() => {});
-                rawGroupRef.current.set(group.id, []);
-                rebuildGroup(group.id);
-              }
-            }}
-            mutedPeers={mutedPeers}
-            setMutedPeers={setMutedPeers}
-          />
-        </aside>
-      )}
-
-      {/* Mobile info drawer */}
-      {isMobile && infoOpen && showConversation && (
-        <div className="fixed inset-0 z-50 bg-black/50 p-3" onClick={() => setInfoOpen(false)}>
-          <div
-            className="app-surface ml-auto h-full w-full max-w-sm overflow-y-auto rounded-2xl p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold text-white">Details</p>
-              <button
-                type="button"
-                onClick={() => setInfoOpen(false)}
-                className="rounded-lg border border-zinc-700 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
-              >
-                ✕
-              </button>
-            </div>
-            <InfoPanel
-              mode={tab}
-              peer={peer}
-              group={group}
-              peerFp={peerFp}
-              onSafety={() => {
-                setInfoOpen(false);
-                setSafetyOpen(true);
-              }}
+        {/* ── Right Info Panel ── */}
+        {showInfo && (
+          <aside className="info-panel hidden w-80 min-w-0 shrink-0 md:flex">
+            <InfoPanel mode={tab} peer={peer} group={group} peerFp={peerFp} onSafety={() => setSafetyOpen(true)}
               onClearChat={async () => {
-                setInfoOpen(false);
-                if (peer) {
-                  const rows = rawDmRef.current.get(peer.id) ?? [];
-                  for (const r of rows) await idbDeleteDm(r.id).catch(() => {});
-                  rawDmRef.current.set(peer.id, []);
-                  rebuildDm(peer.id);
-                }
-                if (group) {
-                  const rows = rawGroupRef.current.get(group.id) ?? [];
-                  for (const r of rows) await idbDeleteGroupMsg(r.id).catch(() => {});
-                  rawGroupRef.current.set(group.id, []);
-                  rebuildGroup(group.id);
-                }
+                if (peer) { const rows = rawDmRef.current.get(peer.id) ?? []; for (const r of rows) await idbDeleteDm(r.id).catch(() => {}); rawDmRef.current.set(peer.id, []); rebuildDm(peer.id); }
+                if (group) { const rows = rawGroupRef.current.get(group.id) ?? []; for (const r of rows) await idbDeleteGroupMsg(r.id).catch(() => {}); rawGroupRef.current.set(group.id, []); rebuildGroup(group.id); }
               }}
-              mutedPeers={mutedPeers}
-              setMutedPeers={setMutedPeers}
-            />
+              mutedPeers={mutedPeers} setMutedPeers={setMutedPeers} />
+          </aside>
+        )}
+
+        {isMobile && infoOpen && showConversation && (
+          <div className="fixed inset-0 z-50 bg-black/50 p-3" onClick={() => setInfoOpen(false)}>
+            <div className="ml-auto h-full w-full max-w-sm overflow-y-auto rounded-2xl p-4" style={{ background: 'var(--bg-elevated)' }} onClick={(e) => e.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Details</p>
+                <button type="button" onClick={() => setInfoOpen(false)} className="btn btn-secondary !px-2 !py-1 !text-xs">✕</button>
+              </div>
+              <InfoPanel mode={tab} peer={peer} group={group} peerFp={peerFp}
+                onSafety={() => { setInfoOpen(false); setSafetyOpen(true); }}
+                onClearChat={async () => {
+                  setInfoOpen(false);
+                  if (peer) { const rows = rawDmRef.current.get(peer.id) ?? []; for (const r of rows) await idbDeleteDm(r.id).catch(() => {}); rawDmRef.current.set(peer.id, []); rebuildDm(peer.id); }
+                  if (group) { const rows = rawGroupRef.current.get(group.id) ?? []; for (const r of rows) await idbDeleteGroupMsg(r.id).catch(() => {}); rawGroupRef.current.set(group.id, []); rebuildGroup(group.id); }
+                }}
+                mutedPeers={mutedPeers} setMutedPeers={setMutedPeers} />
+            </div>
           </div>
-        </div>
-      )}
-      {isMobile && !showConversation && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-800/80 bg-zinc-950/80 p-2 backdrop-blur">
-          <div className="mx-auto flex max-w-md gap-2">
-            <button
-              type="button"
-              onClick={() => setTab("dm")}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${
-                tab === "dm"
-                  ? "bg-emerald-600 text-white"
-                  : "border border-zinc-800 text-zinc-300"
-              }`}
-            >
-              Direkt
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab("group")}
-              className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${
-                tab === "group"
-                  ? "bg-emerald-600 text-white"
-                  : "border border-zinc-800 text-zinc-300"
-              }`}
-            >
-              Gruppen
-            </button>
+        )}
+
+        {isMobile && !showConversation && (
+          <div className="fixed bottom-0 left-0 right-0 z-40 border-t p-2" style={{ borderColor: 'var(--border)', background: 'var(--bg-glass)', backdropFilter: 'blur(12px)' }}>
+            <div className="mx-auto flex max-w-md gap-2">
+              <button type="button" onClick={() => setTab("dm")} className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${tab === "dm" ? "text-white" : ""}`}
+                style={tab === "dm" ? { background: 'var(--accent)' } : { border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Direkt</button>
+              <button type="button" onClick={() => setTab("group")} className={`flex-1 rounded-xl px-3 py-2 text-sm font-medium ${tab === "group" ? "text-white" : ""}`}
+                style={tab === "group" ? { background: 'var(--accent)' } : { border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>Gruppen</button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
 
-      {/* Add Contact Modal */}
-      {showAddContact && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="app-surface w-full max-w-md rounded-2xl p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-                Kontakt hinzufügen
-              </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddContact(false);
-                  setAddContactUsername("");
-                  setAddContactError(null);
-                }}
-                className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Tabs for different methods */}
-            <div className="mb-4 flex gap-2">
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-[var(--bg-hover)]"
-                style={{ borderColor: "var(--border)", color: "var(--text)" }}
-              >
-                🔤 Username
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium opacity-50"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                title="Coming soon"
-              >
-                📱 QR-Code
-              </button>
-              <button
-                type="button"
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium opacity-50"
-                style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
-                title="Coming soon"
-              >
-                🔗 Link
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-                  Username eingeben
-                </label>
-                <input
-                  type="text"
-                  value={addContactUsername}
-                  onChange={(e) => {
-                    setAddContactUsername(e.target.value);
-                    setAddContactError(null);
-                  }}
-                  placeholder="z.B. max_muster"
-                  className="app-input"
-                  autoFocus
-                />
-                {addContactError && (
-                  <p className="mt-1 text-xs text-red-500">{addContactError}</p>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (!addContactUsername.trim()) {
-                    setAddContactError("Bitte Username eingeben");
-                    return;
-                  }
-                  // Search for user by username on server
-                  void (async () => {
-                    setAddContactLoading(true);
-                    setAddContactError(null);
-                    try {
-                      // First refresh all users from server
-                      const { users: allUsers } = await api.listUsers(session.token);
-                      const foundUser = allUsers.find(
-                        (u) => u.username.toLowerCase() === addContactUsername.trim().toLowerCase() && u.id !== session.user.id
-                      );
-                      if (!foundUser) {
-                        setAddContactError("Benutzer nicht gefunden. Bitte Username prüfen.");
-                        setAddContactLoading(false);
-                        return;
-                      }
-                      // Add to users list and open chat
-                      setUsers((prev) => {
-                        if (prev.find((u) => u.id === foundUser.id)) return prev;
-                        return [...prev, foundUser];
-                      });
-                      await observePeerKey(foundUser.id, foundUser.publicKey);
-                      setTab("dm");
-                      setPeer(foundUser);
-                      setShowAddContact(false);
-                      setAddContactUsername("");
-                      setAddContactError(null);
-                    } catch (err) {
-                      setAddContactError("Fehler bei der Suche. Bitte erneut versuchen.");
-                    }
-                    setAddContactLoading(false);
-                  })();
-                }}
-                className="btn btn-primary w-full"
-                disabled={addContactLoading}
-              >
-                {addContactLoading ? "Suche..." : "🔍 Kontakt suchen"}
-              </button>
-
-              <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-                Der Benutzer muss sich vorher registriert haben
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {showAddContact && <AddContactModal isOpen={showAddContact} onClose={() => { setShowAddContact(false); setAddContactUsername(""); setAddContactError(null); }}
+        sessionToken={session.token} sessionUserId={session.user.id}
+        onContactSelected={(user) => { setUsers((prev) => { if (prev.find((u) => u.id === user.id)) return prev; return [...prev, user]; }); observePeerKey(user.id, user.publicKey); setTab("dm"); setPeer(user); setShowAddContact(false); }} />}
     </div>
   );
 }
 
-function PeerRow({
-  u,
-  subtitle,
-  metaRight,
-  unread,
-  selected,
-  onSelect,
-}: {
-  u: api.ApiUser;
-  subtitle?: string;
-  metaRight?: string;
-  unread?: number;
-  selected: boolean;
-  onSelect: () => void;
+function PeerRow({ u, subtitle, metaRight, unread, selected, onSelect }: {
+  u: api.ApiUser; subtitle?: string; metaRight?: string; unread?: number; selected: boolean; onSelect: () => void;
 }) {
   const [pin, setPin] = useState<PeerPin | null>(null);
-  useEffect(() => {
-    void getPin(u.id).then(setPin);
-  }, [u.id, u.publicKey]);
+  useEffect(() => { void getPin(u.id).then(setPin); }, [u.id, u.publicKey]);
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`contact-item w-full ${
-        selected ? "active" : ""
-      } !mx-0 items-center justify-between`}
-    >
-      <div className="contact-avatar !h-9 !w-9 !text-sm">
-        {u.username.slice(0, 1).toUpperCase()}
-      </div>
+    <button type="button" onClick={onSelect} className={`contact-item w-full !mx-0 items-center justify-between ${selected ? "active" : ""}`}>
+      <div className="contact-avatar !h-9 !w-9 !text-sm">{u.username.slice(0, 1).toUpperCase()}</div>
       <div className="contact-info min-w-0">
         <div className="flex items-center gap-2">
           <span className="contact-name">{u.username}</span>
-            {pin?.state === "mismatch" && (
-              <span className="rounded-md border border-red-700/70 bg-red-950/30 px-1.5 py-0.5 text-[10px] text-red-200">
-                ⚠
-              </span>
-            )}
-            {pin?.state === "verified" && (
-              <span
-                className="rounded-md border px-1.5 py-0.5 text-[10px]"
-                style={{
-                  borderColor: "var(--accent)",
-                  color: "var(--accent)",
-                  background: "var(--accent-soft)",
-                }}
-              >
-                ✓
-              </span>
-            )}
+          {pin?.state === "mismatch" && <span className="rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: 'rgba(239,68,68,0.5)', background: 'var(--danger-soft)', color: 'var(--danger)' }}>⚠</span>}
+          {pin?.state === "verified" && <span className="rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-soft)' }}>✓</span>}
         </div>
         <p className="contact-preview">{subtitle ?? ""}</p>
       </div>
       <div className="contact-meta">
         <span className="contact-time">{metaRight ?? ""}</span>
-        {unread && unread > 0 ? (
-          <span className="unread-badge">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        ) : null}
+        {unread && unread > 0 ? <span className="unread-badge">{unread > 99 ? "99+" : unread}</span> : null}
       </div>
     </button>
   );
 }
 
-function InfoPanel({
-  mode,
-  peer,
-  group,
-  peerFp,
-  onSafety,
-  onClearChat,
-  mutedPeers,
-  setMutedPeers,
-}: {
-  mode: "dm" | "group";
-  peer: api.ApiUser | null;
-  group: api.ApiGroup | null;
-  peerFp: string | null;
-  onSafety: () => void;
-  onClearChat: () => void | Promise<void>;
-  mutedPeers: Set<string>;
-  setMutedPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
+function InfoPanel({ mode, peer, group, peerFp, onSafety, onClearChat, mutedPeers, setMutedPeers }: {
+  mode: "dm" | "group"; peer: api.ApiUser | null; group: api.ApiGroup | null; peerFp: string | null;
+  onSafety: () => void; onClearChat: () => void | Promise<void>; mutedPeers: Set<string>; setMutedPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
 }) {
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
   const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
   const isMuted = peer ? mutedPeers.has(peer.id) : false;
-
-  const toggleMute = () => {
-    if (!peer) return;
-    setMutedPeers((prev) => {
-      const next = new Set(prev);
-      if (next.has(peer.id)) {
-        next.delete(peer.id);
-      } else {
-        next.add(peer.id);
-      }
-      return next;
-    });
-  };
+  const toggleMute = () => { if (!peer) return; setMutedPeers((prev) => { const n = new Set(prev); if (n.has(peer.id)) n.delete(peer.id); else n.add(peer.id); return n; }); };
 
   return (
     <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-y-auto p-1">
-      {/* Profile Avatar */}
       <div className="flex flex-col items-center">
-        <div className="info-avatar-large !mb-3 !mt-0 !h-20 !w-20 !text-2xl">
-          {initials}
-        </div>
-        <p className="text-center text-lg font-bold" style={{ color: "var(--text)" }}>
-          {title}
-        </p>
-        <p className="mb-3 text-center text-sm" style={{ color: "var(--text-muted)" }}>
-          {status}
-        </p>
+        <div className="info-avatar-large !mb-3 !mt-0 !h-20 !w-20 !text-2xl">{initials}</div>
+        <p className="text-center text-lg font-bold" style={{ color: 'var(--text)' }}>{title}</p>
+        <p className="mb-3 text-center text-sm" style={{ color: 'var(--text-muted)' }}>{status}</p>
       </div>
 
-      {/* Quick Actions Grid */}
       <div className="mb-4 grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
-          style={{ background: "var(--bg-elevated)" }}
-          title="Profil anzeigen"
-        >
-          <span className="text-lg">👤</span>
-          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Profil</span>
-        </button>
-        <button
-          type="button"
-          className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition ${
-            isMuted ? "border-amber-600 bg-amber-900/30" : "border-[var(--border)] hover:bg-[var(--bg-hover)]"
-          }`}
-          style={isMuted ? {} : { background: "var(--bg-elevated)" }}
-          onClick={toggleMute}
-          title={isMuted ? "Stummschaltung aufheben" : "Stummschalten"}
-        >
+        <button type="button" className="flex flex-col items-center gap-1 rounded-lg border p-2 transition" style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }} title="Profil"><span className="text-lg">👤</span><span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Profil</span></button>
+        <button type="button" className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition`} style={{ borderColor: isMuted ? 'var(--warning)' : 'var(--border)', background: isMuted ? 'rgba(245,158,11,0.15)' : 'var(--bg-elevated)' }} onClick={toggleMute} title={isMuted ? "Stummschaltung aufheben" : "Stummschalten"}>
           <span className="text-lg">{isMuted ? "🔔" : "🔕"}</span>
-          <span className="text-[10px]" style={{ color: isMuted ? "var(--amber)" : "var(--text-secondary)" }}>
-            {isMuted ? "Stumm" : "Benachrichtigungen"}
-          </span>
+          <span className="text-[10px]" style={{ color: isMuted ? 'var(--warning)' : 'var(--text-secondary)' }}>{isMuted ? "Stumm" : "Benachrichtigungen"}</span>
         </button>
-        <button
-          type="button"
-          className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
-          style={{ background: "var(--bg-elevated)" }}
-          title="Suchen"
-        >
-          <span className="text-lg">🔍</span>
-          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Suchen</span>
-        </button>
+        <button type="button" className="flex flex-col items-center gap-1 rounded-lg border p-2 transition" style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }} title="Suchen"><span className="text-lg">🔍</span><span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Suchen</span></button>
       </div>
 
       {mode === "dm" && peer && (
         <div className="info-section">
           <p className="info-section-title">Benutzerinfo</p>
-          <div className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
-            <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Username</span>
-              <span className="font-medium" style={{ color: "var(--text)" }}>@{peer.username}</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>ID</span>
-              <span className="font-mono text-xs" style={{ color: "var(--accent)" }}>
-                {peer.id.slice(0, 16)}...
-              </span>
-            </div>
+          <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}>
+            <div className="flex items-center justify-between"><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Username</span><span className="font-medium" style={{ color: 'var(--text)' }}>@{peer.username}</span></div>
+            <div className="mt-2 flex items-center justify-between"><span className="text-sm" style={{ color: 'var(--text-secondary)' }}>ID</span><span className="font-mono text-xs" style={{ color: 'var(--accent)' }}>{peer.id.slice(0, 16)}...</span></div>
           </div>
         </div>
       )}
 
       <div className="info-section !border-0 !pb-0">
         <p className="info-section-title">🔒 Sicherheit</p>
-        <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-          Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server
-          leitet nur versiegelte Daten. Perfect Forward Secrecy aktiv.
-        </p>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server leitet nur versiegelte Daten. Perfect Forward Secrecy aktiv.</p>
       </div>
 
       {mode === "dm" && (
         <div className="info-section">
           <p className="info-section-title">Sicherheitsnummer</p>
-          <button
-            type="button"
-            onClick={onSafety}
-            className="w-full rounded-xl border p-3 text-left transition hover:opacity-95"
-            style={{
-              borderColor: "var(--border)",
-              background: "var(--bg-elevated)",
-            }}
-          >
-            <p
-              className="font-mono text-xs leading-relaxed break-all"
-              style={{ color: "var(--accent)" }}
-            >
-              {peerFp ?? "…"}
-            </p>
+          <button type="button" onClick={onSafety} className="w-full rounded-xl border p-3 text-left transition" style={{ borderColor: 'var(--border)', background: 'var(--bg-elevated)' }}>
+            <p className="font-mono text-xs leading-relaxed" style={{ color: 'var(--accent)' }}>{peerFp ?? "…"}</p>
             <p className="mt-1 text-[11px] app-muted">Tippen zum Prüfen / vergleichen</p>
           </button>
         </div>
@@ -2432,23 +1347,11 @@ function InfoPanel({
 
       <div className="info-section">
         <p className="info-section-title">Geteilte Inhalte</p>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Dateien und Sprachnotizen erscheinen in diesem Chat. Medienübersicht
-          folgt.
-        </p>
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Dateien und Sprachnotizen erscheinen in diesem Chat. Medienübersicht folgt.</p>
       </div>
 
-      <button
-        type="button"
-        onClick={() => void onClearChat()}
-        className="btn btn-danger w-full"
-      >
-        Chat-Verlauf leeren
-      </button>
-
-      <p className="mt-auto pt-4 text-center text-[11px] app-muted">
-        Verlauf nur lokal, verschlüsselt (IndexedDB).
-      </p>
+      <button type="button" onClick={() => void onClearChat()} className="btn btn-danger w-full">Chat-Verlauf leeren</button>
+      <p className="mt-auto pt-4 text-center text-[11px] app-muted">Verlauf nur lokal, verschlüsselt (IndexedDB).</p>
     </div>
   );
 }
