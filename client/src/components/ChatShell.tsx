@@ -1370,16 +1370,16 @@ export function ChatShell({
 
         {tab === "group" && (
           <>
-            <div className="space-y-2 border-b border-zinc-800/80 p-3">
+            <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
               <input
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-2.5 py-2 text-sm text-white outline-none ring-emerald-500/20 focus:ring-2"
+                className="app-input w-full !py-2 text-sm"
                 placeholder="Gruppenname"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
               />
               <select
                 multiple
-                className="h-24 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 px-2 py-1 text-xs text-zinc-200 outline-none ring-emerald-500/20 focus:ring-2"
+                className="app-input h-24 !py-1 text-xs"
                 value={newGroupMembers}
                 onChange={(e) => {
                   const o = [...e.target.selectedOptions].map((x) => x.value);
@@ -1395,13 +1395,13 @@ export function ChatShell({
               <button
                 type="button"
                 onClick={() => void createGroup()}
-                className="w-full rounded-xl bg-emerald-700 py-2 text-sm font-medium text-white transition hover:bg-emerald-600"
+                className="btn btn-primary w-full"
               >
                 Gruppe erstellen
               </button>
             </div>
-            <div className="border-b border-zinc-800/80 px-3 py-2">
-              <p className="text-xs uppercase tracking-wide text-zinc-500">
+            <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
                 Deine Gruppen
               </p>
             </div>
