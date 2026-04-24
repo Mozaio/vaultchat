@@ -715,8 +715,15 @@ body {
 
 .landing-container {
   min-height: 100vh;
-  display: grid;
-  grid-template-columns: 1fr 480px;
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+@media (min-width: 768px) {
+  .landing-container {
+    display: grid;
+    grid-template-columns: 1fr 480px;
+  }
 }
 
 .landing-hero {
@@ -1111,16 +1118,17 @@ body {
    RESPONSIVE
    ============================================================ */
 
-@media (max-width: 1024px) {
-  .landing-container {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 768px) {
   .landing-hero {
-    display: none;
+    padding: 1.5rem;
+  }
+  .landing-title {
+    font-size: 2rem;
   }
   .auth-card {
     margin: 1rem;
-    padding: 2rem;
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
   }
 }
 
