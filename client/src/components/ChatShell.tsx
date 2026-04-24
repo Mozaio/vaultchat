@@ -1555,7 +1555,7 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setInfoOpen((v) => !v)}
-                    className="rounded-xl border border-zinc-700 px-2.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:hidden"
+                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden"
                     title="Details"
                   >
                     <IconMore size={16} />
@@ -1563,7 +1563,7 @@ export function ChatShell({
                   <select
                     value={ttlDm}
                     onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
-                    className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
+                    className="app-input !py-1.5 !text-xs !w-auto"
                     title="Verschwindende Nachrichten"
                   >
                     {TTL_OPTIONS.map((o) => (
@@ -1575,12 +1575,12 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => setSafetyOpen(true)}
-                    className={`rounded-lg border px-3 py-1 text-xs hover:bg-zinc-800 ${
+                    className={`btn btn-secondary !px-2.5 !py-1.5 !text-xs ${
                       peerPin?.state === "verified"
-                        ? "border-emerald-600 text-emerald-300"
+                        ? "!border-emerald-600 !text-emerald-500"
                         : peerPin?.state === "mismatch"
-                          ? "border-red-700 text-red-300"
-                          : "border-zinc-600 text-zinc-200"
+                          ? "!border-red-500 !text-red-500"
+                          : ""
                     }`}
                   >
                     {peerPin?.state === "verified" && "✓ Verifiziert"}
@@ -1591,14 +1591,14 @@ export function ChatShell({
                   <button
                     type="button"
                     onClick={() => void beginCall()}
-                    className="rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800"
+                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
                   >
                     <IconPhone size={16} />
                   </button>
                   <button
                     type="button"
                     onClick={() => setInfoOpen(true)}
-                    className="hidden rounded-lg border border-zinc-600 px-3 py-1 text-xs text-zinc-200 hover:bg-zinc-800 md:inline-flex"
+                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs hidden md:inline-flex"
                     title="Details"
                   >
                     <IconInfo size={16} />

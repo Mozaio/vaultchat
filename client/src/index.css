@@ -360,8 +360,8 @@ body {
 /* ── Message Wrapper ── */
 .message-wrapper {
   display: flex;
-  margin-bottom: 0.5rem;
-  animation: messageSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-bottom: 0.25rem;
+  animation: messageSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .message-wrapper.sent {
@@ -372,16 +372,72 @@ body {
   justify-content: flex-start;
 }
 
-/* Group consecutive messages from same sender */
-.message-wrapper.sent + .message-wrapper.sent,
+/* Group consecutive messages from same sender (WhatsApp/Telegram style) */
+.message-wrapper.sent + .message-wrapper.sent {
+  margin-top: -0.35rem;
+}
 .message-wrapper.received + .message-wrapper.received {
-  margin-top: -0.25rem;
+  margin-top: -0.35rem;
+}
+
+/* Grouped bubbles have smaller radius and no border on inner side (Discord/Telegram style) */
+.message-bubble.sent:not(.no-group) + .message-bubble.sent,
+.message-bubble.received:not(.no-group) + .message-bubble.received {
+  border-radius: 20px;
+}
+.message-bubble.sent.grouped {
+  border-bottom-right-radius: 6px;
+}
+.message-bubble.sent.grouped + .message-bubble.sent.grouped {
+  border-radius: 20px;
+}
+.message-bubble.sent.grouped:last-child {
+  border-bottom-right-radius: 6px;
+}
+.message-bubble.received.grouped {
+  border-bottom-left-radius: 6px;
+}
+.message-bubble.received.grouped + .message-bubble.received.grouped {
+  border-radius: 20px;
+}
+.message-bubble.received.grouped:last-child {
+  border-bottom-left-radius: 6px;
+}
+
+/* Date separator (WhatsApp/Telegram style) */
+.date-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 1.25rem 0;
+  position: relative;
+}
+.date-separator::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--border);
+}
+.date-separator span {
+  position: relative;
+  z-index: 1;
+  padding: 0.25rem 0.75rem;
+  background: var(--bg-glass);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 @keyframes messageSlide {
   from {
     opacity: 0;
-    transform: translateY(12px) scale(0.96);
+    transform: translateY(8px) scale(0.97);
   }
   to {
     opacity: 1;
