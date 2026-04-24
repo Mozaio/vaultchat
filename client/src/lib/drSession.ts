@@ -6,20 +6,25 @@
  * Verwendet Längen-Padding, damit Ciphertext-Größen nichts über die echte
  * Nachrichtenlänge verraten.
  *
- * Hintergrund: `x3dh.ts` + `POST /api/keys` (keyStore) bereiten vollwertigen
- * X3DH vor; Sitzungsstart in Produktion nutzt derzeit `drInit`/`ensureDrSession`
- * (kompatibel mit Empfängern, bis X3DH Ende-zu-Ende ausgerollt ist).
+ * Session-Initialisierung:
+ *  - Normalfall: `ensureDrSession` → direkter Identity-DH (`drInit`)
+ *  - X3DH-Modus (neu): `ensureDrSessionWithX3dh` → Pre-Key-Bundle + X3DH +
+ *    `drInitFromX3DH` (anderes KDF-Label → kein Root-Kollisionsrisiko).
+ *    Fallback auf `drInit` wenn keine OneTime-PreKeys verfügbar.
  */
 import { base64FromUint8, uint8FromBase64 } from "./b64";
 import {
   drDecrypt,
   drEncrypt,
   drInit,
+  drInitFromX3DH,
   isDrWire,
   type DRState,
 } from "./doubleRatchet";
 import { metaGet, metaSet } from "./idb";
 import { pad, unpad } from "./padding";
+import { x3dhSender } from "./x3dh";
+import * as api from "./api";
 
 function metaKey(peerId: string) {
   return `dr:${peerId}`;
@@ -42,6 +47,67 @@ export async function ensureDrSession(
   const fresh = await drInit(myIdentitySk, peerPublicKeyB64, peerId);
   await metaSet(metaKey(peerId), JSON.stringify(fresh));
   return fresh;
+}
+
+/**
+ * X3DH-basierte Session-Initialisierung (mit Fallback).
+ *
+ * Versuche, ein Pre-Key-Bundle für den Peer zu laden und X3DH durchzuführen.
+ * Wenn keine Pre-Keys verfügbar sind (z.B. alter Client ohne Upload), falle
+ * auf den traditionellen `ensureDrSession` (direkter DH) zurück.
+ *
+ * Der daraus resultierende Root-Key ist anders als bei `ensureDrSession`,
+ * weil `drInitFromX3DH` ein separates KDF-Label verwendet → kein Kollisionsrisiko.
+ *
+ * Token wird für API-Calls benötigt.
+ */
+export async function ensureDrSessionWithX3dh(
+  myIdentitySk: Uint8Array,
+  peerId: string,
+  peerPublicKeyB64: string,
+  token: string
+): Promise<DRState> {
+  // Prüfe ob bereits eine Session existiert
+  const existing = await metaGet(metaKey(peerId));
+  if (existing) {
+    try {
+      const p = JSON.parse(existing) as DRState;
+      if (p.v === 4 && p.peerIdentityPk === peerPublicKeyB64) return p;
+    } catch {
+      /* reinit */
+    }
+  }
+
+  try {
+    // Versuche Pre-Key-Bundle vom Server zu holen
+    const bundle = await api.getPreKeyBundle(token, peerId);
+
+    // X3DH shared secret berechnen
+    const x3dhResult = await x3dhSender(
+      myIdentitySk,
+      bundle.identityKey,
+      bundle.signedPreKey.publicKey,
+      bundle.oneTimePreKey?.publicKey ?? null
+    );
+
+    // DR-Session mit X3DH initiieren (anderes KDF-Label → kein Kollisionsrisiko)
+    const fresh = await drInitFromX3DH(
+      x3dhResult.sharedSecret,
+      peerId,
+      peerPublicKeyB64
+    );
+
+    // Merken dass dies eine X3DH-Session ist (Metadata)
+    const stateWithMeta = { ...fresh };
+
+    await metaSet(metaKey(peerId), JSON.stringify(stateWithMeta));
+    return stateWithMeta;
+  } catch {
+    // Fallback: direkter DH (wie bisher)
+    const fresh = await drInit(myIdentitySk, peerPublicKeyB64, peerId);
+    await metaSet(metaKey(peerId), JSON.stringify(fresh));
+    return fresh;
+  }
 }
 
 async function saveState(st: DRState): Promise<void> {

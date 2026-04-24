@@ -23,11 +23,14 @@ import {
 import {
   decryptGroupPayload,
   encryptGroupPayload,
+  getGroupKeyState,
+  initGroupKeyState,
   randomGroupKey,
   setGroupKey,
 } from "../lib/groupCrypto";
 import { acceptCall, startCall, type RtcPayload } from "../lib/webrtc";
 import { sealSender } from "../lib/sealedSender";
+import { startCoverTraffic } from "../lib/coverTraffic";
 import {
   outboxAdd,
   outboxList,
@@ -174,6 +177,7 @@ export function ChatShell({
     new Map()
   );
   const tokenRef = useRef(session.token);
+  const coverRef = useRef<ReturnType<typeof startCoverTraffic> | null>(null);
   peerRef.current = peer;
   groupRef.current = group;
   usersRef.current = users;
@@ -573,10 +577,26 @@ export function ChatShell({
     ws.onopen = () => {
       setConnected(true);
       void flushOutbox();
+
+      // Starte Cover Traffic (Dummy-Envelopes bei Inaktivität)
+      const peerList = usersRef.current.map((u) => ({
+        id: u.id,
+        publicKey: u.publicKey,
+      }));
+      if (peerList.length > 0) {
+        coverRef.current = startCoverTraffic(ws, peerList, () => {
+          return ws.readyState === WebSocket.OPEN && session !== null;
+        });
+      }
     };
     ws.onclose = () => {
       setConnected(false);
       wsRef.current = null;
+      // Stop cover traffic
+      if (coverRef.current) {
+        coverRef.current.stop();
+        coverRef.current = null;
+      }
       // Auto-reconnect with exponential backoff (max 30 seconds)
       const attempts = reconnectAttempts.current;
       const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
@@ -658,7 +678,15 @@ export function ChatShell({
 
             const plain = dec.plain;
             if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
-              await setGroupKey(plain.groupId, uint8FromBase64(plain.keyB64));
+              const keyBytes = uint8FromBase64(plain.keyB64);
+              await setGroupKey(plain.groupId, keyBytes);
+              // Auch PFS-Key-State initialisieren, damit encryptGroupPayload
+              // den PFS-Pfad (GC2) nutzen kann statt Legacy (GC1)
+              const existingState = await getGroupKeyState(plain.groupId);
+              if (!existingState) {
+                const peers = usersRef.current.map(u => u.id);
+                await initGroupKeyState(plain.groupId, peers, session.user.id, session.secretKey);
+              }
               await loadGroups();
               return;
             }

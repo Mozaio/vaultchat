@@ -350,16 +350,31 @@ export async function decryptGroupPayload(
   
   // Check if it's new format (GC2) or legacy (GC1)
   if (buf.length >= 3 && buf[0] === MAGIC[0] && buf[1] === MAGIC[1] && buf[2] === MAGIC[2]) {
-    // New format - but we need sender info which we don't have
-    // For now, try to decrypt with stored state
+    // New GC2 format — parse senderId aus dem Wire-Format und benutze den korrekten SenderState
+    if (buf.length < MAGIC.length + 16) throw new Error("bad_gc2");
+    const senderIdBytes = buf.subarray(MAGIC.length, MAGIC.length + 16);
+    const senderId = bytesToUuid(senderIdBytes);
+    
     const state = await getGroupKeyState(groupId);
-    if (state && Object.keys(state.senderStates).length > 0) {
-      const firstSenderId = Object.keys(state.senderStates)[0];
-      const senderState = state.senderStates[firstSenderId];
-      return decryptGroupMessage(groupId, firstSenderId, uint8FromBase64(senderState.ephemeralPriv), b64)
-        .then(r => r.plaintext);
+    if (!state) throw new Error("no_group_state");
+    
+    // Stelle sicher, dass wir einen SenderState für diesen Sender haben
+    if (!state.senderStates[senderId]) {
+      // Initialisiere aus dem Root-Key (Fallback für erste Nachricht eines neuen Senders)
+      const rootKey = uint8FromBase64(state.rootKey);
+      state.senderStates[senderId] = {
+        senderKey: base64FromUint8(rootKey),
+        chainCounter: 0,
+        ephemeralPub: "",
+        ephemeralPriv: "",
+      };
+      await setGroupKeyState(groupId, state);
     }
-    throw new Error("need_sender_key_for_v2");
+    
+    // Verwende decryptGroupMessage mit dem korrekten senderId
+    // (Die Funktion parst das Wire-Format erneut, das ist ein Overhead aber sicher)
+    return decryptGroupMessage(groupId, senderId, new Uint8Array(0), b64)
+      .then(r => r.plaintext);
   }
   
   // Legacy format
@@ -386,8 +401,9 @@ export async function encryptGroupPayload(
   const state = await getGroupKeyState(groupId);
   
   if (state && Object.keys(state.senderStates).length > 0) {
-    // Use new PFS encrypt
-    const senderId = Object.keys(state.senderStates)[0];
+    // Use new PFS encrypt — benutze die tatsächliche senderUserId aus dem Payload
+    // (wird in ChatShell als session.user.id gesetzt)
+    const senderId = payload.senderUserId ?? Object.keys(state.senderStates)[0];
     const result = await encryptGroupMessage(groupId, senderId, payload);
     return result.ciphertext;
   }
