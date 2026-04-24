@@ -205,6 +205,8 @@ export function ChatShell({
   const seen = useRef(new Set<string>());
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
+  const [dmScrolledUp, setDmScrolledUp] = useState(false);
+  const [groupScrolledUp, setGroupScrolledUp] = useState(false);
   const rawDmRef = useRef<Map<string, ReturnType<typeof authoredFromDm>>>(
     new Map()
   );
@@ -448,14 +450,21 @@ export function ChatShell({
   }, [group, loadGroupLocal]);
 
   // Auto-scroll: nur wenn der User bereits unten war ODER neue Nachricht reinkommt
+  // Mit smooth scrolling und verbesserter Bottom-Erkennung
   useEffect(() => {
     const el = dmScrollRef.current;
     if (!el) return;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (isAtBottom) {
-      el.scrollTop = el.scrollHeight;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (isNearBottom) {
+      // Smooth scroll to bottom with animation
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: 'smooth'
+      });
+      setDmScrolledUp(false);
     } else {
-      // Zeige einen "neue Nachricht" Button
+      // User has scrolled up - show indicator
+      setDmScrolledUp(true);
       setNewDmMessageWaiting(true);
     }
   }, [messages]);
@@ -464,13 +473,48 @@ export function ChatShell({
   useEffect(() => {
     const el = groupScrollRef.current;
     if (!el) return;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (isAtBottom) {
-      el.scrollTop = el.scrollHeight;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (isNearBottom) {
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: 'smooth'
+      });
+      setGroupScrolledUp(false);
     } else {
+      setGroupScrolledUp(true);
       setNewGroupMessageWaiting(true);
     }
   }, [groupMessages]);
+
+  // Scroll event handler für DM
+  const handleDmScroll = useCallback(() => {
+    const el = dmScrollRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setDmScrolledUp(!isNearBottom);
+    if (isNearBottom) {
+      setNewDmMessageWaiting(false);
+    }
+  }, []);
+
+  // Scroll event handler für Gruppen
+  const handleGroupScroll = useCallback(() => {
+    const el = groupScrollRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setGroupScrolledUp(!isNearBottom);
+    if (isNearBottom) {
+      setNewGroupMessageWaiting(false);
+    }
+  }, []);
+
+  // Scroll to bottom function
+  const scrollToBottom = useCallback((ref: React.RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollTo({
+      top: ref.current.scrollHeight,
+      behavior: 'smooth'
+    });
+  }, []);
 
   const sendRtc = useCallback((toUserId: string, payload: RtcPayload) => {
     wsRef.current?.send(JSON.stringify({ type: "rtc", toUserId, payload }));

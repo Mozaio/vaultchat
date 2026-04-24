@@ -382,12 +382,79 @@ body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 1rem 1.5rem;
+  padding-bottom: 6rem; /* Extra space at bottom for comfortable scrolling */
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   scroll-behavior: smooth;
   background: var(--chat-wallpaper), var(--bg-chat);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scroll-to-bottom fade gradient at top */
+.messages-container::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  margin-top: -40px;
+  margin-bottom: 0;
+  background: linear-gradient(to bottom, var(--bg-chat) 0%, transparent 100%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 5;
+}
+
+.messages-container.scrolled-up::before {
+  opacity: 1;
+}
+
+/* Floating scroll-to-bottom button */
+.scroll-to-bottom-btn {
+  position: fixed;
+  bottom: 120px;
+  right: 20px;
+  z-index: 50;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-accent);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(20px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scroll-to-bottom-btn.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.scroll-to-bottom-btn:hover {
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px var(--accent-glow);
+}
+
+.scroll-to-bottom-btn:active {
+  transform: scale(0.95);
+}
+
+.scroll-to-bottom-btn span {
+  font-size: 1.25rem;
+  margin-bottom: 2px;
 }
 
 /* ── Message Wrapper ── */
