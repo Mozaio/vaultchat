@@ -74,6 +74,7 @@ import {
   IconMic,
   IconMoreVertical,
   IconPaperclip,
+  IconPin,
   IconPhone,
   IconRefreshCw,
   IconSearch,
