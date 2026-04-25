@@ -109,11 +109,6 @@ export function MessageBubble({
   const reacts = msg.reactions ?? {};
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
 
-  // Compute progress for disappearing messages
-  const ttlProgress = msg.expiresAt
-    ? Math.max(0, (msg.expiresAt - Date.now()) / (msg.expiresAt - msg.at))
-    : null;
-
   return (
     <div
       ref={bubbleRef}
@@ -149,32 +144,6 @@ export function MessageBubble({
             isGrouped ? "grouped" : ""
           }`}
         >
-          {/* Disappearing message progress ring */}
-          {ttlProgress !== null && (
-            <svg className="disappearing-progress" viewBox="0 0 20 20">
-              <circle
-                cx="10"
-                cy="10"
-                r="8"
-                stroke={msg.fromMe ? "rgba(255,255,255,0.3)" : "var(--border)"}
-                strokeWidth="2"
-                fill="none"
-              />
-              <circle
-                cx="10"
-                cy="10"
-                r="8"
-                stroke={msg.fromMe ? "rgba(255,255,255,0.8)" : "var(--warning)"}
-                strokeWidth="2"
-                fill="none"
-                strokeDasharray="50"
-                strokeDashoffset={50 * (1 - ttlProgress)}
-                strokeLinecap="round"
-                style={{ transition: "stroke-dashoffset 1s linear" }}
-              />
-            </svg>
-          )}
-
           {msg.deleted ? (
             <span className="italic">Nachricht gelöscht</span>
           ) : editing ? (
@@ -274,10 +243,9 @@ export function MessageBubble({
                 setMenuOpen((v) => !v);
                 setReactOpen(false);
               }}
-              className={`absolute top-2 ${
-                msg.fromMe ? "-left-2" : "-right-2"
-              } hidden rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] w-7 h-7 items-center justify-center hover:bg-[var(--bg-hover)] group-hover:flex z-20`}
-              style={{ color: "var(--text-secondary)" }}
+              className={`message-menu-button ${
+                msg.fromMe ? "from-me" : "from-peer"
+              }`}
             >
               ⋯
             </button>

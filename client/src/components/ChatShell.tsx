@@ -1525,7 +1525,13 @@ export function ChatShell({
                 +
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">{peerList}</div>
+            <div
+              className={`overflow-y-auto p-2 ${
+                sidebarFilter === "all" ? "max-h-[42%]" : "flex-1"
+              }`}
+            >
+              {peerList}
+            </div>
           </>
         )}
 
@@ -1537,7 +1543,7 @@ export function ChatShell({
           </div>
         )}
 
-        {(sidebarFilter === "all" || sidebarFilter === "group") && (
+        {sidebarFilter === "group" && (
           <>
             <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
               <input
@@ -1569,8 +1575,18 @@ export function ChatShell({
                 Gruppe erstellen
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-2">{groupList}</div>
           </>
+        )}
+
+        {(sidebarFilter === "all" || sidebarFilter === "group") && (
+          <div className="flex-1 overflow-y-auto p-2">
+            {sidebarFilter === "all" && visibleGroups.length > 0 && (
+              <p className="px-2 pb-1 pt-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
+                Gruppen
+              </p>
+            )}
+            {groupList}
+          </div>
         )}
 
         <div
@@ -1595,7 +1611,7 @@ export function ChatShell({
           <button
             type="button"
             onClick={() => setSecurityOpen(true)}
-            className="btn btn-secondary btn-icon !h-8 !w-8"
+            className="sidebar-footer-action"
             title="Einstellungen"
           >
             <IconSettings size={16} />
@@ -1603,7 +1619,7 @@ export function ChatShell({
           <button
             type="button"
             onClick={() => setUserMenuOpen((v) => !v)}
-            className="btn btn-secondary !px-2 !py-1 !text-xs"
+            className="sidebar-footer-action"
             title="Mehr"
           >
             <IconMoreVertical size={16} />
