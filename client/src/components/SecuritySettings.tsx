@@ -46,13 +46,23 @@ export function saveSecurityLevel(level: SecurityLevel): void {
 
 interface SecuritySettingsProps {
   onClose: () => void;
+  relayOnly?: boolean;
+  onRelayOnlyChange?: (value: boolean) => void;
+  myFingerprint?: string | null;
+  onExportBackup?: () => void;
 }
 
 /**
  * Security Settings Panel Component
  * Das Panel wird nur gerendert wenn es in ChatShell conditional gerendert wird
  */
-export function SecuritySettings({ onClose }: SecuritySettingsProps) {
+export function SecuritySettings({
+  onClose,
+  relayOnly = false,
+  onRelayOnlyChange,
+  myFingerprint,
+  onExportBackup,
+}: SecuritySettingsProps) {
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [replayStats, setReplayStats] = useState(getReplayStats());
 
@@ -101,6 +111,49 @@ export function SecuritySettings({ onClose }: SecuritySettingsProps) {
             style={{ color: "var(--text-muted)" }}
           >
             ✕
+          </button>
+        </div>
+
+        <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
+          <h3 className="mb-2 text-sm font-medium" style={{ color: "var(--text)" }}>
+            Datenschutz & Anrufe
+          </h3>
+          <label className="flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <input
+              type="checkbox"
+              checked={relayOnly}
+              onChange={(e) => onRelayOnlyChange?.(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Anrufe nur über TURN (Relay) leiten
+              <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
+                Verbirgt direkte Peer-Verbindungen, kann aber die Sprachqualität reduzieren.
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
+          <h3 className="mb-2 text-sm font-medium" style={{ color: "var(--text)" }}>
+            Datensicherung
+          </h3>
+          {myFingerprint && (
+            <p className="mb-3 break-all font-mono text-xs" style={{ color: "var(--accent)" }}>
+              Fingerprint: {myFingerprint}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onExportBackup}
+            className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+            style={{
+              background: "var(--accent-soft)",
+              color: "var(--accent)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            Backup (JSON) herunterladen
           </button>
         </div>
 

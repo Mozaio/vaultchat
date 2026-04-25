@@ -45,6 +45,7 @@ import {
   saveKeyMaterial,
   toUploadBody,
 } from "../lib/keyStore";
+import { loadLocalIdentity } from "../lib/localIdentity";
 import {
   MessageBubble,
   previewForPayload,
@@ -64,20 +65,26 @@ import { AddContactModal } from "./AddContactModal";
 import { SecuritySettings } from "./SecuritySettings";
 import { ChatEmptyState } from "./ChatEmptyState";
 import {
+  IconBell,
+  IconFileText,
   IconInfo,
+  IconLock,
   IconMic,
-  IconMore,
   IconMoreVertical,
   IconPaperclip,
   IconPhone,
-  IconPin,
+  IconRefreshCw,
   IconSearch,
   IconSend,
-  IconBell,
   IconSettings,
+  IconShield,
+  IconShieldCheck,
+  IconSmile,
+  IconUsers,
 } from "./Icons";
 
 type Tab = "dm" | "group";
+type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
 
 type ReplyTarget = { cid: string; author: string; text: string } | null;
 
@@ -185,7 +192,7 @@ export function ChatShell({
   const [isMobile, setIsMobile] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [sideTab, setSideTab] = useState<"direct" | "groups" | "fav">("direct");
+  const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>("all");
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -193,6 +200,10 @@ export function ChatShell({
   const [newGroupMessageWaiting, setNewGroupMessageWaiting] = useState(false);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dmMenuOpen, setDmMenuOpen] = useState(false);
+  const [groupMenuOpen, setGroupMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const callRef = useRef<{
     close: () => void;
@@ -210,6 +221,8 @@ export function ChatShell({
   const seen = useRef(new Set<string>());
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
+  const dmInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const groupInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [dmScrolledUp, setDmScrolledUp] = useState(false);
   const [groupScrolledUp, setGroupScrolledUp] = useState(false);
   const rawDmRef = useRef<Map<string, ReturnType<typeof authoredFromDm>>>(
@@ -233,6 +246,9 @@ export function ChatShell({
       setSafetyOpen(false);
       setInfoOpen(false);
       setGroupPanelOpen(false);
+      setDmMenuOpen(false);
+      setGroupMenuOpen(false);
+      setUserMenuOpen(false);
     },
     onLock: () => onLock(),
   });
@@ -250,7 +266,7 @@ export function ChatShell({
 
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
   const showSidebar = !isMobile || !showConversation;
-  const showInfo = !isMobile && showConversation;
+  const showInfo = !isMobile && showConversation && infoOpen;
 
   const resolveUser = useCallback(
     async (userId: string): Promise<api.ApiUser | null> => {
@@ -911,6 +927,7 @@ export function ChatShell({
     };
     await sendDmWire(peer, payload);
     setText("");
+    resetTextarea(dmInputRef.current);
     setReplyDm(null);
   }
 
@@ -982,6 +999,7 @@ export function ChatShell({
     };
     await sendGroupWire(group, payload);
     setGroupText("");
+    resetTextarea(groupInputRef.current);
     setReplyGroup(null);
   }
 
@@ -1266,14 +1284,53 @@ export function ChatShell({
     return d.toLocaleDateString(undefined, { weekday: "short" });
   }, []);
 
+  const resizeTextarea = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, []);
+
+  const resetTextarea = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "44px";
+  }, []);
+
+  const refreshLists = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadContacts(), loadGroups()]);
+    } finally {
+      window.setTimeout(() => setRefreshing(false), 300);
+    }
+  }, [loadContacts, loadGroups]);
+
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return users;
     return users.filter((u) => u.username.toLowerCase().includes(q));
   }, [users, query]);
 
+  const filteredGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter((g) => g.name.toLowerCase().includes(q));
+  }, [groups, query]);
+
+  const visibleUsers = useMemo(() => {
+    if (sidebarFilter === "group" || sidebarFilter === "fav") return [];
+    if (sidebarFilter === "unread") {
+      return filteredUsers.filter((u) => (unreadByPeer[u.id] ?? 0) > 0);
+    }
+    return filteredUsers;
+  }, [filteredUsers, sidebarFilter, unreadByPeer]);
+
+  const visibleGroups = useMemo(() => {
+    if (sidebarFilter === "dm" || sidebarFilter === "unread" || sidebarFilter === "fav") return [];
+    return filteredGroups;
+  }, [filteredGroups, sidebarFilter]);
+
   const peerList = useMemo(() => {
-    return filteredUsers.map((u) => {
+    return visibleUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
       return (
         <PeerRow
@@ -1286,41 +1343,42 @@ export function ChatShell({
           onSelect={() => {
             setTab("dm");
             setPeer(u);
+            setGroup(null);
+            setInfoOpen(false);
           }}
         />
       );
     });
-  }, [filteredUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer]);
+  }, [visibleUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer]);
 
   const groupList = useMemo(
     () =>
-      groups.map((g) => (
+      visibleGroups.map((g) => (
         <button
           key={g.id}
           type="button"
           onClick={() => {
             setTab("group");
             setGroup(g);
+            setPeer(null);
+            setInfoOpen(false);
           }}
-          className={`contact-item group-item w-full !mx-0 ${
+          className={`contact-item w-full !mx-0 ${
             group?.id === g.id && tab === "group"
               ? "active"
               : ""
           }`}
         >
-          <div className="contact-avatar group">
+          <div className="contact-avatar !h-9 !w-9 !text-sm">
             {g.name.slice(0, 1).toUpperCase()}
           </div>
           <div className="contact-info min-w-0">
             <span className="contact-name">{g.name}</span>
             <p className="contact-preview">{g.memberIds.length} Mitglieder</p>
           </div>
-          <div className="pin-icon">
-            <IconPin size={14} />
-          </div>
         </button>
       )),
-    [groups, group, tab]
+    [visibleGroups, group, tab]
   );
 
   return (
@@ -1357,7 +1415,24 @@ export function ChatShell({
         />
       )}
       {securityOpen && (
-        <SecuritySettings onClose={() => setSecurityOpen(false)} />
+        <SecuritySettings
+          onClose={() => setSecurityOpen(false)}
+          relayOnly={relayOnly}
+          onRelayOnlyChange={setRelayOnly}
+          myFingerprint={myFp}
+          onExportBackup={() => {
+            const local = loadLocalIdentity();
+            if (!local) return;
+            const blob = new Blob([JSON.stringify(local, null, 2)], {
+              type: "application/json",
+            });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `vaultchat-backup-${local.username}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+          }}
+        />
       )}
       <div className="app-surface flex min-h-0 w-full flex-1 overflow-visible rounded-2xl md:rounded-3xl">
       <aside
@@ -1366,11 +1441,16 @@ export function ChatShell({
         } w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
-          <div>
-            <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
+              <IconShield size={18} />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
               VaultChat
-            </p>
-            <p className="text-xs app-muted">Secure Messenger</p>
+              </p>
+              <p className="text-xs app-muted">Secure Messenger</p>
+            </div>
           </div>
           <div className="flex gap-1.5">
             <ThemeToggle />
@@ -1380,22 +1460,8 @@ export function ChatShell({
               className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
               title="Sofort sperren (LDK aus dem Speicher entfernen)"
             >
+              <IconLock size={14} />
               Sperren
-            </button>
-            <button
-              type="button"
-              onClick={() => setSecurityOpen(true)}
-              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-              title="Sicherheitseinstellungen"
-            >
-              🔒
-            </button>
-            <button
-              type="button"
-              onClick={onLogout}
-              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-            >
-              Abmelden
             </button>
           </div>
         </div>
@@ -1413,58 +1479,47 @@ export function ChatShell({
               style={{ color: "var(--text)" }}
             />
           </div>
-        <div className="filter-chips">
-            <button
-              type="button"
-              className={`filter-chip ${sideTab === "direct" ? "active" : ""}`}
-              onClick={() => { setSideTab("direct"); setTab("dm"); }}
-            >
-              Alle
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${tab === "dm" ? "active" : ""}`}
-              onClick={() => { setSideTab("direct"); setTab("dm"); }}
-            >
-              DMs
-            </button>
-            <button
-              type="button"
-              className={`filter-chip ${tab === "group" ? "active" : ""}`}
-              onClick={() => { setSideTab("groups"); setTab("group"); }}
-            >
-              Gruppen
-            </button>
-            <button
-              type="button"
-              className="filter-chip"
-              onClick={() => setSideTab("fav")}
-            >
-              Favoriten
-            </button>
-            <button
-              type="button"
-              className="filter-chip"
-              onClick={() => setSideTab("direct")}
-            >
-              Ungelesen
-            </button>
-          </div>
         </div>
 
-        {tab === "dm" && (
+        <div className="filter-chips mx-3 mt-3">
+          {[
+            ["all", "Alle"],
+            ["dm", "DMs"],
+            ["group", "Gruppen"],
+            ["fav", "Favoriten"],
+            ["unread", "Ungelesen"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={`filter-chip ${sidebarFilter === value ? "active" : ""}`}
+              onClick={() => {
+                const next = value as SidebarFilter;
+                setSidebarFilter(next);
+                if (next === "dm" || next === "unread") setTab("dm");
+                if (next === "group") setTab("group");
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {(sidebarFilter === "all" || sidebarFilter === "dm" || sidebarFilter === "unread") && (
           <>
-            <div className="flex items-center justify-between border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
-              <p
-                className="text-[10px] font-semibold uppercase tracking-wider"
-                style={{ color: "var(--text-muted)" }}
+            <div className="flex items-center justify-end gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
+              <button
+                type="button"
+                onClick={() => void refreshLists()}
+                className={`btn btn-secondary btn-icon !h-8 !w-8 ${refreshing ? "animate-spin" : ""}`}
+                title="Kontakte und Gruppen aktualisieren"
               >
-                Kontakte
-              </p>
+                <IconRefreshCw size={16} />
+              </button>
               <button
                 type="button"
                 onClick={() => setShowAddContact(true)}
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition"
+                className="btn btn-primary btn-icon !h-8 !w-8 !text-base"
                 title="Kontakt hinzufügen"
               >
                 +
@@ -1474,7 +1529,15 @@ export function ChatShell({
           </>
         )}
 
-        {tab === "group" && (
+        {sidebarFilter === "fav" && (
+          <div className="flex flex-1 items-center justify-center px-6 text-center">
+            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+              Favoriten erscheinen hier.
+            </p>
+          </div>
+        )}
+
+        {(sidebarFilter === "all" || sidebarFilter === "group") && (
           <>
             <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
               <input
@@ -1506,39 +1569,66 @@ export function ChatShell({
                 Gruppe erstellen
               </button>
             </div>
-            <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border)' }}>
-              <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                Deine Gruppen
-              </p>
-            </div>
             <div className="flex-1 overflow-y-auto p-2">{groupList}</div>
           </>
         )}
 
-        {/* User profile footer */}
         <div
-          className="flex items-center gap-3 border-t p-3"
-          style={{ borderColor: "var(--border)" }}
+          className="relative mt-auto flex items-center gap-3 border-t px-4 py-2.5 text-xs"
+          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
         >
           <div
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
             style={{ background: userGradient(session.user.id) }}
           >
             {session.user.username.slice(0, 1).toUpperCase()}
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
-              {session.user.username}
-            </p>
-          </div>
           <button
             type="button"
             onClick={() => setSecurityOpen(true)}
-            className="btn btn-ghost !p-2"
+            className="min-w-0 flex-1 truncate text-left font-medium"
+            style={{ color: "var(--text)" }}
+            title={myFp ? `Fingerprint: ${myFp}` : "Eigenes Profil"}
+          >
+            {session.user.username}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSecurityOpen(true)}
+            className="btn btn-secondary btn-icon !h-8 !w-8"
             title="Einstellungen"
           >
             <IconSettings size={16} />
           </button>
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className="btn btn-secondary !px-2 !py-1 !text-xs"
+            title="Mehr"
+          >
+            <IconMoreVertical size={16} />
+          </button>
+          {userMenuOpen && (
+            <div className="user-menu">
+              <button
+                type="button"
+                className="chat-menu-item"
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  setSecurityOpen(true);
+                }}
+              >
+                <IconSettings size={16} /> Einstellungen
+              </button>
+              <button
+                type="button"
+                className="chat-menu-item danger"
+                onClick={onLogout}
+              >
+                Abmelden
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -1590,7 +1680,6 @@ export function ChatShell({
         {tab === "dm" && peer && (
           <>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
-              {/* Connection status indicator */}
               <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
                 <div className={`h-full transition-all duration-500 ${connected ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
               </div>
@@ -1621,15 +1710,9 @@ export function ChatShell({
                     <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)] ${onlinePeers.has(peer.id) ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
                   </div>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
-                        {peer.username}
-                      </p>
-                      {/* Connection status badge */}
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${connected ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
-                        {connected ? 'Online' : 'Verbinden...'}
-                      </span>
-                    </div>
+                    <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
+                      {peer.username}
+                    </p>
                     {typing ? (
                       <p className="text-xs text-emerald-500/80 flex items-center gap-1">
                         <span className="flex gap-0.5">
@@ -1640,67 +1723,72 @@ export function ChatShell({
                         schreibt...
                       </p>
                     ) : (
-                      <p
-                        className="max-w-[min(100%,14rem)] break-all font-mono text-[10px] leading-snug opacity-60 sm:max-w-md sm:text-[11px]"
-                        style={{ color: "var(--accent)" }}
-                      >
-                        {peerFp ? `${peerFp.slice(0, 32)}...` : "Verschlüsselt"}
+                      <p className="flex items-center gap-1.5 text-xs" style={{ color: connected ? "var(--success)" : "var(--text-muted)" }}>
+                        <span className="h-2 w-2 rounded-full" style={{ background: connected ? "var(--success)" : "var(--text-muted)" }} />
+                        {connected ? "Online" : "Zuletzt gesehen vor kurzem"}
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setInfoOpen((v) => !v)}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden"
-                    title="Details"
-                  >
-                    <IconMore size={16} />
-                  </button>
-                  <select
-                    value={ttlDm}
-                    onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
-                    className="app-input !py-1.5 !text-xs !w-auto"
-                    title="Verschwindende Nachrichten"
-                  >
-                    {TTL_OPTIONS.map((o) => (
-                      <option key={o.ms} value={o.ms}>
-                        ⏳ {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setSafetyOpen(true)}
-                    className={`btn btn-secondary !px-2.5 !py-1.5 !text-xs ${
-                      peerPin?.state === "verified"
-                        ? "!border-emerald-600 !text-emerald-500"
-                        : peerPin?.state === "mismatch"
-                          ? "!border-red-500 !text-red-500"
-                          : ""
-                    }`}
-                  >
-                    {peerPin?.state === "verified" && "✓ Verifiziert"}
-                    {peerPin?.state === "mismatch" && "⚠ Schlüssel geändert"}
-                    {(!peerPin || peerPin.state === "pinned") &&
-                      "Sicherheitsnummer"}
-                  </button>
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => void beginCall()}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
+                    className="btn btn-secondary btn-icon !h-9 !w-9"
+                    title="Anrufen"
                   >
-                    <IconPhone size={16} />
+                    <IconPhone size={18} />
                   </button>
                   <button
                     type="button"
-                    onClick={() => setInfoOpen(true)}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs hidden md:inline-flex"
-                    title="Details"
+                    onClick={() => setInfoOpen((v) => !v)}
+                    className={`btn btn-secondary btn-icon !h-9 !w-9 ${infoOpen ? "!border-[var(--accent)] !bg-[var(--accent-soft)] !text-[var(--accent)]" : ""}`}
+                    title="Info"
                   >
-                    <IconInfo size={16} />
+                    <IconInfo size={18} />
                   </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setDmMenuOpen((v) => !v)}
+                      className="btn btn-secondary btn-icon !h-9 !w-9"
+                      title="Mehr"
+                    >
+                      <IconMoreVertical size={18} />
+                    </button>
+                    {dmMenuOpen && (
+                      <div className="chat-menu">
+                        <label className="chat-menu-item cursor-default">
+                          <span>Verschwindende Nachrichten</span>
+                          <select
+                            value={ttlDm}
+                            onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
+                            className="chat-menu-select"
+                            title="Verschwindende Nachrichten"
+                          >
+                            {TTL_OPTIONS.map((o) => (
+                              <option key={o.ms} value={o.ms}>{o.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSafetyOpen(true); }}>
+                          <IconShieldCheck size={16} /> Sicherheitsnummer anzeigen
+                        </button>
+                        <button type="button" className="chat-menu-item" onClick={() => setDmMenuOpen(false)}>
+                          <IconFileText size={16} /> Medien & Dateien
+                        </button>
+                        <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSearchOpen(true); }}>
+                          <IconSearch size={16} /> Suche in Konversation
+                        </button>
+                        <button type="button" className="chat-menu-item danger" onClick={() => setDmMenuOpen(false)}>
+                          Kontakt blockieren
+                        </button>
+                        <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setInfoOpen(true); }}>
+                          <IconInfo size={16} /> Info / Profil anzeigen
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               {peerPin?.state === "mismatch" && (
@@ -1823,15 +1911,15 @@ export function ChatShell({
                   </button>
                 </div>
               )}
-              <div className="relative flex gap-2">
+              <div className="relative flex items-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEmojiOpen((v) => !v)}
-                  className="rounded-xl border px-3 py-2 text-xs transition hover:bg-[var(--bg-hover)]"
+                  className="chat-tool-button"
                   style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
                   title="Emoji"
                 >
-                  🙂
+                  <IconSmile size={18} />
                 </button>
                 {emojiOpen && (
                   <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
@@ -1850,15 +1938,46 @@ export function ChatShell({
                     ))}
                   </div>
                 )}
-                <input
-                  className="app-input flex-1 rounded-xl border border-[color:var(--border)] px-3 py-2 text-sm outline-none ring-[color:var(--shadow)]/30 transition focus:ring-2"
+                <label
+                  className="chat-tool-button cursor-pointer"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  title="Datei anhängen"
+                >
+                  <IconPaperclip size={18} />
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void sendDmFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void sendDmVoice()}
+                  className={`chat-tool-button ${
+                    voice.recording
+                      ? "border-red-500 bg-red-700/60 text-white"
+                      : ""
+                  }`}
+                  style={voice.recording ? {} : { borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                >
+                  {voice.recording ? "■" : <IconMic size={18} />}
+                </button>
+                <textarea
+                  ref={dmInputRef}
+                  className="chat-input-textarea"
                   placeholder={
-                    voice.recording ? "🎙️ Aufnahme läuft…" : "Nachricht…"
+                    voice.recording ? "Aufnahme läuft…" : "Nachricht…"
                   }
                   value={text}
                   disabled={voice.recording || peerPin?.state === "mismatch"}
+                  rows={1}
                   onChange={(e) => {
                     setText(e.target.value);
+                    resizeTextarea(e.currentTarget);
                     const ws = wsRef.current;
                     if (ws && ws.readyState === WebSocket.OPEN && peer) {
                       ws.send(
@@ -1877,39 +1996,11 @@ export function ChatShell({
                     }
                   }}
                 />
-                <label
-                  className="cursor-pointer rounded-xl border px-3 py-2 text-xs transition hover:bg-[var(--bg-hover)]"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                  title="Datei anhängen"
-                >
-                  <IconPaperclip size={16} />
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void sendDmFile(f);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => void sendDmVoice()}
-                  className={`rounded-xl border px-3 py-2 text-xs transition ${
-                    voice.recording
-                      ? "border-red-500 bg-red-700/60 text-white"
-                      : ""
-                  }`}
-                  style={voice.recording ? {} : { borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                >
-                  {voice.recording ? "■" : <IconMic size={16} />}
-                </button>
                 <button
                   type="button"
                   onClick={() => void sendDmText()}
                   disabled={voice.recording || !text.trim()}
-                  className="btn-send disabled:cursor-not-allowed disabled:opacity-40"
+                  className="btn-send"
                 >
                   <IconSend size={16} />
                 </button>
@@ -1947,34 +2038,48 @@ export function ChatShell({
                   </p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setInfoOpen((v) => !v)}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs md:hidden"
-                    title="Info"
-                  >
-                    <IconMore size={16} />
-                  </button>
-                  <select
-                    value={ttlGroup}
-                    onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
-                    className="app-input !py-1.5 !text-xs !w-auto"
-                    title="Verschwindende Nachrichten"
-                  >
-                    {TTL_OPTIONS.map((o) => (
-                      <option key={o.ms} value={o.ms}>
-                        ⏳ {o.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setGroupPanelOpen((v) => !v)}
-                    className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
+                    className="btn btn-secondary btn-icon !h-9 !w-9"
+                    title="Mitglieder"
                   >
-                    Mitglieder
+                    <IconUsers size={18} />
                   </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setGroupMenuOpen((v) => !v)}
+                      className="btn btn-secondary btn-icon !h-9 !w-9"
+                      title="Mehr"
+                    >
+                      <IconMoreVertical size={18} />
+                    </button>
+                    {groupMenuOpen && (
+                      <div className="chat-menu">
+                        <label className="chat-menu-item cursor-default">
+                          <span>Verschwindende Nachrichten</span>
+                          <select
+                            value={ttlGroup}
+                            onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
+                            className="chat-menu-select"
+                            title="Verschwindende Nachrichten"
+                          >
+                            {TTL_OPTIONS.map((o) => (
+                              <option key={o.ms} value={o.ms}>{o.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setSearchOpen(true); }}>
+                          <IconSearch size={16} /> Suche in Konversation
+                        </button>
+                        <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setGroupPanelOpen(true); }}>
+                          <IconUsers size={16} /> Mitglieder anzeigen
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2107,12 +2212,17 @@ export function ChatShell({
                   </button>
                 </div>
               )}
-              <div className="flex gap-2">
-                <input
-                  className="app-input flex-1 !rounded-xl px-3 py-2 text-sm"
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={groupInputRef}
+                  className="chat-input-textarea"
                   placeholder="Gruppennachricht…"
                   value={groupText}
-                  onChange={(e) => setGroupText(e.target.value)}
+                  rows={1}
+                  onChange={(e) => {
+                    setGroupText(e.target.value);
+                    resizeTextarea(e.currentTarget);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -2123,6 +2233,7 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => void sendGroupText()}
+                  disabled={!groupText.trim()}
                   className="btn-send"
                 >
                   <IconSend size={16} />
@@ -2134,8 +2245,8 @@ export function ChatShell({
       </main>
 
       {/* Right info panel (desktop) */}
-      {showInfo && (
-        <aside className="info-panel hidden w-80 min-w-0 shrink-0 md:flex">
+      {!isMobile && showConversation && (
+        <aside className={`info-panel-shell hidden md:flex ${showInfo ? "open" : ""}`}>
           <InfoPanel
             mode={tab}
             peer={peer}
@@ -2276,11 +2387,11 @@ function PeerRow({
       type="button"
       onClick={onSelect}
       className={`contact-item w-full ${
-        selected ? "dm-active" : "dm-inactive"
+        selected ? "active" : ""
       } !mx-0 items-center justify-between`}
     >
       <div
-        className="contact-avatar"
+        className="contact-avatar !h-9 !w-9 !text-sm"
         style={{ background: userGradient(u.id) }}
       >
         {u.username.slice(0, 1).toUpperCase()}
@@ -2308,18 +2419,13 @@ function PeerRow({
         </div>
         <p className="contact-preview">{subtitle ?? ""}</p>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="contact-meta">
-          <span className="contact-time">{metaRight ?? ""}</span>
-          {unread && unread > 0 ? (
-            <span className="unread-badge">
-              {unread > 99 ? "99+" : unread}
-            </span>
-          ) : null}
-        </div>
-        <div className="pin-icon">
-          <IconPin size={14} />
-        </div>
+      <div className="contact-meta">
+        <span className="contact-time">{metaRight ?? ""}</span>
+        {unread && unread > 0 ? (
+          <span className="unread-badge">
+            {unread > 99 ? "99+" : unread}
+          </span>
+        ) : null}
       </div>
     </button>
   );
@@ -2348,6 +2454,9 @@ function InfoPanel({
   const initials = (title.slice(0, 1) || "•").toUpperCase();
   const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
   const isMuted = peer ? mutedPeers.has(peer.id) : false;
+  const groupedSafetyNumber = peerFp
+    ? peerFp.replace(/\s+/g, "").match(/.{1,4}/g)?.join(" ") ?? peerFp
+    : "…";
 
   const toggleMute = () => {
     if (!peer) return;
@@ -2363,11 +2472,14 @@ function InfoPanel({
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full max-w-full flex-col overflow-y-auto p-1">
+    <div className="info-panel">
       {/* Profile Avatar */}
       <div className="flex flex-col items-center">
-        <div className="info-avatar-large !mb-3 !mt-0 !h-20 !w-20 !text-2xl">
-          {initials}
+        <div className="relative">
+          <div className="info-avatar-large">
+            {initials}
+          </div>
+          {mode === "dm" && <span className="online-dot" />}
         </div>
         <p className="text-center text-lg font-bold" style={{ color: "var(--text)" }}>
           {title}
@@ -2381,35 +2493,30 @@ function InfoPanel({
       <div className="mb-4 grid grid-cols-3 gap-2">
         <button
           type="button"
-          className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
-          style={{ background: "var(--bg-elevated)" }}
+          className="info-action-button"
           title="Profil anzeigen"
         >
-          <span className="text-lg">👤</span>
-          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Profil</span>
+          <IconInfo size={18} />
+          <span>Profil</span>
         </button>
         <button
           type="button"
-          className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition ${
-            isMuted ? "border-amber-600 bg-amber-900/30" : "border-[var(--border)] hover:bg-[var(--bg-hover)]"
-          }`}
-          style={isMuted ? {} : { background: "var(--bg-elevated)" }}
+          className={`info-action-button ${isMuted ? "active-warning" : ""}`}
           onClick={toggleMute}
           title={isMuted ? "Stummschaltung aufheben" : "Stummschalten"}
         >
-          <span className="text-lg">{isMuted ? "🔔" : "🔕"}</span>
-          <span className="text-[10px]" style={{ color: isMuted ? "var(--amber)" : "var(--text-secondary)" }}>
+          <IconBell size={18} />
+          <span>
             {isMuted ? "Stumm" : "Benachrichtigungen"}
           </span>
         </button>
         <button
           type="button"
-          className="flex flex-col items-center gap-1 rounded-lg border border-[var(--border)] p-2 transition hover:bg-[var(--bg-hover)]"
-          style={{ background: "var(--bg-elevated)" }}
+          className="info-action-button"
           title="Suchen"
         >
-          <span className="text-lg">🔍</span>
-          <span className="text-[10px]" style={{ color: "var(--text-secondary)" }}>Suchen</span>
+          <IconSearch size={18} />
+          <span>Suchen</span>
         </button>
       </div>
 
@@ -2423,16 +2530,23 @@ function InfoPanel({
             </div>
             <div className="mt-2 flex items-center justify-between">
               <span className="text-sm" style={{ color: "var(--text-secondary)" }}>ID</span>
-              <span className="font-mono text-xs" style={{ color: "var(--accent)" }}>
+              <button
+                type="button"
+                className="group inline-flex items-center gap-1 font-mono text-xs"
+                style={{ color: "var(--accent)" }}
+                title="ID kopieren"
+                onClick={() => void navigator.clipboard?.writeText(peer.id)}
+              >
                 {peer.id.slice(0, 16)}...
-              </span>
+                <span className="opacity-0 transition group-hover:opacity-100">⧉</span>
+              </button>
             </div>
           </div>
         </div>
       )}
 
       <div className="info-section !border-0 !pb-0">
-        <p className="info-section-title">🔒 Sicherheit</p>
+        <p className="info-section-title">Sicherheit</p>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
           Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server
           leitet nur versiegelte Daten. Perfect Forward Secrecy aktiv.
@@ -2451,13 +2565,18 @@ function InfoPanel({
               background: "var(--bg-elevated)",
             }}
           >
-            <p
-              className="font-mono text-xs leading-relaxed break-all"
-              style={{ color: "var(--accent)" }}
-            >
-              {peerFp ?? "…"}
-            </p>
-            <p className="mt-1 text-[11px] app-muted">Tippen zum Prüfen / vergleichen</p>
+            <div className="flex items-start justify-between gap-3">
+              <p
+                className="font-mono text-[13px] leading-relaxed tracking-wider"
+                style={{ color: "var(--accent)" }}
+              >
+                {groupedSafetyNumber}
+              </p>
+              <span className="btn btn-secondary !px-2 !py-1 !text-[11px]">
+                <IconShieldCheck size={14} />
+                Verifizieren
+              </span>
+            </div>
           </button>
         </div>
       )}

@@ -13,6 +13,9 @@ export function AutoLockProgressBar({
 }: AutoLockProgressBarProps) {
   const [progress, setProgress] = useState(100);
   const [isWarning, setIsWarning] = useState(false);
+  const remainingMs = Math.max(0, Math.round((progress / 100) * timeoutMs));
+  const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+  const isCritical = remainingMs <= 10_000;
   
   const WARNING_THRESHOLD = 60_000; // Last 60 seconds
 
@@ -41,9 +44,14 @@ export function AutoLockProgressBar({
   }, [timeoutMs, onTimeout]);
 
   return (
-    <div 
-      className={`auto-lock-bar ${isWarning ? 'warning' : ''}`}
-      style={{ width: `${progress}%` }}
-    />
+    <div className="auto-lock-wrap" title={`Auto-Lock in ${remainingMinutes} Minuten`}>
+      <div
+        className={`auto-lock-bar ${isWarning ? "warning" : ""} ${isCritical ? "critical" : ""}`}
+        style={{ width: `${progress}%` }}
+      />
+      <span className="auto-lock-tooltip">
+        Auto-Lock in {remainingMinutes} Minuten
+      </span>
+    </div>
   );
 }
