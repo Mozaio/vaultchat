@@ -88,6 +88,27 @@ import {
 type Tab = "dm" | "group";
 type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
+type SharedMediaItem = {
+  id: string;
+  kind: "file" | "voice";
+  name: string;
+  href: string;
+  at: number;
+};
+
+function loadStringSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveStringSet(key: string, value: Set<string>) {
+  localStorage.setItem(key, JSON.stringify(Array.from(value)));
+}
 
 type ReplyTarget = {
   cid: string;
@@ -187,6 +208,12 @@ export function ChatShell({
   // Notification settings per chat
   const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
   const [mutedGroups, setMutedGroups] = useState<Set<string>>(new Set());
+  const [favoritePeers, setFavoritePeers] = useState<Set<string>>(
+    () => loadStringSet("vaultchat.favorites.peers")
+  );
+  const [blockedPeers, setBlockedPeers] = useState<Set<string>>(
+    () => loadStringSet("vaultchat.blocked.peers")
+  );
   // Online status tracking
   const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
@@ -598,6 +625,10 @@ export function ChatShell({
       payload: PlainPayload,
       suppressLocal = false
     ): Promise<string | null> => {
+      if (blockedPeers.has(toUser.id)) {
+        setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
+        return null;
+      }
       const encrypted = await drEncryptJsonForDm(
         session.secretKey,
         toUser.id,
@@ -650,7 +681,7 @@ export function ChatShell({
       }
       return tmpId;
     },
-    [session.secretKey, session.user.id, rebuildDm, refreshPendingCount]
+    [session.secretKey, session.user.id, rebuildDm, refreshPendingCount, blockedPeers]
   );
 
   const sendGroupWire = useCallback(
@@ -836,6 +867,7 @@ export function ChatShell({
               resolveUser
             );
             if (!dec) return;
+            if (blockedPeers.has(dec.senderUserId)) return;
             seen.current.add(id);
             const peerUser =
               usersRef.current.find((u) => u.id === dec.senderUserId) ??
@@ -970,6 +1002,7 @@ export function ChatShell({
     refreshPendingCount,
     mutedPeers,
     mutedGroups,
+    blockedPeers,
     maybeNotify,
     sendReadReceipts,
   ]);
@@ -1437,17 +1470,61 @@ export function ChatShell({
   }, [groups, query]);
 
   const visibleUsers = useMemo(() => {
-    if (sidebarFilter === "group" || sidebarFilter === "fav") return [];
+    if (sidebarFilter === "group") return [];
+    if (sidebarFilter === "fav") {
+      return filteredUsers.filter((u) => favoritePeers.has(u.id));
+    }
     if (sidebarFilter === "unread") {
       return filteredUsers.filter((u) => (unreadByPeer[u.id] ?? 0) > 0);
     }
     return filteredUsers;
-  }, [filteredUsers, sidebarFilter, unreadByPeer]);
+  }, [filteredUsers, sidebarFilter, unreadByPeer, favoritePeers]);
 
   const visibleGroups = useMemo(() => {
     if (sidebarFilter === "dm" || sidebarFilter === "unread" || sidebarFilter === "fav") return [];
     return filteredGroups;
   }, [filteredGroups, sidebarFilter]);
+
+  const sharedMediaItems = useMemo<SharedMediaItem[]>(() => {
+    const rows =
+      tab === "dm" && peer
+        ? rawDmRef.current.get(peer.id) ?? []
+        : tab === "group" && group
+          ? rawGroupRef.current.get(group.id) ?? []
+          : [];
+    return rows
+      .flatMap((row) => {
+        try {
+          const plain = JSON.parse(row.plainJson) as PlainPayload;
+          if (plain.kind === "file") {
+            return [
+              {
+                id: row.id,
+                kind: "file" as const,
+                name: plain.fileName ?? "Datei",
+                href: plain.body ?? "#",
+                at: row.at,
+              },
+            ];
+          }
+          if (plain.kind === "voice") {
+            return [
+              {
+                id: row.id,
+                kind: "voice" as const,
+                name: "Sprachnachricht",
+                href: plain.body ?? "#",
+                at: row.at,
+              },
+            ];
+          }
+        } catch {
+          /* ignore malformed local rows */
+        }
+        return [];
+      })
+      .sort((a, b) => b.at - a.at);
+  }, [tab, peer, group, messages.length, groupMessages.length]);
 
   const peerList = useMemo(() => {
     return visibleUsers.map((u) => {
@@ -1459,6 +1536,8 @@ export function ChatShell({
           subtitle={prev?.text ?? "Keine Nachrichten"}
           metaRight={fmtListTime(prev?.at)}
           unread={unreadByPeer[u.id] ?? 0}
+          isFavorite={favoritePeers.has(u.id)}
+          isBlocked={blockedPeers.has(u.id)}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
@@ -1469,7 +1548,7 @@ export function ChatShell({
         />
       );
     });
-  }, [visibleUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer]);
+  }, [visibleUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer, favoritePeers, blockedPeers]);
 
   const groupList = useMemo(
     () =>
@@ -1673,10 +1752,16 @@ export function ChatShell({
         )}
 
         {sidebarFilter === "fav" && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center">
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Favoriten erscheinen hier.
-            </p>
+          <div className="flex-1 overflow-y-auto p-2">
+            {peerList.length > 0 ? (
+              peerList
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 text-center">
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  Markiere Kontakte als Favorit, damit sie hier erscheinen.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -1947,14 +2032,43 @@ export function ChatShell({
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSafetyOpen(true); }}>
                           <IconShieldCheck size={16} /> Sicherheitsnummer anzeigen
                         </button>
-                        <button type="button" className="chat-menu-item" onClick={() => setDmMenuOpen(false)}>
+                        <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setInfoOpen(true); }}>
                           <IconFileText size={16} /> Medien & Dateien
+                        </button>
+                        <button
+                          type="button"
+                          className="chat-menu-item"
+                          onClick={() => {
+                            setFavoritePeers((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(peer.id)) next.delete(peer.id);
+                              else next.add(peer.id);
+                              saveStringSet("vaultchat.favorites.peers", next);
+                              return next;
+                            });
+                            setDmMenuOpen(false);
+                          }}
+                        >
+                          <IconPin size={16} /> {favoritePeers.has(peer.id) ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSearchOpen(true); }}>
                           <IconSearch size={16} /> Suche in Konversation
                         </button>
-                        <button type="button" className="chat-menu-item danger" onClick={() => setDmMenuOpen(false)}>
-                          Kontakt blockieren
+                        <button
+                          type="button"
+                          className="chat-menu-item danger"
+                          onClick={() => {
+                            setBlockedPeers((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(peer.id)) next.delete(peer.id);
+                              else next.add(peer.id);
+                              saveStringSet("vaultchat.blocked.peers", next);
+                              return next;
+                            });
+                            setDmMenuOpen(false);
+                          }}
+                        >
+                          {blockedPeers.has(peer.id) ? "Kontakt entsperren" : "Kontakt blockieren"}
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setInfoOpen(true); }}>
                           <IconInfo size={16} /> Info / Profil anzeigen
@@ -1968,6 +2082,11 @@ export function ChatShell({
                 <div className="mt-2 rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
                   Der Identity-Key dieses Peers hat sich geändert. Nachrichten
                   werden blockiert, bis du die Sicherheitsnummer neu geprüft hast.
+                </div>
+              )}
+              {blockedPeers.has(peer.id) && (
+                <div className="mt-2 rounded-lg border border-amber-800/60 bg-amber-950/40 px-3 py-2 text-xs text-amber-100">
+                  Dieser Kontakt ist blockiert. Eingehende Nachrichten werden lokal verworfen.
                 </div>
               )}
             </header>
@@ -2427,6 +2546,7 @@ export function ChatShell({
             group={group}
             peerFp={peerFp}
             onSafety={() => setSafetyOpen(true)}
+            onOpenSearch={() => setSearchOpen(true)}
             onClearChat={async () => {
               if (peer) {
                 const rows = rawDmRef.current.get(peer.id) ?? [];
@@ -2443,6 +2563,29 @@ export function ChatShell({
             }}
             mutedPeers={mutedPeers}
             setMutedPeers={setMutedPeers}
+            isFavorite={Boolean(peer && favoritePeers.has(peer.id))}
+            onToggleFavorite={() => {
+              if (!peer) return;
+              setFavoritePeers((prev) => {
+                const next = new Set(prev);
+                if (next.has(peer.id)) next.delete(peer.id);
+                else next.add(peer.id);
+                saveStringSet("vaultchat.favorites.peers", next);
+                return next;
+              });
+            }}
+            isBlocked={Boolean(peer && blockedPeers.has(peer.id))}
+            onToggleBlocked={() => {
+              if (!peer) return;
+              setBlockedPeers((prev) => {
+                const next = new Set(prev);
+                if (next.has(peer.id)) next.delete(peer.id);
+                else next.add(peer.id);
+                saveStringSet("vaultchat.blocked.peers", next);
+                return next;
+              });
+            }}
+            sharedMediaItems={sharedMediaItems}
           />
         </aside>
       )}
@@ -2473,6 +2616,10 @@ export function ChatShell({
                 setInfoOpen(false);
                 setSafetyOpen(true);
               }}
+              onOpenSearch={() => {
+                setInfoOpen(false);
+                setSearchOpen(true);
+              }}
               onClearChat={async () => {
                 setInfoOpen(false);
                 if (peer) {
@@ -2490,6 +2637,29 @@ export function ChatShell({
               }}
               mutedPeers={mutedPeers}
               setMutedPeers={setMutedPeers}
+              isFavorite={Boolean(peer && favoritePeers.has(peer.id))}
+              onToggleFavorite={() => {
+                if (!peer) return;
+                setFavoritePeers((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(peer.id)) next.delete(peer.id);
+                  else next.add(peer.id);
+                  saveStringSet("vaultchat.favorites.peers", next);
+                  return next;
+                });
+              }}
+              isBlocked={Boolean(peer && blockedPeers.has(peer.id))}
+              onToggleBlocked={() => {
+                if (!peer) return;
+                setBlockedPeers((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(peer.id)) next.delete(peer.id);
+                  else next.add(peer.id);
+                  saveStringSet("vaultchat.blocked.peers", next);
+                  return next;
+                });
+              }}
+              sharedMediaItems={sharedMediaItems}
             />
           </div>
         </div>
@@ -2542,6 +2712,8 @@ function PeerRow({
   subtitle,
   metaRight,
   unread,
+  isFavorite,
+  isBlocked,
   selected,
   onSelect,
 }: {
@@ -2549,6 +2721,8 @@ function PeerRow({
   subtitle?: string;
   metaRight?: string;
   unread?: number;
+  isFavorite?: boolean;
+  isBlocked?: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -2573,6 +2747,16 @@ function PeerRow({
       <div className="contact-info min-w-0">
         <div className="flex items-center gap-2">
           <span className="contact-name">{u.username}</span>
+            {isFavorite && (
+              <span className="rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+                ★
+              </span>
+            )}
+            {isBlocked && (
+              <span className="rounded-md border border-amber-700/70 bg-amber-950/30 px-1.5 py-0.5 text-[10px] text-amber-200">
+                blockiert
+              </span>
+            )}
             {pin?.state === "mismatch" && (
               <span className="rounded-md border border-red-700/70 bg-red-950/30 px-1.5 py-0.5 text-[10px] text-red-200">
                 ⚠
@@ -2611,18 +2795,30 @@ function InfoPanel({
   group,
   peerFp,
   onSafety,
+  onOpenSearch,
   onClearChat,
   mutedPeers,
   setMutedPeers,
+  isFavorite,
+  onToggleFavorite,
+  isBlocked,
+  onToggleBlocked,
+  sharedMediaItems,
 }: {
   mode: "dm" | "group";
   peer: api.ApiUser | null;
   group: api.ApiGroup | null;
   peerFp: string | null;
   onSafety: () => void;
+  onOpenSearch: () => void;
   onClearChat: () => void | Promise<void>;
   mutedPeers: Set<string>;
   setMutedPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  isBlocked: boolean;
+  onToggleBlocked: () => void;
+  sharedMediaItems: SharedMediaItem[];
 }) {
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
@@ -2667,11 +2863,13 @@ function InfoPanel({
       <div className="mb-4 grid grid-cols-3 gap-2">
         <button
           type="button"
-          className="info-action-button"
-          title="Profil anzeigen"
+          className={`info-action-button ${isFavorite ? "active" : ""}`}
+          onClick={onToggleFavorite}
+          title={isFavorite ? "Aus Favoriten entfernen" : "Als Favorit markieren"}
+          disabled={mode !== "dm"}
         >
-          <IconInfo size={18} />
-          <span>Profil</span>
+          <IconPin size={18} />
+          <span>{isFavorite ? "Favorit" : "Favorit"}</span>
         </button>
         <button
           type="button"
@@ -2687,6 +2885,20 @@ function InfoPanel({
         <button
           type="button"
           className="info-action-button"
+          onClick={onToggleBlocked}
+          disabled={mode !== "dm"}
+          title={isBlocked ? "Kontakt entsperren" : "Kontakt blockieren"}
+        >
+          <IconShieldCheck size={18} />
+          <span>{isBlocked ? "Blockiert" : "Blockieren"}</span>
+        </button>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-2">
+        <button
+          type="button"
+          className="info-action-button !h-auto !py-3"
+          onClick={onOpenSearch}
           title="Suchen"
         >
           <IconSearch size={18} />
@@ -2757,10 +2969,29 @@ function InfoPanel({
 
       <div className="info-section">
         <p className="info-section-title">Geteilte Inhalte</p>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-          Dateien und Sprachnotizen erscheinen in diesem Chat. Medienübersicht
-          folgt.
-        </p>
+        {sharedMediaItems.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            Noch keine Dateien oder Sprachnotizen in diesem Chat.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {sharedMediaItems.slice(0, 8).map((item) => (
+              <a
+                key={item.id}
+                href={item.href}
+                download={item.kind === "file" ? item.name : undefined}
+                className="flex items-center gap-3 rounded-xl border p-2 text-sm transition hover:opacity-90"
+                style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text)" }}
+              >
+                {item.kind === "file" ? <IconFileText size={16} /> : <IconMic size={16} />}
+                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  {new Date(item.at).toLocaleDateString()}
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       <button

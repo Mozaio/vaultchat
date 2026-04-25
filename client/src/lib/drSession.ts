@@ -29,6 +29,10 @@ import { pad, unpad } from "./padding";
 import { x3dhReceiver, x3dhSender } from "./x3dh";
 import * as api from "./api";
 
+type PersistedDRState = DRState & {
+  initMode?: "legacy" | "x3dh";
+};
+
 function metaKey(peerId: string) {
   return `dr:${peerId}`;
 }
@@ -94,13 +98,16 @@ export async function ensureDrSession(
   const existing = await metaGet(metaKey(peerId));
   if (existing) {
     try {
-      const p = JSON.parse(existing) as DRState;
+      const p = JSON.parse(existing) as PersistedDRState;
       if (p.v === 4 && p.peerIdentityPk === peerPublicKeyB64) return p;
     } catch {
       /* reinit */
     }
   }
-  const fresh = await drInit(myIdentitySk, peerPublicKeyB64, peerId);
+  const fresh: PersistedDRState = {
+    ...(await drInit(myIdentitySk, peerPublicKeyB64, peerId)),
+    initMode: "legacy",
+  };
   await metaSet(metaKey(peerId), JSON.stringify(fresh));
   return fresh;
 }
@@ -127,7 +134,7 @@ export async function ensureDrSessionWithX3dh(
   const existing = await metaGet(metaKey(peerId));
   if (existing) {
     try {
-      const p = JSON.parse(existing) as DRState;
+      const p = JSON.parse(existing) as PersistedDRState;
       if (p.v === 4 && p.peerIdentityPk === peerPublicKeyB64) return p;
     } catch {
       /* reinit */
@@ -154,13 +161,16 @@ export async function ensureDrSessionWithX3dh(
     );
 
     // Merken dass dies eine X3DH-Session ist (Metadata)
-    const stateWithMeta = { ...fresh };
+    const stateWithMeta: PersistedDRState = { ...fresh, initMode: "x3dh" };
 
     await metaSet(metaKey(peerId), JSON.stringify(stateWithMeta));
     return stateWithMeta;
   } catch {
     // Fallback: direkter DH (wie bisher)
-    const fresh = await drInit(myIdentitySk, peerPublicKeyB64, peerId);
+    const fresh: PersistedDRState = {
+      ...(await drInit(myIdentitySk, peerPublicKeyB64, peerId)),
+      initMode: "legacy",
+    };
     await metaSet(metaKey(peerId), JSON.stringify(fresh));
     return fresh;
   }
@@ -173,11 +183,16 @@ async function saveState(st: DRState): Promise<void> {
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-async function loadState(peerId: string, peerPublicKeyB64: string): Promise<DRState | null> {
+async function loadState(
+  peerId: string,
+  peerPublicKeyB64: string,
+  options: { requireLegacy?: boolean } = {}
+): Promise<DRState | null> {
   const existing = await metaGet(metaKey(peerId));
   if (!existing) return null;
   try {
-    const p = JSON.parse(existing) as DRState;
+    const p = JSON.parse(existing) as PersistedDRState;
+    if (options.requireLegacy && p.initMode !== "legacy") return null;
     if (p.v === 4 && p.peerIdentityPk === peerPublicKeyB64) return p;
   } catch {
     /* ignore */
@@ -192,12 +207,23 @@ export async function drEncryptJsonForDm(
   plainJson: string,
   token: string
 ): Promise<DmEncryptResult> {
-  const existing = await loadState(peerId, peerPublicKeyB64);
+  const x3dhEnabled = import.meta.env.VITE_VAULTCHAT_ENABLE_X3DH === "1";
+  const existing = await loadState(peerId, peerPublicKeyB64, {
+    requireLegacy: !x3dhEnabled,
+  });
   if (existing) {
     const padded = pad(enc.encode(plainJson));
     const { state, wire } = await drEncrypt(existing, padded);
     await saveState(state);
     return { innerB64: base64FromUint8(wire), mode: "ratchet" };
+  }
+
+  if (!x3dhEnabled) {
+    const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
+    const padded = pad(enc.encode(plainJson));
+    const { state, wire } = await drEncrypt(st, padded);
+    await saveState(state);
+    return { innerB64: base64FromUint8(wire), mode: "legacy" };
   }
 
   try {
@@ -208,7 +234,10 @@ export async function drEncryptJsonForDm(
       bundle.signedPreKey.publicKey,
       bundle.oneTimePreKey?.publicKey ?? null
     );
-    const st = await drInitFromX3DH(x3dh.sharedSecret, peerId, peerPublicKeyB64);
+    const st: PersistedDRState = {
+      ...(await drInitFromX3DH(x3dh.sharedSecret, peerId, peerPublicKeyB64)),
+      initMode: "x3dh",
+    };
     const padded = pad(enc.encode(plainJson));
     const { state, wire } = await drEncrypt(st, padded);
     await saveState(state);
@@ -251,7 +280,10 @@ export async function drDecryptJson(
   peerPublicKeyB64: string,
   wireB64: string
 ): Promise<string> {
-  const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
+  const x3dhEnabled = import.meta.env.VITE_VAULTCHAT_ENABLE_X3DH === "1";
+  const st =
+    (await loadState(peerId, peerPublicKeyB64, { requireLegacy: !x3dhEnabled })) ??
+    (await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64));
   const wire = uint8FromBase64(wireB64);
   const { state, plaintext } = await drDecrypt(st, myIdentitySk, wire);
   // IMPORTANT: save state only after successful decode+unpad,
