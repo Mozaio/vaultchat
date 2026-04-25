@@ -1247,6 +1247,43 @@ select:focus-visible {
   pointer-events: none;
 }
 
+.landing-logo {
+  position: relative;
+  z-index: 1;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 1.5rem;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background:
+    linear-gradient(135deg, var(--accent-soft), transparent),
+    var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg), 0 0 32px var(--accent-glow);
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.auth-brand-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+}
+
 .landing-title {
   font-size: 3.5rem;
   font-weight: 800;

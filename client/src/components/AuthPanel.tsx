@@ -150,6 +150,9 @@ export function AuthPanel({
   return (
     <div className="landing-container min-h-full w-full bg-[var(--bg)]">
       <div className="landing-hero">
+        <div className="landing-logo" aria-hidden>
+          <IconShieldCheck size={34} />
+        </div>
         <p
           className="relative z-[1] mb-2 text-xs font-semibold uppercase tracking-widest"
           style={{ color: "var(--accent)" }}
@@ -187,10 +190,16 @@ export function AuthPanel({
 
       <div className="flex min-h-full w-full min-w-0 items-center justify-center p-4">
         <div className="auth-card w-full max-w-md">
-          <div className="mb-2 flex items-start justify-between gap-3">
+          <div className="mb-5 flex items-start justify-between gap-3">
             <div className="min-w-0">
+              <div className="auth-brand">
+                <span className="auth-brand-logo" aria-hidden>
+                  <IconShieldCheck size={22} />
+                </span>
+                <span>VaultChat</span>
+              </div>
               <h2
-                className="text-lg font-bold tracking-tight"
+                className="mt-4 text-lg font-bold tracking-tight"
                 style={{ color: "var(--text)" }}
               >
                 {hasLocal

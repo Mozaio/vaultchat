@@ -1928,8 +1928,9 @@ export function ChatShell({
                         key={e}
                         type="button"
                         className="rounded px-1.5 py-1 transition hover:bg-[var(--bg-hover)]"
+                        title="Emoji-Vorschau"
                         onClick={() => {
-                          setText((t) => (t ? t + e : e));
+                          dmInputRef.current?.focus();
                           setEmojiOpen(false);
                         }}
                       >
