@@ -200,7 +200,7 @@ export function AuthPanel({
       setFp(f);
     } catch {
       setFp(null);
-      setError("Token ungültig — bitte über „Anderes Konto" neu anmelden.");
+      setError("Token ungueltig - bitte ueber 'Anderes Konto' neu anmelden.");
     }
   }
 
