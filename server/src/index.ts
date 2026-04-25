@@ -324,7 +324,8 @@ app.post("/api/groups/:id/members", groupLimiter, async (req, res) => {
     res.status(400).json({ error: "invalid_body" });
     return;
   }
-  const g = addGroupMember(req.params.id, jwtUser.userId, parsed.data.memberId);
+  const groupId = String(req.params.id);
+  const g = addGroupMember(groupId, jwtUser.userId, parsed.data.memberId);
   if (!g) {
     res.status(400).json({ error: "cannot_add" });
     return;
@@ -341,7 +342,9 @@ app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) =
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  const g = removeGroupMember(req.params.id, jwtUser.userId, req.params.memberId);
+  const groupId = String(req.params.id);
+  const memberId = String(req.params.memberId);
+  const g = removeGroupMember(groupId, jwtUser.userId, memberId);
   if (!g) {
     res.status(400).json({ error: "cannot_remove" });
     return;
