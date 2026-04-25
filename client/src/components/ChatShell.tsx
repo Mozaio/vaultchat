@@ -74,6 +74,7 @@ import {
   IconSearch,
   IconSend,
   IconBell,
+  IconSettings,
 } from "./Icons";
 
 type Tab = "dm" | "group";
@@ -1514,31 +1515,29 @@ export function ChatShell({
           </>
         )}
 
+        {/* User profile footer */}
         <div
-          className="space-y-1.5 border-t p-3 text-xs"
-          style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
+          className="flex items-center gap-3 border-t p-3"
+          style={{ borderColor: "var(--border)" }}
         >
-          <p className="font-mono text-[10px] leading-snug" style={{ color: "var(--accent)" }}>
-            Du: {myFp ?? "…"}
-          </p>
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              checked={relayOnly}
-              onChange={(e) => setRelayOnly(e.target.checked)}
-            />
-            <span>Anruf nur über TURN (Relay)</span>
-          </label>
+          <div
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+            style={{ background: userGradient(session.user.id) }}
+          >
+            {session.user.username.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium" style={{ color: "var(--text)" }}>
+              {session.user.username}
+            </p>
+          </div>
           <button
             type="button"
-            className="text-left font-medium hover:underline"
-            style={{ color: "var(--accent)" }}
-            onClick={() => {
-              void loadContacts();
-              void loadGroups();
-            }}
+            onClick={() => setSecurityOpen(true)}
+            className="btn btn-ghost !p-2"
+            title="Einstellungen"
           >
-            Kontakte & Gruppen aktualisieren
+            <IconSettings size={16} />
           </button>
         </div>
       </aside>

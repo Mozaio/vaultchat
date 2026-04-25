@@ -13,7 +13,7 @@ import {
 import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
 import { ThemeToggle } from "./ThemeToggle";
-import { IconShield, IconLoader2 } from "./Icons";
+import { IconShield, IconLoader2, IconAlertTriangle, IconLock, IconShieldCheck, IconTimer, IconRefreshCw } from "./Icons";
 
 type Mode = "unlock" | "login" | "register" | "import" | "onboarding";
 
@@ -218,7 +218,7 @@ export function AuthPanel({
   }
 
   return (
-    <div className="landing-container min-h-full w-full bg-[var(--bg)]">
+    <div className="landing-container min-h-full w-full bg-[var(--bg)] overflow-hidden" style={{ height: "100dvh" }}>
       {/* Hero Section with animated shield */}
       <div className="landing-hero">
         <div className="auth-shield">
@@ -230,16 +230,19 @@ export function AuthPanel({
         </p>
         <div className="feature-list max-w-lg">
           <Feature
+            icon={<IconLock size={18} />}
             title="Sealed Sender"
-            desc="Der Server sieht keinen Absender in DMs."
+            desc="Server sieht keinen Absender"
           />
           <Feature
-            title="TOFU + Sicherheitsnummer"
-            desc="Hinweis bei Schlüsselwechsel, ähnlich wie bei Signal."
+            icon={<IconShieldCheck size={18} />}
+            title="TOFU"
+            desc="Schlüsselwechsel-Erkennung"
           />
           <Feature
+            icon={<IconTimer size={18} />}
             title="Auto-Lock"
-            desc="Schlüssel nach Inaktivität aus dem Arbeitsspeicher entfernt."
+            desc="Schlüssel nach Inaktivität gelöscht"
           />
         </div>
       </div>
@@ -572,16 +575,18 @@ export function AuthPanel({
           )}
 
           {error && (
-            <p
-              className="mt-4 rounded-lg border px-3 py-2.5 text-sm"
+            <div
+              className="mt-4 flex items-start gap-2 rounded-lg border px-3 py-2.5"
               style={{
-                borderColor: "rgba(248,113,113,0.35)",
+                borderColor: "var(--danger)",
                 background: "var(--danger-soft)",
-                color: "var(--danger)",
               }}
             >
-              {error}
-            </p>
+              <IconAlertTriangle size={16} style={{ color: "var(--danger)", flexShrink: 0, marginTop: 1 }} />
+              <span style={{ fontSize: 13, color: "var(--danger)" }}>
+                {error}
+              </span>
+            </div>
           )}
 
           <p className="auth-footer">
@@ -595,11 +600,11 @@ export function AuthPanel({
   );
 }
 
-function Feature({ title, desc }: { title: string; desc: string }) {
+function Feature({ icon, title, desc }: { icon?: React.ReactNode; title: string; desc: string }) {
   return (
     <div className="feature-item">
-      <div className="feature-icon" aria-hidden>
-        ✓
+      <div className="feature-icon" aria-hidden style={{ color: "var(--accent)" }}>
+        {icon || "✓"}
       </div>
       <div className="feature-text">
         <h3>{title}</h3>
