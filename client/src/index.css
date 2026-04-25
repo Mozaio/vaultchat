@@ -36,146 +36,146 @@ body,
 
 
 /* ============================================================
-   VAULTCHAT DESIGN SYSTEM — Professional UI Overhaul
+   AUTH & LOCK SCREEN
    ============================================================ */
 
-/* ── Base Theme (Light) ── */
-:root {
-  /* Backgrounds */
-  --bg: #ffffff;
-  --bg-elevated: #ffffff;
-  --bg-sidebar: #f8fafc;
-  --bg-chat: #f1f5f9;
-  --bg-hover: #e2e8f0;
-  --bg-active: #dbeafe;
-  --bg-glass: rgba(255, 255, 255, 0.72);
-
-  /* Text */
-  --text: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --text-on-accent: #ffffff;
-
-  /* Brand — VaultChat Emerald */
-  --accent: #10b981;
-  --accent-hover: #059669;
-  --accent-soft: rgba(16, 185, 129, 0.08);
-  --accent-glow: rgba(16, 185, 129, 0.25);
-
-  /* Semantic */
-  --danger: #ef4444;
-  --danger-soft: rgba(239, 68, 68, 0.08);
-  --success: #22c55e;
-  --warning: #f59e0b;
-
-  /* Borders & Shadows */
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.06), 0 2px 4px -2px rgb(0 0 0 / 0.04);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.06), 0 4px 6px -4px rgb(0 0 0 / 0.04);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.06), 0 8px 10px -6px rgb(0 0 0 / 0.04);
-  --shadow-accent: 0 4px 14px 0 rgba(16, 185, 129, 0.35);
-
-  /* Chat Bubbles */
-  --bubble-me: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  --bubble-me-text: #ffffff;
-  --bubble-peer: #ffffff;
-  --bubble-peer-text: #0f172a;
-  --bubble-peer-border: #e2e8f0;
-  --bubble-peer-shadow: 0 1px 1px rgba(0,0,0,0.06);
-
-  /* Chat wallpaper */
-  --chat-wallpaper: radial-gradient(circle at 20% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 50%, rgba(16, 185, 129, 0.02) 0%, transparent 50%);
-
-  /* Radius */
-  --radius-sm: 8px;
-  --radius: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-full: 9999px;
+/* Auth panel hero section */
+.auth-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem;
 }
 
-/* ── Dark Theme ── */
-:root.dark {
-  --bg: #0b0f19;
-  --bg-elevated: #111827;
-  --bg-sidebar: #0f172a;
-  --bg-chat: #0b0f19;
-  --bg-hover: #1e293b;
-  --bg-active: #1e3a5f;
-  --bg-glass: rgba(15, 23, 42, 0.72);
-
-  --text: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-on-accent: #ffffff;
-
-  --accent: #34d399;
-  --accent-hover: #10b981;
-  --accent-soft: rgba(52, 211, 153, 0.08);
-  --accent-glow: rgba(52, 211, 153, 0.25);
-
-  --danger: #f87171;
-  --danger-soft: rgba(248, 113, 113, 0.08);
-  --success: #4ade80;
-  --warning: #fbbf24;
-
-  --border: #1e293b;
-  --border-strong: #334155;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.45), 0 4px 6px -4px rgb(0 0 0 / 0.35);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
-  --shadow-accent: 0 4px 20px 0 rgba(52, 211, 153, 0.3);
-
-  --bubble-me: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  --bubble-me-text: #ffffff;
-  --bubble-peer: #1e293b;
-  --bubble-peer-text: #f1f5f9;
-  --bubble-peer-border: #334155;
-  --bubble-peer-shadow: 0 1px 2px rgba(0,0,0,0.2);
-
-  --chat-wallpaper: radial-gradient(circle at 20% 50%, rgba(52, 211, 153, 0.03) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 50%, rgba(52, 211, 153, 0.02) 0%, transparent 50%);
+.auth-shield {
+  width: 80px;
+  height: 80px;
+  color: var(--accent);
+  margin-bottom: 1.5rem;
+  animation: shield-pulse 2s ease-in-out infinite;
 }
 
-/* ── Body ── */
-body {
-  margin: 0;
-  background: var(--bg);
+@keyframes shield-pulse {
+  0%, 100% { filter: drop-shadow(0 0 0px var(--accent)); }
+  50% { filter: drop-shadow(0 0 16px var(--accent-glow)); }
+}
+
+/* Password strength indicator */
+.password-strength {
+  margin-top: 0.5rem;
+}
+
+.password-strength-bar {
+  height: 4px;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+  margin-bottom: 0.25rem;
+}
+
+.password-strength-bar.weak { width: 25%; background: var(--danger); }
+.password-strength-bar.fair { width: 50%; background: var(--warning); }
+.password-strength-bar.strong { width: 75%; background: var(--accent); }
+.password-strength-bar.very-strong { width: 100%; background: #3b82f6; }
+
+.password-strength-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.password-strength-label.weak { color: var(--danger); }
+.password-strength-label.fair { color: var(--warning); }
+.password-strength-label.strong { color: var(--accent); }
+.password-strength-label.very-strong { color: #3b82f6; }
+
+/* Argon2id loading spinner */
+.argon-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.argon-loading .spinner {
+  animation: spin 1s linear infinite;
+  color: var(--accent);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Onboarding stepper */
+.onboarding-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.onboarding-step {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: all 0.3s ease;
+}
+
+.onboarding-step.active {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.onboarding-step.completed {
+  background: var(--accent);
+}
+
+/* Lock screen overlay */
+.lock-screen-overlay {
+  position: fixed;
+  inset: 0;
+  backdrop-filter: blur(20px);
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.lock-screen-panel {
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem;
+  text-align: center;
+  max-width: 360px;
+  width: 90%;
+}
+
+.lock-screen-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--accent);
+  margin: 0 auto 1.5rem;
+}
+
+.lock-screen-time {
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: 700;
   color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  margin-bottom: 0.5rem;
 }
 
-/* ============================================================
-   BACKWARD COMPATIBLE ALIASES
-   ============================================================ */
-:root {
-  --app-bg: var(--bg);
-  --app-fg: var(--text);
-  --surface: var(--bg-elevated);
-  --surface-2: var(--bg-sidebar);
-  --muted: var(--text-muted);
-  --muted-2: var(--text-secondary);
-  --brand: var(--accent);
-  --brand-2: var(--accent-hover);
-
-  --bubble-me-bg: var(--bubble-me);
-  --bubble-me-border: transparent;
-  --bubble-me-fg: var(--bubble-me-text);
-  --bubble-them-bg: var(--bubble-peer);
-  --bubble-them-border: var(--bubble-peer-border);
-  --bubble-them-fg: var(--bubble-peer-text);
-  --input-bg: var(--bg-elevated);
-  --input-fg: var(--text);
-  --input-placeholder: var(--text-muted);
+.lock-screen-last-activity {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
 }
 
 /* ============================================================

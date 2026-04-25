@@ -373,3 +373,60 @@ export function IconCheckCheck(props: P) {
   );
 }
 
+export function IconShield(props: P) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 12l2 2 4-4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function IconLock(props: P) {
+  return (
+    <Svg {...props}>
+      <rect
+        x="3"
+        y="11"
+        width="18"
+        height="11"
+        rx="2"
+        ry="2"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path
+        d="M7 11V7a5 5 0 0 1 10 0v4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function IconLoader2(props: P) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M21 12a9 9 0 1 1-6.219-8.56"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+

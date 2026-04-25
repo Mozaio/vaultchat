@@ -13,8 +13,25 @@ import {
 import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
 import { ThemeToggle } from "./ThemeToggle";
+import { IconShield, IconLoader2 } from "./Icons";
 
-type Mode = "unlock" | "login" | "register" | "import";
+type Mode = "unlock" | "login" | "register" | "import" | "onboarding";
+
+// Password strength calculation
+function calculatePasswordStrength(password: string): { level: string; label: string } {
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (password.length >= 16) score++;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  if (/[^a-zA-Z0-9]/.test(password)) score++;
+
+  if (score <= 2) return { level: "weak", label: "Schwach" };
+  if (score <= 4) return { level: "fair", label: "Fair" };
+  if (score <= 5) return { level: "strong", label: "Stark" };
+  return { level: "very-strong", label: "Sehr stark" };
+}
 
 // Discord-like username validation
 function validateUsername(username: string): { valid: boolean; error?: string } {
@@ -27,15 +44,12 @@ function validateUsername(username: string): { valid: boolean; error?: string } 
   if (username.length > 32) {
     return { valid: false, error: "Maximal 32 Zeichen" };
   }
-  // Alphanumeric, underscore, hyphen
   if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
     return { valid: false, error: "Nur Buchstaben, Zahlen, _ und - erlaubt" };
   }
-  // Can't start or end with underscore/hyphen
   if (/^[_-]|[_-]$/.test(username)) {
     return { valid: false, error: "Darf nicht mit _ oder - beginnen/enden" };
   }
-  // No double underscore/hyphen
   if (/__|--|-_|_-|__/.test(username)) {
     return { valid: false, error: "Keine doppelte Zeichen wie __ oder -- erlaubt" };
   }
@@ -69,6 +83,12 @@ function humanError(err: unknown): string {
   return msg;
 }
 
+const ONBOARDING_STEPS = [
+  { icon: "🔑", title: "Deine Identität", desc: "wird lokal erstellt" },
+  { icon: "🔒", title: "E2E-Verschlüsselung", desc: "schützt deine Nachrichten" },
+  { icon: "✅", title: "Zero-Knowledge", desc: "kein Server kennt deine Schlüssel" },
+];
+
 export function AuthPanel({
   onSession,
 }: {
@@ -85,6 +105,12 @@ export function AuthPanel({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [fp, setFp] = useState<string | null>(null);
+  const [onboardingStep, setOnboardingStep] = useState(0);
+
+  const passwordStrength = useMemo(
+    () => calculatePasswordStrength(password),
+    [password]
+  );
 
   async function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
@@ -138,14 +164,26 @@ export function AuthPanel({
     e.preventDefault();
     setError(null);
     setBusy(true);
+    setOnboardingStep(0);
+    setMode("onboarding");
+
     try {
+      // Step 1: Identity creation (instant)
+      await new Promise((r) => setTimeout(r, 500));
+      setOnboardingStep(1);
+
+      // Step 2: E2E encryption setup (Argon2id derivation)
       const { session, local } = await buildSessionFromRegister(
         username,
         password
       );
+      setOnboardingStep(2);
+      await new Promise((r) => setTimeout(r, 300));
+
       await onSession(session, local);
     } catch (err) {
       setError(humanError(err));
+      setMode("register");
     } finally {
       setBusy(false);
     }
@@ -162,7 +200,7 @@ export function AuthPanel({
       setFp(f);
     } catch {
       setFp(null);
-      setError("Token ungültig — bitte über „Anderes Konto“ neu anmelden.");
+      setError("Token ungültig — bitte über „Anderes Konto" neu anmelden.");
     }
   }
 
@@ -181,16 +219,14 @@ export function AuthPanel({
 
   return (
     <div className="landing-container min-h-full w-full bg-[var(--bg)]">
+      {/* Hero Section with animated shield */}
       <div className="landing-hero">
-        <p
-          className="relative z-[1] mb-2 text-xs font-semibold uppercase tracking-widest"
-          style={{ color: "var(--accent)" }}
-        >
-          Secure Messenger
-        </p>
+        <div className="auth-shield">
+          <IconShield size={80} />
+        </div>
         <h1 className="landing-title">VaultChat</h1>
-        <p className="landing-subtitle max-w-lg">
-          Ende-zu-Ende verschlüsselt. Sealed-Sender. Double-Ratchet v4.
+        <p className="landing-subtitle max-w-lg" style={{ color: "var(--text-muted)" }}>
+          Zero-Knowledge. End-to-End Encrypted.
         </p>
         <div className="feature-list max-w-lg">
           <Feature
@@ -206,12 +242,6 @@ export function AuthPanel({
             desc="Schlüssel nach Inaktivität aus dem Arbeitsspeicher entfernt."
           />
         </div>
-        <p
-          className="relative z-[1] mt-10 max-w-md text-sm"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Tipp: Exportiere direkt nach der Registrierung dein JSON-Backup.
-        </p>
       </div>
 
       <div className="flex min-h-full w-full min-w-0 items-center justify-center p-4">
@@ -228,9 +258,11 @@ export function AuthPanel({
                     : "Anderes Konto"
                   : mode === "import"
                     ? "Backup importieren"
-                    : mode === "register"
-                      ? "Konto erstellen"
-                      : "Anmelden"}
+                    : mode === "onboarding"
+                      ? "Einrichtung…"
+                      : mode === "register"
+                        ? "Konto erstellen"
+                        : "Anmelden"}
               </h2>
               <p
                 className="mt-0.5 text-sm"
@@ -244,277 +276,319 @@ export function AuthPanel({
             <ThemeToggle />
           </div>
 
-          <div className="mb-6 border-b pb-5 md:hidden" style={{ borderColor: "var(--border)" }}>
-            <h3
-              className="text-2xl font-bold tracking-tight"
-              style={{ color: "var(--text)" }}
-            >
-              VaultChat
-            </h3>
-            <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Sicher verschlüsselt, minimal Metadaten.
-            </p>
-          </div>
-
-        {hasLocal && mode !== "import" && (
-          <div className="auth-tabs mb-5">
-            <button
-              type="button"
-              className={mode === "unlock" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("unlock")}
-            >
-              Entsperren
-            </button>
-            <button
-              type="button"
-              className={mode === "login" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("login")}
-            >
-              Anderes Konto
-            </button>
-          </div>
-        )}
-
-        {!hasLocal && mode !== "import" && (
-          <div className="auth-tabs mb-5">
-            <button
-              type="button"
-              className={mode === "login" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("login")}
-            >
-              Anmelden
-            </button>
-            <button
-              type="button"
-              className={mode === "register" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("register")}
-            >
-              Registrieren
-            </button>
-          </div>
-        )}
-
-        {mode === "unlock" && hasLocal && (
-          <form onSubmit={handleUnlock} className="space-y-4">
-            <div className="auth-input-group">
-              <label>Passwort (lokale Schlüssel)</label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                className="auth-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={busy}
-              className="auth-button"
-            >
-              {busy ? "…" : "Entsperren"}
-            </button>
-            <div className="flex flex-col gap-2 pt-1">
+          {hasLocal && mode !== "import" && (
+            <div className="auth-tabs mb-5">
               <button
                 type="button"
-                onClick={showFingerprint}
-                className="btn btn-ghost w-full !justify-start !px-0"
+                className={mode === "unlock" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("unlock")}
               >
-                Fingerprint anzeigen
+                Entsperren
               </button>
               <button
                 type="button"
-                onClick={exportBackup}
-                className="btn btn-ghost w-full !justify-start !px-0"
-                style={{ color: "var(--accent)" }}
+                className={mode === "login" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("login")}
               >
-                Backup (JSON) herunterladen
+                Anderes Konto
               </button>
             </div>
-            {fp && (
-              <p
-                className="rounded-lg border px-3 py-2 text-center font-mono text-sm"
-                style={{
-                  borderColor: "var(--border)",
-                  background: "var(--bg-sidebar)",
-                  color: "var(--accent)",
-                }}
+          )}
+
+          {!hasLocal && mode !== "import" && mode !== "onboarding" && (
+            <div className="auth-tabs mb-5">
+              <button
+                type="button"
+                className={mode === "login" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("login")}
               >
-                {fp}
-              </p>
-            )}
-          </form>
-        )}
-
-        {mode === "login" && (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="auth-input-group">
-              <label>Benutzername</label>
-              <input
-                className="auth-input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-              />
+                Anmelden
+              </button>
+              <button
+                type="button"
+                className={mode === "register" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("register")}
+              >
+                Registrieren
+              </button>
             </div>
-            <div className="auth-input-group">
-              <label>Passwort</label>
-              <input
-                type="password"
-                className="auth-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => setMode("import")}
-              className="btn btn-secondary w-full"
-            >
-              Neues Gerät? Backup importieren
-            </button>
-            <button
-              type="submit"
-              disabled={busy}
-              className="auth-button"
-            >
-              {busy ? "…" : "Anmelden"}
-            </button>
-          </form>
-        )}
+          )}
 
-        {mode === "register" && !hasLocal && (
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div className="auth-input-group">
-              <label className="flex items-center justify-between">
-                <span>Benutzername</span>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  Discord-like Format
-                </span>
-              </label>
-              <input
-                className="auth-input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                placeholder="z.B. cool_user123"
-                required
-              />
-              {/* Username validation checklist */}
-              {username.length > 0 && (
-                <div className="mt-2 space-y-1 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-sidebar)" }}>
-                  <div className={`flex items-center gap-2 text-xs ${username.length >= 2 && username.length <= 32 ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={username.length >= 2 && username.length <= 32} />
-                    <span>2-32 Zeichen</span>
+          {/* Onboarding Stepper */}
+          {mode === "onboarding" && (
+            <div className="mb-6">
+              <div className="onboarding-stepper">
+                {ONBOARDING_STEPS.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`onboarding-step ${
+                      i < onboardingStep ? "completed" : i === onboardingStep ? "active" : ""
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="text-center">
+                <p className="text-3xl mb-2">{ONBOARDING_STEPS[onboardingStep]?.icon}</p>
+                <p className="font-semibold" style={{ color: "var(--text)" }}>
+                  {ONBOARDING_STEPS[onboardingStep]?.title}
+                </p>
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  {ONBOARDING_STEPS[onboardingStep]?.desc}
+                </p>
+              </div>
+              {busy && (
+                <div className="argon-loading mt-4">
+                  <div className="spinner">
+                    <IconLoader2 size={32} />
                   </div>
-                  <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z0-9_-]+$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={/^[a-zA-Z0-9_-]+$/.test(username)} />
-                    <span>Nur a-z, A-Z, 0-9, _, -</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z]/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={/^[a-zA-Z]/.test(username)} />
-                    <span>Beginnt mit Buchstabe</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${!/[_-]$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={!/[_-]$/.test(username)} />
-                    <span>Endet nicht mit _ oder -</span>
-                  </div>
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Schlüssel wird abgeleitet… (Argon2id)
+                  </p>
                 </div>
               )}
             </div>
-            <div className="auth-input-group">
-              <label>Passwort (min. 10 Zeichen)</label>
-              <input
-                type="password"
-                className="auth-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                minLength={10}
-                required
-              />
-              {password.length > 0 && password.length < 10 && (
-                <p className="mt-1 text-xs text-amber-500">
-                  Noch {10 - password.length} Zeichen erforderlich
+          )}
+
+          {mode === "unlock" && hasLocal && (
+            <form onSubmit={handleUnlock} className="space-y-4">
+              <div className="auth-input-group">
+                <label>Passwort (lokale Schlüssel)</label>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  className="auth-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={busy}
+                className="auth-button"
+              >
+                {busy ? "…" : "Entsperren"}
+              </button>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={showFingerprint}
+                  className="btn btn-ghost w-full !justify-start !px-0"
+                >
+                  Fingerprint anzeigen
+                </button>
+                <button
+                  type="button"
+                  onClick={exportBackup}
+                  className="btn btn-ghost w-full !justify-start !px-0"
+                  style={{ color: "var(--accent)" }}
+                >
+                  Backup (JSON) herunterladen
+                </button>
+              </div>
+              {fp && (
+                <p
+                  className="rounded-lg border px-3 py-2 text-center font-mono text-sm"
+                  style={{
+                    borderColor: "var(--border)",
+                    background: "var(--bg-sidebar)",
+                    color: "var(--accent)",
+                  }}
+                >
+                  {fp}
                 </p>
               )}
-            </div>
-            <button
-              type="submit"
-              disabled={busy || !validateUsername(username).valid || password.length < 10}
-              className="auth-button"
-            >
-              {busy ? "…" : "Konto erstellen"}
-            </button>
-          </form>
-        )}
+            </form>
+          )}
 
-        {mode === "import" && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setMode("login");
-              void handleLogin(e);
-            }}
-            className="space-y-4"
-          >
-            <div className="flex items-center justify-between">
-              <p
-                className="text-sm font-semibold"
-                style={{ color: "var(--text)" }}
+          {mode === "login" && (
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="auth-input-group">
+                <label>Benutzername</label>
+                <input
+                  className="auth-input"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div className="auth-input-group">
+                <label>Passwort</label>
+                <input
+                  type="password"
+                  className="auth-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setMode("import")}
+                className="btn btn-secondary w-full"
               >
-                Backup-JSON
+                Neues Gerät? Backup importieren
+              </button>
+              <button
+                type="submit"
+                disabled={busy}
+                className="auth-button"
+              >
+                {busy ? "…" : "Anmelden"}
+              </button>
+            </form>
+          )}
+
+          {mode === "register" && !hasLocal && (
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="auth-input-group">
+                <label className="flex items-center justify-between">
+                  <span>Benutzername</span>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Discord-like Format
+                  </span>
+                </label>
+                <input
+                  className="auth-input"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  placeholder="z.B. cool_user123"
+                  required
+                />
+                {/* Username validation checklist */}
+                {username.length > 0 && (
+                  <div className="mt-2 space-y-1 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-sidebar)" }}>
+                    <div className={`flex items-center gap-2 text-xs ${username.length >= 2 && username.length <= 32 ? "text-emerald-400" : "text-zinc-500"}`}>
+                      <CheckIcon valid={username.length >= 2 && username.length <= 32} />
+                      <span>2-32 Zeichen</span>
+                    </div>
+                    <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z0-9_-]+$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
+                      <CheckIcon valid={/^[a-zA-Z0-9_-]+$/.test(username)} />
+                      <span>Nur a-z, A-Z, 0-9, _, -</span>
+                    </div>
+                    <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z]/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
+                      <CheckIcon valid={/^[a-zA-Z]/.test(username)} />
+                      <span>Beginnt mit Buchstabe</span>
+                    </div>
+                    <div className={`flex items-center gap-2 text-xs ${!/[_-]$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
+                      <CheckIcon valid={!/[_-]$/.test(username)} />
+                      <span>Endet nicht mit _ oder -</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="auth-input-group">
+                <label>Passwort (min. 10 Zeichen)</label>
+                <input
+                  type="password"
+                  className="auth-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={10}
+                  required
+                />
+                {/* Password strength indicator */}
+                {password.length > 0 && (
+                  <div className="password-strength">
+                    <div
+                      className={`password-strength-bar ${passwordStrength.level}`}
+                      style={{ width: passwordStrength.level === "weak" ? "25%" : passwordStrength.level === "fair" ? "50%" : passwordStrength.level === "strong" ? "75%" : "100%" }}
+                    />
+                    <span className={`password-strength-label ${passwordStrength.level}`}>
+                      {passwordStrength.label}
+                    </span>
+                  </div>
+                )}
+                {password.length > 0 && password.length < 10 && (
+                  <p className="mt-1 text-xs text-amber-500">
+                    Noch {10 - password.length} Zeichen erforderlich
+                  </p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={busy || !validateUsername(username).valid || password.length < 10}
+                className="auth-button"
+              >
+                {busy ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <IconLoader2 size={18} className="spinner" />
+                    Wird eingerichtet…
+                  </span>
+                ) : (
+                  "Konto erstellen"
+                )}
+              </button>
+            </form>
+          )}
+
+          {mode === "import" && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setMode("login");
+                void handleLogin(e);
+              }}
+              className="space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--text)" }}
+                >
+                  Backup-JSON
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className="btn btn-ghost !px-2 !py-1 text-xs"
+                >
+                  Zurück
+                </button>
+              </div>
+              <textarea
+                className="auth-input min-h-[140px] font-mono text-xs"
+                value={importJson}
+                onChange={(e) => setImportJson(e.target.value)}
+                placeholder='{"userId":"…","username":"…",…}'
+              />
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Danach meldest du dich mit Benutzername und Passwort an. Das
+                Backup stellt deinen lokalen Schlüssel wieder her.
               </p>
               <button
                 type="button"
-                onClick={() => setMode("login")}
-                className="btn btn-ghost !px-2 !py-1 text-xs"
+                disabled={busy || !importJson.trim()}
+                onClick={(e) => void handleLogin(e as unknown as React.FormEvent)}
+                className="auth-button"
               >
-                Zurück
+                {busy ? "…" : "Importieren & anmelden"}
               </button>
-            </div>
-            <textarea
-              className="auth-input min-h-[140px] font-mono text-xs"
-              value={importJson}
-              onChange={(e) => setImportJson(e.target.value)}
-              placeholder='{"userId":"…","username":"…",…}'
-            />
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Danach meldest du dich mit Benutzername und Passwort an. Das
-              Backup stellt deinen lokalen Schlüssel wieder her.
-            </p>
-            <button
-              type="button"
-              disabled={busy || !importJson.trim()}
-              onClick={(e) => void handleLogin(e as unknown as React.FormEvent)}
-              className="auth-button"
+            </form>
+          )}
+
+          {error && (
+            <p
+              className="mt-4 rounded-lg border px-3 py-2.5 text-sm"
+              style={{
+                borderColor: "rgba(248,113,113,0.35)",
+                background: "var(--danger-soft)",
+                color: "var(--danger)",
+              }}
             >
-              {busy ? "…" : "Importieren & anmelden"}
-            </button>
-          </form>
-        )}
+              {error}
+            </p>
+          )}
 
-        {error && (
-          <p
-            className="mt-4 rounded-lg border px-3 py-2.5 text-sm"
-            style={{
-              borderColor: "rgba(248,113,113,0.35)",
-              background: "var(--danger-soft)",
-              color: "var(--danger)",
-            }}
-          >
-            {error}
+          <p className="auth-footer">
+            Browser und externer Server: Ohne vollständige Software-Audit ist das
+            Bedrohungsmodell schwächer als bei nativen Apps. Siehe THREAT_MODEL.md
+            im Repository.
           </p>
-        )}
-
-        <p className="auth-footer">
-          Browser und externer Server: Ohne vollständige Software-Audit ist das
-          Bedrohungsmodell schwächer als bei nativen Apps. Siehe THREAT_MODEL.md
-          im Repository.
-        </p>
         </div>
       </div>
     </div>
