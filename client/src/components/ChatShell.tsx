@@ -62,6 +62,7 @@ import { useShortcuts } from "../lib/shortcuts";
 import { SearchPanel } from "./SearchPanel";
 import { AddContactModal } from "./AddContactModal";
 import { SecuritySettings } from "./SecuritySettings";
+import { ChatEmptyState } from "./ChatEmptyState";
 import {
   IconInfo,
   IconMic,
@@ -1608,14 +1609,7 @@ export function ChatShell({
         )}
 
         {tab === "dm" && !peer && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center app-muted">
-            <div className="max-w-sm">
-              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
-                Wähle eine Unterhaltung
-              </p>
-              <p className="mt-1 text-xs">Verlauf nur auf diesem Gerät, verschlüsselt (IndexedDB).</p>
-            </div>
-          </div>
+          <ChatEmptyState />
         )}
 
         {tab === "dm" && peer && (
@@ -1950,14 +1944,7 @@ export function ChatShell({
         )}
 
         {tab === "group" && !group && (
-          <div className="flex flex-1 items-center justify-center px-6 text-center">
-            <div className="max-w-sm">
-              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>Wähle eine Gruppe</p>
-              <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                Oder erstelle oben links eine neue Gruppe.
-              </p>
-            </div>
-          </div>
+          <ChatEmptyState />
         )}
 
         {tab === "group" && group && (
