@@ -67,6 +67,7 @@ import {
   IconInfo,
   IconMic,
   IconMore,
+  IconMoreVertical,
   IconPaperclip,
   IconPhone,
   IconPin,
@@ -1411,24 +1412,24 @@ export function ChatShell({
               style={{ color: "var(--text)" }}
             />
           </div>
-          <div className="filter-chips">
+        <div className="filter-chips">
             <button
               type="button"
               className={`filter-chip ${sideTab === "direct" ? "active" : ""}`}
-              onClick={() => setSideTab("direct")}
+              onClick={() => { setSideTab("direct"); setTab("dm"); }}
             >
               Alle
             </button>
             <button
               type="button"
-              className={`filter-chip ${sideTab === "direct" && tab === "dm" ? "active" : ""}`}
+              className={`filter-chip ${tab === "dm" ? "active" : ""}`}
               onClick={() => { setSideTab("direct"); setTab("dm"); }}
             >
               DMs
             </button>
             <button
               type="button"
-              className={`filter-chip ${sideTab === "groups" || tab === "group" ? "active" : ""}`}
+              className={`filter-chip ${tab === "group" ? "active" : ""}`}
               onClick={() => { setSideTab("groups"); setTab("group"); }}
             >
               Gruppen
@@ -1436,43 +1437,18 @@ export function ChatShell({
             <button
               type="button"
               className="filter-chip"
+              onClick={() => setSideTab("fav")}
+            >
+              Favoriten
+            </button>
+            <button
+              type="button"
+              className="filter-chip"
               onClick={() => setSideTab("direct")}
-              title="Ungelesen"
             >
               Ungelesen
             </button>
           </div>
-        </div>
-
-        <div className="tab-group !mx-3 !mt-2 !mb-1">
-          <button
-            type="button"
-            className={`tab ${sideTab === "direct" ? "active" : ""}`}
-            onClick={() => {
-              setSideTab("direct");
-              setTab("dm");
-            }}
-          >
-            Direkt
-          </button>
-          <button
-            type="button"
-            className={`tab ${sideTab === "groups" ? "active" : ""}`}
-            onClick={() => {
-              setSideTab("groups");
-              setTab("group");
-            }}
-          >
-            Gruppen
-          </button>
-          <button
-            type="button"
-            className={`tab ${sideTab === "fav" ? "active" : ""}`}
-            onClick={() => setSideTab("fav")}
-            title="Favoriten (coming soon)"
-          >
-            Favoriten
-          </button>
         </div>
 
         {tab === "dm" && (
