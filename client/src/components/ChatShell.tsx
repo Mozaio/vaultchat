@@ -86,7 +86,12 @@ import {
 type Tab = "dm" | "group";
 type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
 
-type ReplyTarget = { cid: string; author: string; text: string } | null;
+type ReplyTarget = {
+  cid: string;
+  author: string;
+  text: string;
+  expiresAt?: number;
+} | null;
 
 const TTL_OPTIONS: { label: string; ms: number }[] = [
   { label: "Aus", ms: 0 },
@@ -210,6 +215,7 @@ export function ChatShell({
     handleRemote?: (p: RtcPayload) => void | Promise<void>;
     addIce?: (c: RTCIceCandidateInit) => void | Promise<void>;
   } | null>(null);
+  const pendingRtcRef = useRef<Map<string, RtcPayload[]>>(new Map());
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -744,11 +750,18 @@ export function ChatShell({
               setIncomingOffer({ from: u, sdp: payload.sdp });
               return;
             }
-            if (callRef.current?.handleRemote) {
-              await callRef.current.handleRemote(payload);
+            const activeCall = callRef.current;
+            if (!activeCall) {
+              const queued = pendingRtcRef.current.get(fromId) ?? [];
+              queued.push(payload);
+              pendingRtcRef.current.set(fromId, queued);
+              return;
             }
-            if (payload.type === "candidate" && callRef.current?.addIce) {
-              await callRef.current.addIce(payload.candidate);
+            if (activeCall.handleRemote) {
+              await activeCall.handleRemote(payload);
+            }
+            if (payload.type === "candidate" && activeCall.addIce) {
+              await activeCall.addIce(payload.candidate);
             }
             return;
           }
@@ -920,7 +933,9 @@ export function ChatShell({
       ...(replyDm
         ? {
             replyToCid: replyDm.cid,
-            replyPreview: `${replyDm.author}: ${replyDm.text}`,
+            ...(!replyDm.expiresAt
+              ? { replyPreview: `${replyDm.author}: ${replyDm.text}` }
+              : {}),
           }
         : {}),
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
@@ -992,7 +1007,9 @@ export function ChatShell({
       ...(replyGroup
         ? {
             replyToCid: replyGroup.cid,
-            replyPreview: `${replyGroup.author}: ${replyGroup.text}`,
+            ...(!replyGroup.expiresAt
+              ? { replyPreview: `${replyGroup.author}: ${replyGroup.text}` }
+              : {}),
           }
         : {}),
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
@@ -1192,40 +1209,57 @@ export function ChatShell({
 
   async function beginCall() {
     if (!peer) return;
-    const ctrl = await startCall(
-      peer,
-      tokenRef.current,
-      relayOnly,
-      sendRtc,
-      (s) => setCallRemote(s),
-      () => {
-        setCallRemote(null);
-        callRef.current = null;
+    try {
+      const ctrl = await startCall(
+        peer,
+        tokenRef.current,
+        relayOnly,
+        sendRtc,
+        (s) => setCallRemote(s),
+        () => {
+          setCallRemote(null);
+          callRef.current = null;
+        }
+      );
+      callRef.current = ctrl;
+      const queued = pendingRtcRef.current.get(peer.id) ?? [];
+      pendingRtcRef.current.delete(peer.id);
+      for (const payload of queued) {
+        await ctrl.handleRemote?.(payload);
+        if (payload.type === "candidate") await ctrl.addIce?.(payload.candidate);
       }
-    );
-    callRef.current = ctrl;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "call_failed");
+    }
   }
 
   async function acceptIncoming() {
     if (!incomingOffer) return;
-    const ctrl = await acceptCall(
-      incomingOffer.from,
-      incomingOffer.sdp,
-      tokenRef.current,
-      relayOnly,
-      sendRtc,
-      (s) => setCallRemote(s),
-      () => {
-        setCallRemote(null);
-        callRef.current = null;
+    try {
+      const ctrl = await acceptCall(
+        incomingOffer.from,
+        incomingOffer.sdp,
+        tokenRef.current,
+        relayOnly,
+        sendRtc,
+        (s) => setCallRemote(s),
+        () => {
+          setCallRemote(null);
+          callRef.current = null;
+        }
+      );
+      callRef.current = ctrl;
+      const queued = pendingRtcRef.current.get(incomingOffer.from.id) ?? [];
+      pendingRtcRef.current.delete(incomingOffer.from.id);
+      for (const payload of queued) {
+        await ctrl.handleRemote?.(payload);
+        if (payload.type === "candidate") await ctrl.addIce?.(payload.candidate);
       }
-    );
-    callRef.current = {
-      ...ctrl,
-      handleRemote: undefined,
-      addIce: ctrl.addIce,
-    };
-    setIncomingOffer(null);
+      setIncomingOffer(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "call_failed");
+      setIncomingOffer(null);
+    }
   }
 
   async function onChangeTtlDm(ms: number) {
@@ -1248,6 +1282,25 @@ export function ChatShell({
     return {
       author: m.fromMe ? "Du" : peer?.username ?? "Peer",
       text: previewForPayload(m.plain),
+    };
+  }
+
+  function replyPreviewForMessage(
+    list: ChatMsg[],
+    msg: ChatMsg,
+    fallbackAuthor: string
+  ): { author: string; text: string } | null {
+    if (msg.plain.replyToCid) {
+      return findReplyPreview(list, msg.plain.replyToCid);
+    }
+    if (!msg.plain.replyPreview) return null;
+    return {
+      author: msg.plain.replyPreview.split(":")[0] ?? fallbackAuthor,
+      text: msg.plain.replyPreview
+        .split(":")
+        .slice(1)
+        .join(":")
+        .trim(),
     };
   }
 
@@ -1873,23 +1926,17 @@ export function ChatShell({
                       messages[i + 1].fromMe !== m.fromMe
                     }
                     peerLabel={peer.username}
-                    replyToPreview={
-                      m.plain.replyPreview
-                        ? {
-                            author: m.plain.replyPreview.split(":")[0] ?? "",
-                            text: m.plain.replyPreview
-                              .split(":")
-                              .slice(1)
-                              .join(":")
-                              .trim(),
-                          }
-                        : findReplyPreview(messages, m.plain.replyToCid)
-                    }
+                    replyToPreview={replyPreviewForMessage(
+                      messages,
+                      m,
+                      peer.username
+                    )}
                     onReply={(x) =>
                       setReplyDm({
                         cid: x.plain.cid ?? "",
                         author: x.fromMe ? "Du" : peer.username,
                         text: previewForPayload(x.plain),
+                        expiresAt: x.expiresAt,
                       })
                     }
                     onReact={(x, e) => void reactDm(x, e)}
@@ -1944,9 +1991,16 @@ export function ChatShell({
                         key={e}
                         type="button"
                         className="rounded px-1.5 py-1 transition hover:bg-[var(--bg-hover)]"
-                        title="Emoji-Vorschau"
+                        title={`Emoji ${e} einfügen`}
                         onClick={() => {
-                          dmInputRef.current?.focus();
+                          setText((current) => {
+                            const next = current ? `${current}${e}` : e;
+                            window.requestAnimationFrame(() => {
+                              resizeTextarea(dmInputRef.current);
+                              dmInputRef.current?.focus();
+                            });
+                            return next;
+                          });
                           setEmojiOpen(false);
                         }}
                       >
@@ -2183,23 +2237,17 @@ export function ChatShell({
                   peerLabel={
                     users.find((u) => u.id === m.fromUserId)?.username ?? group.name
                   }
-                  replyToPreview={
-                    m.plain.replyPreview
-                      ? {
-                          author: m.plain.replyPreview.split(":")[0] ?? "",
-                          text: m.plain.replyPreview
-                            .split(":")
-                            .slice(1)
-                            .join(":")
-                            .trim(),
-                        }
-                      : findReplyPreview(groupMessages, m.plain.replyToCid)
-                  }
+                  replyToPreview={replyPreviewForMessage(
+                    groupMessages,
+                    m,
+                    users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied"
+                  )}
                   onReply={(x) =>
                     setReplyGroup({
                       cid: x.plain.cid ?? "",
                       author: x.fromMe ? "Du" : "Mitglied",
                       text: previewForPayload(x.plain),
+                      expiresAt: x.expiresAt,
                     })
                   }
                   onReact={(x, e) => void reactGroup(x, e)}
