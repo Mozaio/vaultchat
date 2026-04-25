@@ -68,8 +68,10 @@ import {
   IconMore,
   IconPaperclip,
   IconPhone,
+  IconPin,
   IconSearch,
   IconSend,
+  IconBell,
 } from "./Icons";
 
 type Tab = "dm" | "group";
@@ -1297,18 +1299,21 @@ export function ChatShell({
             setTab("group");
             setGroup(g);
           }}
-          className={`contact-item w-full !mx-0 ${
+          className={`contact-item group-item w-full !mx-0 ${
             group?.id === g.id && tab === "group"
               ? "active"
               : ""
           }`}
         >
-          <div className="contact-avatar !h-9 !w-9 !text-sm">
+          <div className="contact-avatar group">
             {g.name.slice(0, 1).toUpperCase()}
           </div>
           <div className="contact-info min-w-0">
             <span className="contact-name">{g.name}</span>
             <p className="contact-preview">{g.memberIds.length} Mitglieder</p>
+          </div>
+          <div className="pin-icon">
+            <IconPin size={14} />
           </div>
         </button>
       )),
@@ -1404,6 +1409,37 @@ export function ChatShell({
               className="w-full border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text)" }}
             />
+          </div>
+          <div className="filter-chips">
+            <button
+              type="button"
+              className={`filter-chip ${sideTab === "direct" ? "active" : ""}`}
+              onClick={() => setSideTab("direct")}
+            >
+              Alle
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${sideTab === "direct" && tab === "dm" ? "active" : ""}`}
+              onClick={() => { setSideTab("direct"); setTab("dm"); }}
+            >
+              DMs
+            </button>
+            <button
+              type="button"
+              className={`filter-chip ${sideTab === "groups" || tab === "group" ? "active" : ""}`}
+              onClick={() => { setSideTab("groups"); setTab("group"); }}
+            >
+              Gruppen
+            </button>
+            <button
+              type="button"
+              className="filter-chip"
+              onClick={() => setSideTab("direct")}
+              title="Ungelesen"
+            >
+              Ungelesen
+            </button>
           </div>
         </div>
 
@@ -2278,11 +2314,11 @@ function PeerRow({
       type="button"
       onClick={onSelect}
       className={`contact-item w-full ${
-        selected ? "active" : ""
+        selected ? "dm-active" : "dm-inactive"
       } !mx-0 items-center justify-between`}
     >
       <div
-        className="contact-avatar !h-9 !w-9 !text-sm"
+        className="contact-avatar"
         style={{ background: userGradient(u.id) }}
       >
         {u.username.slice(0, 1).toUpperCase()}
@@ -2310,13 +2346,18 @@ function PeerRow({
         </div>
         <p className="contact-preview">{subtitle ?? ""}</p>
       </div>
-      <div className="contact-meta">
-        <span className="contact-time">{metaRight ?? ""}</span>
-        {unread && unread > 0 ? (
-          <span className="unread-badge">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        ) : null}
+      <div className="flex items-center gap-2">
+        <div className="contact-meta">
+          <span className="contact-time">{metaRight ?? ""}</span>
+          {unread && unread > 0 ? (
+            <span className="unread-badge">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          ) : null}
+        </div>
+        <div className="pin-icon">
+          <IconPin size={14} />
+        </div>
       </div>
     </button>
   );

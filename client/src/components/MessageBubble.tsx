@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { PlainPayload } from "../lib/crypto";
+import {
+  IconFileText,
+  IconDownload,
+  IconTimer,
+  IconSmile,
+  IconCheck,
+  IconCheckCheck,
+} from "./Icons";
 
 export type ChatMsg = {
   id: string;
@@ -21,7 +29,7 @@ export type ChatMsg = {
   deliveredToPeer?: boolean;
 };
 
-const QUICK_EMOJIS = ["👍", "❤️", "😂", "🎉", "😮", "😢", "🙏", "🔥"];
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮"];
 
 function fmtDuration(ms?: number): string {
   if (!ms) return "";
@@ -34,6 +42,13 @@ function fmtDuration(ms?: number): string {
 function truncate(text: string, n = 64): string {
   if (!text) return "";
   return text.length > n ? text.slice(0, n - 1) + "…" : text;
+}
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function previewForPayload(p: PlainPayload): string {
@@ -74,12 +89,12 @@ export function MessageBubble({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
-  const wrapperRef = useState<HTMLDivElement | null>(null)[1];
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState(msg.plain.body ?? "");
   const [ttlLeft, setTtlLeft] = useState<string | null>(() =>
     computeTtlLeft(msg.expiresAt)
   );
+  const bubbleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!msg.expiresAt) return;
@@ -94,8 +109,14 @@ export function MessageBubble({
   const reacts = msg.reactions ?? {};
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
 
+  // Compute progress for disappearing messages
+  const ttlProgress = msg.expiresAt
+    ? Math.max(0, (msg.expiresAt - Date.now()) / (msg.expiresAt - msg.at))
+    : null;
+
   return (
     <div
+      ref={bubbleRef}
       className={`message-wrapper group ${
         msg.fromMe ? "sent" : "received"
       }`}
@@ -121,15 +142,63 @@ export function MessageBubble({
           </div>
         )}
 
-      <div
-        className={`message-bubble relative ${
-          msg.fromMe ? "sent" : "received"
-        } max-w-full ${msg.deleted ? "italic app-muted-2" : ""} ${
-          isGrouped ? "grouped" : ""
-        } ${isLastInGroup ? "" : ""}`}
-      >
+        <div
+          className={`message-bubble relative ${
+            msg.fromMe ? "sent" : "received"
+          } max-w-full ${msg.deleted ? "italic opacity-60" : ""} ${
+            isGrouped ? "grouped" : ""
+          }`}
+        >
+          {/* Disappearing message progress ring */}
+          {ttlProgress !== null && (
+            <svg className="disappearing-progress" viewBox="0 0 20 20">
+              <circle
+                cx="10"
+                cy="10"
+                r="8"
+                stroke={msg.fromMe ? "rgba(255,255,255,0.3)" : "var(--border)"}
+                strokeWidth="2"
+                fill="none"
+              />
+              <circle
+                cx="10"
+                cy="10"
+                r="8"
+                stroke={msg.fromMe ? "rgba(255,255,255,0.8)" : "var(--warning)"}
+                strokeWidth="2"
+                fill="none"
+                strokeDasharray="50"
+                strokeDashoffset={50 * (1 - ttlProgress)}
+                strokeLinecap="round"
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+          )}
+
+          {/* Reaction toolbar on hover */}
+          {!msg.deleted && (
+            <div className="reaction-toolbar">
+              {QUICK_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  className={`reaction-btn ${
+                    msg.myReaction === e ? "bg-[var(--accent-soft)]" : ""
+                  }`}
+                  onClick={(ev) => {
+                    ev.stopPropagation();
+                    onReact(msg, msg.myReaction === e ? "" : e);
+                  }}
+                  title={e}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          )}
+
           {msg.deleted ? (
-            <span>Nachricht gelöscht</span>
+            <span className="italic">Nachricht gelöscht</span>
           ) : editing ? (
             <div className="flex items-center gap-2">
               <input
@@ -162,31 +231,41 @@ export function MessageBubble({
               </button>
             </div>
           ) : msg.plain.kind === "file" ? (
-            <a
-              className="underline"
-              style={{
-                color: msg.fromMe ? "inherit" : "var(--accent)",
-              }}
-              href={body}
-              download={msg.plain.fileName}
-            >
-              📎 {msg.plain.fileName ?? "Datei"}
-            </a>
-          ) : msg.plain.kind === "voice" ? (
-            <div className="flex items-center gap-2">
-              <span
-                className="text-xs"
-                style={{ color: msg.fromMe ? "inherit" : "var(--accent)" }}
+            <div className="file-attachment-card">
+              <div className="file-icon-wrapper">
+                <IconFileText size={18} />
+              </div>
+              <div className="file-info">
+                <div className="file-name">{msg.plain.fileName ?? "Datei"}</div>
+                <div className="file-size">{formatFileSize(msg.plain.fileSize)}</div>
+              </div>
+              <a
+                href={body}
+                download={msg.plain.fileName}
+                className="download-btn"
+                onClick={(e) => e.stopPropagation()}
               >
-                🎤 {fmtDuration(msg.plain.durationMs)}
-              </span>
-              <audio controls src={body} className="h-8 max-w-[220px]" />
+                <IconDownload size={14} />
+              </a>
+            </div>
+          ) : msg.plain.kind === "voice" ? (
+            <div className="voice-message">
+              <div className="play-btn">▶</div>
+              <audio controls src={body} className="h-8 flex-1 max-w-[180px]" />
+              <span className="text-xs opacity-70">{fmtDuration(msg.plain.durationMs)}</span>
             </div>
           ) : (
             <p className="whitespace-pre-wrap break-words">{body}</p>
           )}
 
-            <div className="mt-1 flex items-center gap-2 text-[10px] app-muted">
+          {/* Timestamp and status */}
+          <div className="bubble-meta">
+            {ttlLeft && (
+              <span className="disappearing-timer">
+                <IconTimer size={10} />
+                {ttlLeft}
+              </span>
+            )}
             <span>
               {new Date(msg.at).toLocaleTimeString(undefined, {
                 hour: "2-digit",
@@ -194,14 +273,20 @@ export function MessageBubble({
               })}
             </span>
             {msg.edited && !msg.deleted && <span>(bearbeitet)</span>}
-            {ttlLeft && <span>⏳ {ttlLeft}</span>}
             {msg.fromMe && !msg.deleted && (
-              <span title={msg.readByPeer ? "Gelesen" : msg.deliveredToPeer ? "Zugestellt" : "Gesendet"}>
-                {msg.readByPeer ? "✓✓" : msg.deliveredToPeer ? "✓✓" : "✓"}
+              <span className="status-icon" title={msg.readByPeer ? "Gelesen" : msg.deliveredToPeer ? "Zugestellt" : "Gesendet"}>
+                {msg.readByPeer ? (
+                  <IconCheckCheck size={13} className="read" />
+                ) : msg.deliveredToPeer ? (
+                  <IconCheckCheck size={13} className="delivered" />
+                ) : (
+                  <IconCheck size={13} />
+                )}
               </span>
             )}
           </div>
 
+          {/* Menu button */}
           {!msg.deleted && (
             <button
               type="button"
@@ -211,9 +296,9 @@ export function MessageBubble({
                 setMenuOpen((v) => !v);
                 setReactOpen(false);
               }}
-              className={`absolute -top-3 ${
-                msg.fromMe ? "right-0" : "left-0"
-              } hidden rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs hover:bg-[var(--bg-hover)] group-hover:block z-20`}
+              className={`absolute top-2 ${
+                msg.fromMe ? "-left-2" : "-right-2"
+              } hidden rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] w-7 h-7 items-center justify-center hover:bg-[var(--bg-hover)] group-hover:flex z-20`}
               style={{ color: "var(--text-secondary)" }}
             >
               ⋯
@@ -222,31 +307,31 @@ export function MessageBubble({
 
           {menuOpen && !msg.deleted && (
             <div
-              className={`absolute top-6 z-30 w-40 rounded-lg border p-1 text-xs shadow-xl ${
+              className={`absolute top-8 z-30 w-40 rounded-lg border p-1 text-xs shadow-xl ${
                 msg.fromMe ? "-right-2" : "-left-2"
               }`}
               style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
             >
               <button
                 type="button"
-                className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
                 style={{ color: "var(--text)" }}
                 onClick={() => {
                   onReply(msg);
                   setMenuOpen(false);
                 }}
               >
-                Antworten
+                <IconSmile size={14} /> Antworten
               </button>
               <button
                 type="button"
-                className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
                 style={{ color: "var(--text)" }}
                 onClick={() => {
                   setReactOpen(true);
                 }}
               >
-                Reagieren
+                😊 Reagieren
               </button>
               {msg.plain.kind === "text" && body && (
                 <button
