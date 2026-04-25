@@ -175,28 +175,6 @@ export function MessageBubble({
             </svg>
           )}
 
-          {/* Reaction toolbar on hover */}
-          {!msg.deleted && (
-            <div className="reaction-toolbar">
-              {QUICK_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  className={`reaction-btn ${
-                    msg.myReaction === e ? "bg-[var(--accent-soft)]" : ""
-                  }`}
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    onReact(msg, msg.myReaction === e ? "" : e);
-                  }}
-                  title={e}
-                >
-                  {e}
-                </button>
-              ))}
-            </div>
-          )}
-
           {msg.deleted ? (
             <span className="italic">Nachricht gelöscht</span>
           ) : editing ? (
