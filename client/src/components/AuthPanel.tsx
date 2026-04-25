@@ -11,6 +11,7 @@ import {
 } from "../lib/localIdentity";
 import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
+import { parseIdentityBackup } from "../lib/backup";
 import { ThemeToggle } from "./ThemeToggle";
 import { IconAlertTriangle, IconLock, IconShieldCheck, IconTimer } from "./Icons";
 
@@ -112,7 +113,9 @@ export function AuthPanel({
     try {
       let local: LocalIdentity | null = null;
       if (importJson.trim()) {
-        local = JSON.parse(importJson) as LocalIdentity;
+        local = await parseIdentityBackup(importJson, () =>
+          window.prompt("Backup-Passphrase eingeben")
+        );
         saveLocalIdentity(local);
       } else {
         local = loadLocalIdentity();

@@ -1,6 +1,11 @@
 import type { ApiUser } from "./api";
 import { openPayload, type PlainPayload } from "./crypto";
-import { drDecryptJson, isDrCiphertext } from "./drSession";
+import {
+  drDecryptJson,
+  drDecryptX3dhPreKeyJson,
+  isDrCiphertext,
+  isX3dhPreKeyFrame,
+} from "./drSession";
 import { openSealedEnvelope } from "./sealedSender";
 import { isMessageDuplicate } from "./replayProtection";
 import type { Session } from "./sessionHelpers";
@@ -46,6 +51,14 @@ export async function decryptIncomingSealedDm(
   try {
     if (isDrCiphertext(innerB64)) {
       const json = await drDecryptJson(
+        session.secretKey,
+        peer.id,
+        peer.publicKey,
+        innerB64
+      );
+      plain = JSON.parse(json) as PlainPayload;
+    } else if (isX3dhPreKeyFrame(innerB64)) {
+      const json = await drDecryptX3dhPreKeyJson(
         session.secretKey,
         peer.id,
         peer.publicKey,

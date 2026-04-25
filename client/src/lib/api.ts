@@ -101,8 +101,10 @@ export async function me(token: string) {
   return req<ApiUser>("/api/me", { headers: {}, token });
 }
 
-export async function listUsers(token: string) {
-  return req<{ users: ApiUser[] }>("/api/users", { token });
+export async function listUsers(token: string, ids: string[] = []) {
+  const unique = Array.from(new Set(ids)).slice(0, 50);
+  const qs = unique.length ? `?ids=${encodeURIComponent(unique.join(","))}` : "";
+  return req<{ users: ApiUser[] }>(`/api/users${qs}`, { token });
 }
 
 /**
@@ -112,7 +114,7 @@ export async function listUsers(token: string) {
  */
 export async function searchUsers(token: string, query: string) {
   const q = query.trim().toLowerCase();
-  if (q.length < 2) {
+  if (q.length < 3) {
     return { users: [] as ApiUser[] };
   }
   return req<{ users: ApiUser[] }>(`/api/users/search?q=${encodeURIComponent(q)}`, { token });
@@ -187,7 +189,9 @@ export type PreKeyBundle = {
     keyId: number;
     publicKey: string;
     signature: string;
+    signingPublicKey?: string;
   };
+  remainingPreKeys?: number;
   oneTimePreKey: { keyId: number; publicKey: string } | null;
 };
 
@@ -198,7 +202,12 @@ export async function getPreKeyBundle(token: string, userId: string) {
 export async function uploadPreKeys(
   token: string,
   body: {
-    signedPreKey: { keyId: number; publicKey: string; signature: string };
+    signedPreKey: {
+      keyId: number;
+      publicKey: string;
+      signature: string;
+      signingPublicKey?: string;
+    };
     oneTimePreKeys: { keyId: number; publicKey: string }[];
   }
 ) {

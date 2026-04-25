@@ -115,7 +115,14 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
     }
   }
 
+  const now = Date.now();
   const out = Array.from(byCid.values()).map((m) => {
+    if (m.plain.replyToCid && m.plain.replyPreview) {
+      const target = byCid.get(m.plain.replyToCid);
+      if (!target || target.deleted || (target.expiresAt && target.expiresAt <= now)) {
+        m.plain = { ...m.plain, replyPreview: undefined };
+      }
+    }
     const { _reactByUser, ...rest } = m;
     void _reactByUser;
     return rest;

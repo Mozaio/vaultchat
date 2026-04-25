@@ -8,15 +8,15 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 
 ### Transport- und Server-Schicht
 
-- **TLS** in Produktion (`https` / `wss`); das Relay lehnt unauthentifizierte WS-Verbindungen ab.
+- **TLS** in Produktion (`https` / `wss`); das Relay lehnt unauthentifizierte WS-Verbindungen ab. Tokens werden im ersten WebSocket-Auth-Frame gesendet, nicht in URLs.
 - **RAM-only Verzeichnis**: Benutzer (Name, Argon2id-Hash, Identity-Public-Key), Gruppenmitgliedschaften — nur flüchtig im Arbeitsspeicher. Bei Neustart verschwindet der Verzeichniszustand.
 - **Keine Nachrichten-Persistenz**: Der Server leitet Ciphertexts direkt weiter und speichert sie weder kurzzeitig noch dauerhaft.
 - **Sealed-Sender DM-Protokoll**: Der Server sieht für DMs ausschließlich `toUserId` + einen opaken `envelope`. Er kennt den Absender einer DM nicht. Der Absender ist kryptografisch nur für den Empfänger sichtbar.
 - **Sealed Group Sender**: Gruppenframes werden ohne `fromUserId` relayiert. Der Absender ist Teil der E2EE-Payload; nur Gruppenmitglieder können ihn entschlüsseln.
 - **Keine Delivery-Receipts am Server**: Zustell-/Lesebestätigungen sind E2EE-Payloads, kein Server-Metadatum.
 - **Strenge HTTP-Header**: `Content-Security-Policy` ohne Inline-Scripts oder externe Ressourcen, `X-Frame-Options: DENY`, `Permissions-Policy` für Kamera/Mikrofon nur auf `self`, `Referrer-Policy: no-referrer`, HSTS.
-- **Rate-Limits**: pro API-IP (`express-rate-limit`) sowie pro WebSocket-Socket (Token-Bucket im Server).
-- **Ciphertext-Cap**: WS akzeptiert maximal 6 MiB pro Frame (max 8 MiB pro Socket-Message).
+- **Rate-Limits**: getrennte Limits für Auth, Suche, Gruppen-Operationen und allgemeine API sowie pro WebSocket-Socket (Token-Bucket im Server).
+- **Ciphertext-Cap**: WS akzeptiert nur begrenzte Frames für E2EE-Umschläge und verwirft zu große Socket-Messages.
 
 ### Kryptografie (Client)
 
@@ -57,18 +57,18 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 
 - Peer-to-peer über WebRTC; nur SDP + ICE-Candidates werden vom Server durchgereicht. Medien sind SRTP zwischen den Peers.
 - **Konfigurierbare TURN-Relays** via `VAULTCHAT_TURN_URL`, `VAULTCHAT_TURN_USER`, `VAULTCHAT_TURN_PASS`.
-- **Relay-Only-Modus**: Im Client per Checkbox aktivierbar (sowie server-forciert via `VAULTCHAT_FORCE_RELAY=1`). Setzt `iceTransportPolicy: "relay"` und filtert lokale Host-Kandidaten vor dem Signaling — verhindert IP-Exposure an den Peer.
+- **Relay-Only-Modus**: Im Client per Checkbox aktivierbar (sowie server-forciert via `VAULTCHAT_FORCE_RELAY=1`). Setzt `iceTransportPolicy: "relay"`, entfernt STUN-Fallbacks bei server-forciertem Relay und filtert Host-/srflx-Kandidaten vor dem Signaling — verhindert IP-Exposure an den Peer, wenn TURN korrekt konfiguriert ist.
 
 ### Asset-Integrität
 
 - Vite-Build injiziert `integrity="sha384-…"` in alle gebündelten JS/CSS-Dateien (`vite-plugin-sri`).
-- Zusätzlich **clientseitiger SHA-384-Fingerprint des Hauptbundles**: beim ersten Vertrauen lokal gepinnt; bei Abweichung zeigt die App eine rote Warnung, bevor der Nutzer sich entsperrt. Ersetzt keine Reproducible Builds, aber erlaubt dem Nutzer, Drift zu erkennen und den Hash out-of-band mit einer unabhängigen Quelle zu vergleichen.
+- Zusätzlich **clientseitiger SHA-384-Fingerprint des Hauptbundles**: beim ersten Vertrauen lokal gepinnt und nach Unlock verschlüsselt gespeichert. Bei Abweichung blockiert die App das Entsperren, bis der Nutzer den neuen Build bewusst out-of-band verifiziert und neu pinnt. Ersetzt keine Reproducible Builds, mindert aber Drift-Angriffe nach dem ersten Vertrauen.
 
 ## Bedrohungen und Grenzen (Stand jetzt)
 
 1. **Kompromittierter Web-Host** *(residual)*: Der Host kann pro Aufruf neuen JS-Code liefern. SRI schützt nur vor Tampering zwischen Build und Auslieferung. Unser **Code-Hash-Pinning** mindert den Angriff (TOFU-Policy auf Bundle-Ebene), schützt aber nicht vor gezieltem Angriff auf den ersten Aufruf. Vollständige Minderung braucht reproducible builds + unabhängig veröffentlichte Hashes + idealerweise native Clients oder signierte Web Bundles.
 
-   **Verbesserung (v2)**: Code-Integrity-Pinning mit **passwortgeschütztem Hash** (`codeIntegrityEnhanced.ts`). Der Hash wird mit einem aus dem `secretKey` abgeleiteten Schlüssel verschlüsselt gespeichert. Einfaches Auslesen von localStorage reicht nicht aus — der Angreifer müsste den Browser-Prozess kontrollieren.
+   **Verbesserung (v2)**: Code-Integrity-Pinning mit **passwortgeschütztem Hash** (`codeIntegrityEnhanced.ts`). Der Hash wird mit einem aus dem `secretKey` abgeleiteten Schlüssel verschlüsselt gespeichert und ein Mismatch blockiert Unlock/Session-Start. Einfaches Auslesen von localStorage reicht nicht aus — der Angreifer müsste den Browser-Prozess kontrollieren.
 
 2. **Kein auditiertes libsignal** *(residual)*: Unser Double Ratchet v4 ist konzeptionell korrekt, nutzt libsodium-Primitive (XChaCha20-Poly1305, X25519, BLAKE2b) und bindet Header per AAD. Er ist dennoch **kein** Drop-in-Ersatz für `libsignal-protocol`. Es gibt kein X3DH mit One-Time-Prekeys, keine Deniable Signatures, kein formales Audit.
 
@@ -76,7 +76,7 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 
 4. **MITM bei Erstkontakt** *(stark reduziert)*: TOFU-Pinning detektiert Key-Wechsel automatisch und blockiert weitere DMs, bis der Nutzer verifiziert. Safety-Number-Vergleich bleibt der Goldstandard.
 
-5. **Offline/Neues Gerät** *(teilweise gelöst)*: Sender-Outbox übernimmt Store-and-Forward-Funktion, ohne dass der Server speichert. Ein neues Gerät benötigt weiterhin den JSON-Backup-Import für die Identität.
+5. **Offline/Neues Gerät** *(teilweise gelöst)*: Sender-Outbox übernimmt Store-and-Forward-Funktion, ohne dass der Server speichert. Ein neues Gerät benötigt weiterhin den Backup-Import für die Identität; neue Backups sind passwortgeschützte Argon2id/Secretbox-Bundles, Legacy-Klartext-JSON wird nur noch für Import-Kompatibilität akzeptiert.
 
 6. **Browser-Forensik** *(reduziert)*: Auto-Lock + `memzero` entfernen LDK und SK nach 10 min Inaktivität bzw. manuellem Lock. Root-Zugriff auf ein laufendes, aktives Gerät bleibt außerhalb des Modells.
 

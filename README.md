@@ -33,7 +33,7 @@ Sicherheitsorientierter **Browser-Chat** mit selbstentwickeltem **Double Ratchet
 | WebSocket-Relay mit Token-Bucket-Rate-Limit | ✔ |
 | Strenge CSP, HSTS, kein Inline-JS | ✔ |
 | Subresource Integrity für Bundle | ✔ |
-| Typing-Indikator, Fingerprint, JSON-Backup | ✔ |
+| Typing-Indikator, Fingerprint, verschlüsseltes JSON-Backup | ✔ |
 
 ## Entwicklung
 
@@ -54,6 +54,10 @@ Hinweis: Server-Nutzer und Gruppen leben nur im **RAM** — nach Neustart neu re
 
 ```bash
 export VAULTCHAT_JWT_SECRET="$(openssl rand -base64 48)"
+# Optional: erlaubte Client-/Connect-Origins, kommagetrennt
+export VAULTCHAT_CORS_ORIGIN="https://chat.example.org"
+export VAULTCHAT_CLIENT_ORIGINS="https://chat.example.org"
+export VAULTCHAT_CONNECT_ORIGINS="https://chat.example.org"
 # Optional: TURN-Server für WebRTC-Calls hinter NAT
 export VAULTCHAT_TURN_URL="turn:turn.example.org:3478"
 export VAULTCHAT_TURN_USER="…"
@@ -84,8 +88,9 @@ docker compose up --build
 - **Auto-Lock**: Zähler auf Maus/Tastatur/Visibility; nach 10 min wird `secretKey`/LDK per `memzero` gelöscht.
 - **Padding**: Nachrichten werden vor der Verschlüsselung auf Bucket-Größen aufgepolstert.
 - **Sicherheitsnummer**: BLAKE2b über sortierte Identity-Pubkeys → 60-Zeichen-Nummer + 8-Emoji-Sequenz. UI erlaubt verifizieren und Re-Pinning nach Key-Wechsel.
-- **Code-Integrität**: Client berechnet SHA-384 des Haupt-Bundles und pinnt es im localStorage. Bei Drift wird eine rote Warnung angezeigt, bevor sich der Nutzer entsperrt.
-- **WebRTC**: Konfigurierbarer TURN über ENV (`VAULTCHAT_TURN_URL/USER/PASS`). Relay-Only-Modus (`iceTransportPolicy: relay`) filtert lokale Host-Kandidaten — kein IP-Leak an den Peer.
+- **Code-Integrität**: Client berechnet SHA-384 des Haupt-Bundles und pinnt es verschlüsselt. Bei Drift wird Entsperren blockiert, bis der Nutzer bewusst neu pinnt.
+- **WebRTC**: Konfigurierbarer TURN über ENV (`VAULTCHAT_TURN_URL/USER/PASS`). Relay-Only-Modus (`iceTransportPolicy: relay`) filtert lokale Host-/srflx-Kandidaten; server-forciertes Relay entfernt STUN-Fallbacks.
+- **Backups**: Identitäts-Backups werden als passwortgeschützte Argon2id/Secretbox-Bundles exportiert. Klartext-Identity-JSON bleibt nur als Legacy-Import kompatibel.
 - **Server-Header**: strikte CSP ohne Inline-Skripte, `X-Frame-Options: DENY`, HSTS, Referrer-Policy `no-referrer`, Permissions-Policy restriktiv.
 
 ## Environment-Variablen (Server)
@@ -93,13 +98,19 @@ docker compose up --build
 | Variable | Zweck |
 |---|---|
 | `VAULTCHAT_JWT_SECRET` | Pflicht in Prod — signiert JWTs |
-| `VAULTCHAT_CORS_ORIGIN` | CORS-Origin (default: alle) |
+| `VAULTCHAT_CORS_ORIGIN` | CORS-Origin, kommagetrennt; in Produktion default geschlossen |
+| `VAULTCHAT_CLIENT_ORIGINS` | Zusätzliche erlaubte CSP-Origins |
+| `VAULTCHAT_CONNECT_ORIGINS` | Zusätzliche erlaubte `connect-src` Origins |
 | `VAULTCHAT_SERVE_SPA` | `1` = statisches Frontend aus `/client/dist` ausliefern |
 | `VAULTCHAT_STUN_URL` | Override des Default-STUN (Google) |
 | `VAULTCHAT_TURN_URL` | TURN-URL (`turn:...` / `turns:...`) |
 | `VAULTCHAT_TURN_USER` | TURN-Username |
 | `VAULTCHAT_TURN_PASS` | TURN-Passwort |
 | `VAULTCHAT_FORCE_RELAY` | `1` = Clients kriegen Hinweis, Relay-Only zu nutzen |
+
+## Security Roadmap
+
+Die installierbare/native Release-Strategie ist in [`SECURITY_ROADMAP.md`](./SECURITY_ROADMAP.md) dokumentiert. Bis dahin bleiben Sicherheitsclaims bewusst auf Web-App-Niveau begrenzt.
 
 ## Lizenz
 

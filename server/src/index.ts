@@ -2,9 +2,9 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-import { randomUUID } from "node:crypto";
+import { createPublicKey, randomUUID, verify as verifySignature } from "node:crypto";
 import { createServer } from "node:http";
-import { WebSocketServer } from "ws";
+import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
 import {
   addGroupMember,
@@ -20,6 +20,7 @@ import {
 } from "./memoryStore.js";
 import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
 import { registerClient, sendToUser } from "./wsHub.js";
+import { enqueueMailboxDm, popMailboxDms } from "./mailboxStore.js";
 import {
   getPreKeyBundle,
   getRemainingPreKeyCount,
@@ -30,6 +31,32 @@ import {
 const app = express();
 const port = Number(process.env.PORT ?? 8787);
 
+function splitEnvList(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+const clientOrigins = splitEnvList(process.env.VAULTCHAT_CLIENT_ORIGINS);
+const corsOrigins = splitEnvList(process.env.VAULTCHAT_CORS_ORIGIN);
+const apiOrigins = splitEnvList(process.env.VAULTCHAT_CONNECT_ORIGINS);
+const connectSrc = [
+  "'self'",
+  ...clientOrigins,
+  ...corsOrigins,
+  ...apiOrigins,
+  ...(process.env.NODE_ENV === "production" ? ["wss:"] : ["ws:", "wss:"]),
+];
+const corsOrigin =
+  corsOrigins.length === 0
+    ? process.env.NODE_ENV === "production"
+      ? false
+      : true
+    : corsOrigins.length === 1
+      ? corsOrigins[0]
+      : corsOrigins;
+
 app.set("trust proxy", 1);
 app.use(
   helmet({
@@ -39,11 +66,12 @@ app.use(
         "default-src": ["'self'"],
         "script-src": ["'self'"],
         "script-src-attr": ["'none'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
+        "style-src": ["'self'"],
+        "style-src-attr": ["'unsafe-inline'"],
         "img-src": ["'self'", "data:", "blob:"],
         "media-src": ["'self'", "data:", "blob:"],
         "font-src": ["'self'", "data:"],
-        "connect-src": ["'self'", "ws:", "wss:"],
+        "connect-src": Array.from(new Set(connectSrc)),
         "worker-src": ["'self'", "blob:"],
         "object-src": ["'none'"],
         "base-uri": ["'self'"],
@@ -66,7 +94,7 @@ app.use((_req, res, next) => {
 });
 app.use(
   cors({
-    origin: process.env.VAULTCHAT_CORS_ORIGIN ?? true,
+    origin: corsOrigin,
     credentials: true,
   })
 );
@@ -74,7 +102,7 @@ app.use(express.json({ limit: "12mb" }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 80,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -82,6 +110,18 @@ const authLimiter = rateLimit({
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const groupLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -177,15 +217,29 @@ app.get("/api/me", async (req, res) => {
 
 app.get("/api/users", async (req, res) => {
   const t = bearer(req);
-  if (!t || !verifyToken(t)) {
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  res.json({ users: listUsersSafe() });
+  const ids = (req.query.ids as string | undefined)
+    ?.split(",")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .slice(0, 50);
+  if (!ids?.length) {
+    res.json({ users: [] });
+    return;
+  }
+  const users = ids.flatMap((id) => {
+    const u = findUserById(id);
+    return u ? [{ id: u.id, username: u.username, publicKey: u.publicKey }] : [];
+  });
+  res.json({ users });
 });
 
-// Username-Suche (Telegram-Style): Nur Ergebnisse bei Mindestlänge 2
-app.get("/api/users/search", async (req, res) => {
+// Username-Suche: Nur Ergebnisse bei Mindestlänge 3, kein globales Directory.
+app.get("/api/users/search", searchLimiter, async (req, res) => {
   const t = bearer(req);
   if (!t || !verifyToken(t)) {
     res.status(401).json({ error: "unauthorized" });
@@ -194,7 +248,7 @@ app.get("/api/users/search", async (req, res) => {
   const query = (req.query.q as string | undefined)?.trim().toLowerCase() ?? "";
   const currentUser = verifyToken(t);
   
-  if (!query || query.length < 2) {
+  if (!query || query.length < 3) {
     res.json({ users: [] });
     return;
   }
@@ -210,7 +264,7 @@ app.get("/api/users/search", async (req, res) => {
   res.json({ users: results });
 });
 
-app.post("/api/groups", async (req, res) => {
+app.post("/api/groups", groupLimiter, async (req, res) => {
   const t = bearer(req);
   const jwtUser = t ? verifyToken(t) : null;
   if (!jwtUser) {
@@ -258,7 +312,7 @@ app.get("/api/groups", async (req, res) => {
 
 const MemberBody = z.object({ memberId: z.string().uuid() });
 
-app.post("/api/groups/:id/members", async (req, res) => {
+app.post("/api/groups/:id/members", groupLimiter, async (req, res) => {
   const t = bearer(req);
   const jwtUser = t ? verifyToken(t) : null;
   if (!jwtUser) {
@@ -280,7 +334,7 @@ app.post("/api/groups/:id/members", async (req, res) => {
   });
 });
 
-app.delete("/api/groups/:id/members/:memberId", async (req, res) => {
+app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) => {
   const t = bearer(req);
   const jwtUser = t ? verifyToken(t) : null;
   if (!jwtUser) {
@@ -325,11 +379,16 @@ app.get("/api/rtc/config", async (req, res) => {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  const servers: { urls: string | string[]; username?: string; credential?: string }[] = [
-    { urls: process.env.VAULTCHAT_STUN_URL ?? "stun:stun.l.google.com:19302" },
-  ];
-  const turnUrl = process.env.VAULTCHAT_TURN_URL;
-  if (turnUrl) {
+  const forceRelay = process.env.VAULTCHAT_FORCE_RELAY === "1";
+  const turnUrls = splitEnvList(process.env.VAULTCHAT_TURN_URL);
+  const stunUrls = forceRelay
+    ? []
+    : splitEnvList(process.env.VAULTCHAT_STUN_URL).length
+      ? splitEnvList(process.env.VAULTCHAT_STUN_URL)
+      : ["stun:stun.l.google.com:19302"];
+  const servers: { urls: string | string[]; username?: string; credential?: string }[] =
+    stunUrls.map((urls) => ({ urls }));
+  for (const turnUrl of turnUrls) {
     servers.push({
       urls: turnUrl,
       username: process.env.VAULTCHAT_TURN_USER ?? "",
@@ -338,7 +397,8 @@ app.get("/api/rtc/config", async (req, res) => {
   }
   res.json({
     iceServers: servers,
-    forceRelay: process.env.VAULTCHAT_FORCE_RELAY === "1",
+    forceRelay,
+    warning: forceRelay && turnUrls.length === 0 ? "force_relay_without_turn" : undefined,
   });
 });
 
@@ -361,11 +421,38 @@ const PreKeyUploadBody = z.object({
     keyId: z.number(),
     publicKey: z.string(),
     signature: z.string(),
+    signingPublicKey: z.string().optional(),
   }),
   oneTimePreKeys: z
     .array(z.object({ keyId: z.number(), publicKey: z.string() }))
     .max(200),
 });
+
+const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
+
+function verifySignedPreKey(input: {
+  publicKey: string;
+  signature: string;
+  signingPublicKey?: string;
+}): boolean {
+  if (!input.signingPublicKey) return true; // Legacy clients are allowed but tracked as weaker.
+  try {
+    const publicKey = Buffer.from(input.publicKey, "base64");
+    const signature = Buffer.from(input.signature, "base64");
+    const signingPublicKey = Buffer.from(input.signingPublicKey, "base64");
+    if (publicKey.length !== 32 || signature.length !== 64 || signingPublicKey.length !== 32) {
+      return false;
+    }
+    const keyObject = createPublicKey({
+      key: Buffer.concat([ED25519_SPKI_PREFIX, signingPublicKey]),
+      format: "der",
+      type: "spki",
+    });
+    return verifySignature(null, publicKey, keyObject, signature);
+  } catch {
+    return false;
+  }
+}
 
 app.post("/api/keys", async (req, res) => {
   const t = bearer(req);
@@ -384,11 +471,16 @@ app.post("/api/keys", async (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
+  if (!verifySignedPreKey(parsed.data.signedPreKey)) {
+    res.status(400).json({ error: "invalid_signed_prekey_signature" });
+    return;
+  }
   initPreKeyBundle(
     jwtUser.userId,
     user.publicKey,
     parsed.data.signedPreKey.publicKey,
-    parsed.data.signedPreKey.signature
+    parsed.data.signedPreKey.signature,
+    parsed.data.signedPreKey.signingPublicKey
   );
   uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
   res.json({ ok: true, remaining: getRemainingPreKeyCount(jwtUser.userId) });
@@ -399,14 +491,33 @@ const server = createServer(app);
  * E2E-DM: base64(Envelope) / Gruppen-ciphertext. Zod-Maxlänge = erlaubter Umschlag.
  * WebSocket-Frame etwas größer (JSON-Metadaten um `envelope` herum).
  */
-const MAX_B64_CIPHERTEXT = 128 * 1024 * 1024;
-const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 2 * 1024 * 1024;
+const MAX_B64_CIPHERTEXT = Number(
+  process.env.VAULTCHAT_MAX_B64_CIPHERTEXT_BYTES ?? 16 * 1024 * 1024
+);
+const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 512 * 1024;
 
 const wss = new WebSocketServer({
   server,
   path: "/ws",
   maxPayload: WS_MAX_FRAME_BYTES,
 });
+
+function flushMailboxToSocket(userId: string, ws: WebSocket) {
+  const pending = popMailboxDms(userId);
+  for (const item of pending) {
+    if (ws.readyState !== ws.OPEN) break;
+    ws.send(
+      JSON.stringify({
+        type: "dm",
+        id: item.id,
+        toUserId: userId,
+        envelope: item.envelope,
+        createdAt: item.createdAt,
+        mailbox: true,
+      })
+    );
+  }
+}
 
 /**
  * Schlanker Token-Bucket pro Socket. Verhindert WS-Floods/Spam, ohne dass der
@@ -431,9 +542,15 @@ function createBucket() {
 wss.on("connection", (ws, req) => {
   const url = new URL(req.url ?? "", "http://localhost");
   const urlToken = url.searchParams.get("token");
-  const verifiedFromUrl = urlToken ? verifyToken(urlToken) : null;
+  const allowUrlToken = process.env.VAULTCHAT_ALLOW_WS_URL_TOKEN === "1";
+  const verifiedFromUrl = allowUrlToken && urlToken ? verifyToken(urlToken) : null;
   let jwtUser: { userId: string; username: string } | null = verifiedFromUrl;
   let authTimer: ReturnType<typeof setTimeout> | null = null;
+
+  if (urlToken && !allowUrlToken) {
+    ws.close(4401, "url_token_disabled");
+    return;
+  }
 
   if (urlToken) {
     if (!jwtUser) {
@@ -441,6 +558,7 @@ wss.on("connection", (ws, req) => {
       return;
     }
     registerClient(jwtUser.userId, ws);
+    flushMailboxToSocket(jwtUser.userId, ws);
   } else {
     authTimer = setTimeout(() => {
       if (!jwtUser) ws.close(4401, "auth_timeout");
@@ -474,6 +592,7 @@ wss.on("connection", (ws, req) => {
       }
       registerClient(u.userId, ws);
       ws.send(JSON.stringify({ type: "auth_ok" }));
+      flushMailboxToSocket(u.userId, ws);
       return;
     }
 
@@ -506,10 +625,26 @@ wss.on("connection", (ws, req) => {
       ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
     });
 
+    const RtcPayload = z.union([
+      z.object({ type: z.literal("offer"), sdp: z.string().min(1).max(256_000) }),
+      z.object({ type: z.literal("answer"), sdp: z.string().min(1).max(256_000) }),
+      z.object({
+        type: z.literal("candidate"),
+        candidate: z
+          .object({
+            candidate: z.string().max(16_384).optional(),
+            sdpMid: z.string().max(64).nullable().optional(),
+            sdpMLineIndex: z.number().int().min(0).max(64).nullable().optional(),
+            usernameFragment: z.string().max(256).nullable().optional(),
+          })
+          .passthrough(),
+      }),
+    ]);
+
     const Rtc = z.object({
       type: z.literal("rtc"),
       toUserId: z.string().uuid(),
-      payload: z.unknown(),
+      payload: RtcPayload,
     });
 
     const Ping = z.object({ type: z.literal("ping") });
@@ -600,6 +735,9 @@ wss.on("connection", (ws, req) => {
       envelope,
       createdAt,
     });
+    if (delivered === 0) {
+      enqueueMailboxDm({ toUserId, envelope, createdAt });
+    }
 
     ws.send(
       JSON.stringify({

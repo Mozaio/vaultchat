@@ -17,6 +17,7 @@ import { getSodium, sodiumReady } from "./sodium";
 
 const PIN_KEY = "vaultchat.codeHash.pin";
 const ENCRYPTED_PIN_KEY = "vaultchat.codeHash.encryptedPin";
+const SALT_KEY = "vaultchat.codeHash.salt";
 
 // Für die Verschlüsselung benötigen wir einen abgeleiteten Schlüssel
 // Dieser wird aus einem Kombinations-Hash von secretKey + passphrase erstellt
@@ -24,6 +25,26 @@ let _derivedVerificationKey: Uint8Array | null = null;
 
 // salt für die Ableitung (wird bei erstem Pinning generiert)
 let _verificationSalt: Uint8Array | null = null;
+
+function loadOrCreateVerificationSalt(): Uint8Array {
+  const sodium = getSodium();
+  try {
+    const stored = localStorage.getItem(SALT_KEY);
+    if (stored) {
+      const salt = uint8FromBase64(stored);
+      if (salt.length === 16) return salt;
+    }
+  } catch {
+    /* ignore */
+  }
+  const salt = sodium.randombytes_buf(16);
+  try {
+    localStorage.setItem(SALT_KEY, base64FromUint8(salt));
+  } catch {
+    /* ignore */
+  }
+  return salt;
+}
 
 async function sha384Hex(data: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-384", data);
@@ -65,8 +86,7 @@ export async function setVerificationKey(secretKey: Uint8Array): Promise<void> {
   await sodiumReady();
   const sodium = getSodium();
   
-  // Generiere eindeutigen Salt für diese Session
-  _verificationSalt = sodium.randombytes_buf(16);
+  _verificationSalt = loadOrCreateVerificationSalt();
   
   // Ableitung eines 32-Byte Verifikationsschlüssels
   _derivedVerificationKey = sodium.crypto_generichash(
@@ -164,8 +184,7 @@ export async function securePinCodeHash(hash: string): Promise<void> {
     if (_derivedVerificationKey) {
       const encrypted = await encryptHash(hash);
       localStorage.setItem(ENCRYPTED_PIN_KEY, encrypted);
-      // Auch unverschlüsselt setzen für Abwärtskompatibilität
-      localStorage.setItem(PIN_KEY, hash);
+      localStorage.removeItem(PIN_KEY);
     } else {
       // Fallback: unverschlüsselt
       pinCodeHash(hash);
@@ -199,6 +218,7 @@ export function clearPinnedCodeHash(): void {
   try {
     localStorage.removeItem(PIN_KEY);
     localStorage.removeItem(ENCRYPTED_PIN_KEY);
+    localStorage.removeItem(SALT_KEY);
   } catch {
     /* ignore */
   }

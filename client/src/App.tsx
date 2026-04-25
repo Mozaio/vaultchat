@@ -52,31 +52,34 @@ export function App() {
       );
   }, []);
 
-  useEffect(() => {
-    // Verwende enhanced Code-Integrity-Check wenn möglich
-    void checkCodeIntegrityEnhanced()
-      .then((enhancedCheck) => {
-        // Konvertiere zu altem Format für UI-Kompatibilität
-        const legacyCheck: CodeCheck = (() => {
-          switch (enhancedCheck.state) {
-            case "pinned_ok":
-              return { state: "pinned_ok", hash: enhancedCheck.hash };
-            case "pinned_mismatch":
-              return { state: "pinned_mismatch", hash: enhancedCheck.hash, pinned: enhancedCheck.pinned };
-            case "verification_key_missing":
-            case "unknown":
-              return { state: "unknown", hash: enhancedCheck.hash };
-          }
-        })();
-        setCodeCheck(legacyCheck);
-      })
-      .catch(() => {
-        // Fallback auf alten Check
-        return checkCodeIntegrity().then(setCodeCheck);
-      });
+  const unlocked = useMemo(() => session !== null, [session]);
+  const refreshCodeIntegrity = useCallback(async () => {
+    try {
+      const enhancedCheck = await checkCodeIntegrityEnhanced();
+      switch (enhancedCheck.state) {
+        case "pinned_ok":
+          setCodeCheck({ state: "pinned_ok", hash: enhancedCheck.hash });
+          return;
+        case "pinned_mismatch":
+          setCodeCheck({
+            state: "pinned_mismatch",
+            hash: enhancedCheck.hash,
+            pinned: enhancedCheck.pinned,
+          });
+          return;
+        case "verification_key_missing":
+        case "unknown":
+          setCodeCheck({ state: "unknown", hash: enhancedCheck.hash });
+          return;
+      }
+    } catch {
+      await checkCodeIntegrity().then(setCodeCheck);
+    }
   }, []);
 
-  const unlocked = useMemo(() => session !== null, [session]);
+  useEffect(() => {
+    void refreshCodeIntegrity();
+  }, [refreshCodeIntegrity]);
 
   const lock = useCallback(() => {
     if (session) {
@@ -137,10 +140,29 @@ export function App() {
   }
 
   const banner = codeCheck ? (
-    <CodeIntegrityBanner check={codeCheck} />
+    <CodeIntegrityBanner check={codeCheck} onPinned={refreshCodeIntegrity} />
   ) : null;
 
   if (!unlocked) {
+    if (codeCheck?.state === "pinned_mismatch") {
+      return (
+        <div className="flex min-h-full flex-col">
+          {banner}
+          <div className="flex flex-1 items-center justify-center p-6">
+            <div className="app-surface max-w-xl rounded-2xl p-5">
+              <p className="text-sm font-semibold text-red-200">
+                Entsperren blockiert: Der ausgelieferte App-Code stimmt nicht
+                mit dem gepinnten Hash überein.
+              </p>
+              <p className="mt-2 text-sm app-muted">
+                Vergleiche den aktuellen Hash mit einer unabhängigen Quelle.
+                Pinne nur neu, wenn du diesem Build bewusst vertraust.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-full flex-col">
         {banner}
@@ -161,6 +183,11 @@ export function App() {
                 
                 // Neue Sicherheits-Features initialisieren
                 await setVerificationKey(s.secretKey);
+                const postUnlockCheck = await checkCodeIntegrityEnhanced();
+                if (postUnlockCheck.state === "pinned_mismatch") {
+                  clearVerificationKey();
+                  throw new Error("code_integrity_mismatch");
+                }
                 registerKeyForProtection(s.secretKey);
                 startPeriodicWipe();
                 
@@ -267,7 +294,13 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-function CodeIntegrityBanner({ check }: { check: CodeCheck }) {
+function CodeIntegrityBanner({
+  check,
+  onPinned,
+}: {
+  check: CodeCheck;
+  onPinned: () => void | Promise<void>;
+}) {
   const [dismissed, setDismissed] = useState(false);
   if (dismissed) return null;
   if (check.state === "pinned_ok") {
@@ -299,6 +332,7 @@ function CodeIntegrityBanner({ check }: { check: CodeCheck }) {
             } catch {
               pinCodeHash(check.hash);
             }
+            await onPinned();
             setDismissed(true);
           }}
           className="ml-3 rounded border border-emerald-600 px-2 py-0.5 text-emerald-300 hover:bg-emerald-900/30"
@@ -325,6 +359,7 @@ function CodeIntegrityBanner({ check }: { check: CodeCheck }) {
             } catch {
               pinCodeHash(check.hash);
             }
+            await onPinned();
             setDismissed(true);
           }}
           className="rounded border border-amber-600 px-2 py-0.5 text-amber-200 hover:bg-amber-900/30"

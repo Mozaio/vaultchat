@@ -17,10 +17,7 @@ export async function loadRtcConfig(token: string): Promise<{
     const cfg = await getRtcConfig(token);
     cached = { iceServers: cfg.iceServers, forceRelay: cfg.forceRelay };
   } catch {
-    cached = {
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      forceRelay: false,
-    };
+    throw new Error("rtc_config_unavailable");
   }
   return cached;
 }
@@ -79,10 +76,12 @@ async function addIceCandidateSafely(
 
 async function flushPendingCandidates(
   pc: RTCPeerConnection,
-  pendingCandidates: RTCIceCandidateInit[]
+  pendingCandidates: RTCIceCandidateInit[],
+  relayOnly: boolean
 ) {
   const pending = pendingCandidates.splice(0);
   for (const candidate of pending) {
+    if (relayOnly && !isRelayCandidate(candidate)) continue;
     try {
       await pc.addIceCandidate(candidate);
     } catch (err) {
@@ -143,7 +142,7 @@ export async function startCall(
       try {
         if (payload.type === "answer") {
           await pc.setRemoteDescription({ type: "answer", sdp: payload.sdp });
-          await flushPendingCandidates(pc, pendingCandidates);
+          await flushPendingCandidates(pc, pendingCandidates, effectiveRelayOnly);
         } else if (payload.type === "candidate") {
           await addIceCandidateSafely(
             pc,
@@ -205,7 +204,7 @@ export async function acceptCall(
   };
   
   await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
-  await flushPendingCandidates(pc, pendingCandidates);
+  await flushPendingCandidates(pc, pendingCandidates, effectiveRelayOnly);
   
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "../lib/sessionHelpers";
 import * as api from "../lib/api";
 import { decryptIncomingSealedDm } from "../lib/incomingDm";
-import { drEncryptJson, ensureDrSession } from "../lib/drSession";
+import { drEncryptJsonForDm } from "../lib/drSession";
 import { getWsUrl } from "../lib/wsUrl";
 import {
   fingerprintFromPublicKeyB64,
@@ -42,9 +42,11 @@ import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import {
   generateKeyMaterial,
   loadKeyMaterial,
+  replenishOneTimePreKeys,
   saveKeyMaterial,
   toUploadBody,
 } from "../lib/keyStore";
+import { encryptIdentityBackup } from "../lib/backup";
 import { loadLocalIdentity } from "../lib/localIdentity";
 import {
   MessageBubble,
@@ -85,6 +87,7 @@ import {
 
 type Tab = "dm" | "group";
 type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
+type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
 
 type ReplyTarget = {
   cid: string;
@@ -177,6 +180,7 @@ export function ChatShell({
     sdp: string;
   } | null>(null);
   const [callRemote, setCallRemote] = useState<MediaStream | null>(null);
+  const [callStatus, setCallStatus] = useState<CallStatus>("idle");
   const [replyDm, setReplyDm] = useState<ReplyTarget>(null);
   // Contact add modal
   const [showAddContact, setShowAddContact] = useState(false);
@@ -209,6 +213,12 @@ export function ChatShell({
   const [dmMenuOpen, setDmMenuOpen] = useState(false);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [sendTypingIndicators, setSendTypingIndicators] = useState(
+    () => localStorage.getItem("vaultchat.privacy.typing") !== "off"
+  );
+  const [sendReadReceipts, setSendReadReceipts] = useState(
+    () => localStorage.getItem("vaultchat.privacy.receipts") !== "off"
+  );
 
   const callRef = useRef<{
     close: () => void;
@@ -223,6 +233,7 @@ export function ChatShell({
   const peerRef = useRef<api.ApiUser | null>(null);
   const groupRef = useRef<api.ApiGroup | null>(null);
   const usersRef = useRef<api.ApiUser[]>([]);
+  const groupsRef = useRef<api.ApiGroup[]>([]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seen = useRef(new Set<string>());
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
@@ -242,6 +253,7 @@ export function ChatShell({
   peerRef.current = peer;
   groupRef.current = group;
   usersRef.current = users;
+  groupsRef.current = groups;
   tokenRef.current = session.token;
 
   useShortcuts({
@@ -270,6 +282,30 @@ export function ChatShell({
     return () => mq.removeEventListener?.("change", apply);
   }, []);
 
+  useEffect(() => {
+    if (!incomingOffer) return;
+    const t = window.setTimeout(() => {
+      setIncomingOffer(null);
+      setCallStatus("ended");
+    }, 30_000);
+    return () => window.clearTimeout(t);
+  }, [incomingOffer]);
+
+  const maybeNotify = useCallback((title: string, body: string) => {
+    if (!("Notification" in window) || document.visibilityState === "visible") return;
+    if (Notification.permission === "granted") {
+      new Notification(title, { body, tag: "vaultchat-message" });
+      return;
+    }
+    if (Notification.permission === "default") {
+      void Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(title, { body, tag: "vaultchat-message" });
+        }
+      });
+    }
+  }, []);
+
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
   const showSidebar = !isMobile || !showConversation;
   const showInfo = !isMobile && showConversation && infoOpen;
@@ -279,7 +315,7 @@ export function ChatShell({
       const local = usersRef.current.find((u) => u.id === userId);
       if (local) return local;
       try {
-        const { users: list } = await api.listUsers(session.token);
+        const { users: list } = await api.listUsers(session.token, [userId]);
         // Only add to local list if we actually need this user (for decryption)
         // Don't replace the entire users list - this prevents showing ALL users
         const found = list.find((u) => u.id === userId);
@@ -301,7 +337,7 @@ export function ChatShell({
   // Don't load all users on start - only search on demand
   const searchUserByUsername = useCallback(async (username: string): Promise<api.ApiUser | null> => {
     try {
-      const { users: list } = await api.listUsers(session.token);
+      const { users: list } = await api.searchUsers(session.token, username);
       const found = list.find(
         (u) => u.username.toLowerCase() === username.toLowerCase() && u.id !== session.user.id
       );
@@ -319,7 +355,7 @@ export function ChatShell({
   const loadContacts = useCallback(async () => {
     // Only show contacts we've exchanged messages with (from local storage)
     const contactIds = Array.from(rawDmRef.current.keys());
-    const { users: list } = await api.listUsers(session.token);
+    const { users: list } = await api.listUsers(session.token, contactIds);
     const contacts = list.filter((u) => contactIds.includes(u.id));
     setUsers(contacts);
     
@@ -361,6 +397,11 @@ export function ChatShell({
         let km = await loadKeyMaterial();
         if (!km) {
           km = await generateKeyMaterial(session.secretKey);
+          await saveKeyMaterial(km);
+        }
+        const replenished = await replenishOneTimePreKeys(km);
+        if (replenished !== km) {
+          km = replenished;
           await saveKeyMaterial(km);
         }
         await api.uploadPreKeys(session.token, toUploadBody(km));
@@ -460,7 +501,6 @@ export function ChatShell({
     }
     seen.current = new Set();
     void (async () => {
-      await ensureDrSession(session.secretKey, peer.id, peer.publicKey);
       await loadDmLocal(peer);
       await metaSet(`seen:dm:${peer.id}`, String(Date.now())).catch(() => {});
       setUnreadByPeer((m) => ({ ...m, [peer.id]: 0 }));
@@ -558,17 +598,21 @@ export function ChatShell({
       payload: PlainPayload,
       suppressLocal = false
     ): Promise<string | null> => {
-      const inner = await drEncryptJson(
+      const encrypted = await drEncryptJsonForDm(
         session.secretKey,
         toUser.id,
         toUser.publicKey,
-        JSON.stringify(payload)
+        JSON.stringify(payload),
+        tokenRef.current
       );
       const envelope = await sealSender(
         session.user.id,
-        inner,
+        encrypted.innerB64,
         toUser.publicKey
       );
+      if (encrypted.mode === "legacy") {
+        setError("Legacy-DH-Fallback genutzt: Prekey-Bundle des Kontakts nicht verfügbar.");
+      }
       const cid = newCid();
 
       const at = Date.now();
@@ -677,10 +721,13 @@ export function ChatShell({
   }, [refreshPendingCount]);
 
   useEffect(() => {
-    const url = getWsUrl(session.token);
+    const url = getWsUrl();
     const ws = new WebSocket(url);
     wsRef.current = ws;
     ws.onopen = () => {
+      const activeWs = wsRef.current;
+      if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
+      activeWs.send(JSON.stringify({ type: "auth", token: tokenRef.current }));
       setConnected(true);
       void flushOutbox();
 
@@ -690,8 +737,8 @@ export function ChatShell({
         publicKey: u.publicKey,
       }));
       if (peerList.length > 0) {
-        coverRef.current = startCoverTraffic(ws, peerList, () => {
-          return ws.readyState === WebSocket.OPEN && session !== null;
+        coverRef.current = startCoverTraffic(activeWs, peerList, () => {
+          return activeWs.readyState === WebSocket.OPEN && session !== null;
         });
       }
     };
@@ -709,7 +756,7 @@ export function ChatShell({
       reconnectAttempts.current = attempts + 1;
       reconnectTimer.current = setTimeout(() => {
         // Force effect remount by creating a new WebSocket
-        const url = getWsUrl(tokenRef.current);
+        const url = getWsUrl();
         const newWs = new WebSocket(url);
         wsRef.current = newWs;
         newWs.onopen = ws.onopen;
@@ -748,6 +795,7 @@ export function ChatShell({
             const payload = data.payload as RtcPayload;
             if (payload.type === "offer" && u) {
               setIncomingOffer({ from: u, sdp: payload.sdp });
+              setCallStatus("ringing");
               return;
             }
             const activeCall = callRef.current;
@@ -759,9 +807,7 @@ export function ChatShell({
             }
             if (activeCall.handleRemote) {
               await activeCall.handleRemote(payload);
-            }
-            if (payload.type === "candidate" && activeCall.addIce) {
-              await activeCall.addIce(payload.candidate);
+              if (payload.type === "answer") setCallStatus("connecting");
             }
             return;
           }
@@ -791,9 +837,9 @@ export function ChatShell({
             );
             if (!dec) return;
             seen.current.add(id);
-            const peerUser = usersRef.current.find(
-              (u) => u.id === dec.senderUserId
-            );
+            const peerUser =
+              usersRef.current.find((u) => u.id === dec.senderUserId) ??
+              (await resolveUser(dec.senderUserId));
             if (!peerUser) return;
 
             const plain = dec.plain;
@@ -832,6 +878,9 @@ export function ChatShell({
             if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
             // Update unread (if chat not currently open).
             if (peerRef.current?.id !== peerUser.id) {
+              if (!mutedPeers.has(peerUser.id)) {
+                maybeNotify(peerUser.username, previewForPayload(plain));
+              }
               void (async () => {
                 const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
                   () => null
@@ -846,7 +895,7 @@ export function ChatShell({
               })();
             }
 
-            if (plain.kind !== "receipt" && plain.cid) {
+            if (sendReadReceipts && plain.kind !== "receipt" && plain.cid) {
               const receipt: PlainPayload = {
                 v: 2,
                 cid: newCid(),
@@ -892,6 +941,10 @@ export function ChatShell({
             });
             rawGroupRef.current.set(gid, arr);
             if (groupRef.current?.id === gid) rebuildGroup(gid);
+            if (groupRef.current?.id !== gid && !mutedGroups.has(gid)) {
+              const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? "Gruppe";
+              maybeNotify(groupName, previewForPayload(plain));
+            }
           }
         } catch {
           /* ignore malformed frames */
@@ -915,6 +968,10 @@ export function ChatShell({
     resolveUser,
     flushOutbox,
     refreshPendingCount,
+    mutedPeers,
+    mutedGroups,
+    maybeNotify,
+    sendReadReceipts,
   ]);
 
   async function sendDmText() {
@@ -1209,16 +1266,21 @@ export function ChatShell({
 
   async function beginCall() {
     if (!peer) return;
+    setCallStatus("connecting");
     try {
       const ctrl = await startCall(
         peer,
         tokenRef.current,
         relayOnly,
         sendRtc,
-        (s) => setCallRemote(s),
+        (s) => {
+          setCallRemote(s);
+          setCallStatus("connected");
+        },
         () => {
           setCallRemote(null);
           callRef.current = null;
+          setCallStatus("ended");
         }
       );
       callRef.current = ctrl;
@@ -1226,15 +1288,16 @@ export function ChatShell({
       pendingRtcRef.current.delete(peer.id);
       for (const payload of queued) {
         await ctrl.handleRemote?.(payload);
-        if (payload.type === "candidate") await ctrl.addIce?.(payload.candidate);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "call_failed");
+      setCallStatus("failed");
     }
   }
 
   async function acceptIncoming() {
     if (!incomingOffer) return;
+    setCallStatus("connecting");
     try {
       const ctrl = await acceptCall(
         incomingOffer.from,
@@ -1242,10 +1305,14 @@ export function ChatShell({
         tokenRef.current,
         relayOnly,
         sendRtc,
-        (s) => setCallRemote(s),
+        (s) => {
+          setCallRemote(s);
+          setCallStatus("connected");
+        },
         () => {
           setCallRemote(null);
           callRef.current = null;
+          setCallStatus("ended");
         }
       );
       callRef.current = ctrl;
@@ -1253,11 +1320,11 @@ export function ChatShell({
       pendingRtcRef.current.delete(incomingOffer.from.id);
       for (const payload of queued) {
         await ctrl.handleRemote?.(payload);
-        if (payload.type === "candidate") await ctrl.addIce?.(payload.candidate);
       }
       setIncomingOffer(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "call_failed");
+      setCallStatus("failed");
       setIncomingOffer(null);
     }
   }
@@ -1473,15 +1540,30 @@ export function ChatShell({
           relayOnly={relayOnly}
           onRelayOnlyChange={setRelayOnly}
           myFingerprint={myFp}
-          onExportBackup={() => {
+          sendTypingIndicators={sendTypingIndicators}
+          onSendTypingIndicatorsChange={(value) => {
+            setSendTypingIndicators(value);
+            localStorage.setItem("vaultchat.privacy.typing", value ? "on" : "off");
+          }}
+          sendReadReceipts={sendReadReceipts}
+          onSendReadReceiptsChange={(value) => {
+            setSendReadReceipts(value);
+            localStorage.setItem("vaultchat.privacy.receipts", value ? "on" : "off");
+          }}
+          onExportBackup={async () => {
             const local = loadLocalIdentity();
             if (!local) return;
-            const blob = new Blob([JSON.stringify(local, null, 2)], {
+            const passphrase = window.prompt(
+              "Passphrase für das verschlüsselte Backup eingeben"
+            );
+            if (!passphrase) return;
+            const backup = await encryptIdentityBackup(local, passphrase);
+            const blob = new Blob([JSON.stringify(backup, null, 2)], {
               type: "application/json",
             });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = `vaultchat-backup-${local.username}.json`;
+            a.download = `vaultchat-backup-${local.username}-encrypted.json`;
             a.click();
             URL.revokeObjectURL(a.href);
           }}
@@ -1502,7 +1584,9 @@ export function ChatShell({
               <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
               VaultChat
               </p>
-              <p className="text-xs app-muted">Secure Messenger</p>
+              <p className="text-xs app-muted">
+                {pendingCount > 0 ? `${pendingCount} ausstehend` : "Secure Messenger"}
+              </p>
             </div>
           </div>
           <div className="flex gap-1.5">
@@ -1720,7 +1804,10 @@ export function ChatShell({
               <button
                 type="button"
                 className="rounded-lg bg-zinc-700 px-3 py-1"
-                onClick={() => setIncomingOffer(null)}
+                onClick={() => {
+                  setIncomingOffer(null);
+                  setCallStatus("ended");
+                }}
               >
                 Ablehnen
               </button>
@@ -1728,17 +1815,34 @@ export function ChatShell({
           </div>
         )}
 
-        {callRemote && (
-          <div className="border-b border-zinc-800 bg-black/40 p-2">
-            <p className="text-xs text-zinc-400">Remote-Video</p>
-            <video
-              className="max-h-48 w-full rounded-lg"
-              autoPlay
-              playsInline
-              ref={(el) => {
-                if (el) el.srcObject = callRemote;
-              }}
-            />
+        {callStatus !== "idle" && callStatus !== "ended" && (
+          <div className="flex items-center justify-between border-b p-2 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
+            <p>
+              Anruf: {callStatus === "ringing" ? "eingehend" : callStatus === "connecting" ? "verbinde..." : callStatus === "connected" ? "verbunden" : "fehlgeschlagen"}
+              {relayOnly ? " · Relay geschützt" : ""}
+            </p>
+            {callRef.current && (
+              <button
+                type="button"
+                className="btn btn-danger !px-2 !py-1 !text-xs"
+                onClick={() => {
+                  callRef.current?.close();
+                  callRef.current = null;
+                  setCallRemote(null);
+                  setCallStatus("ended");
+                }}
+              >
+                Auflegen
+              </button>
+            )}
+            {callRemote && (
+              <audio
+                autoPlay
+                ref={(el) => {
+                  if (el) el.srcObject = callRemote;
+                }}
+              />
+            )}
           </div>
         )}
 
@@ -2050,7 +2154,12 @@ export function ChatShell({
                     setText(e.target.value);
                     resizeTextarea(e.currentTarget);
                     const ws = wsRef.current;
-                    if (ws && ws.readyState === WebSocket.OPEN && peer) {
+                    if (
+                      sendTypingIndicators &&
+                      ws &&
+                      ws.readyState === WebSocket.OPEN &&
+                      peer
+                    ) {
                       ws.send(
                         JSON.stringify({
                           type: "typing",

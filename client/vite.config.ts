@@ -30,7 +30,7 @@ export default defineConfig({
     },
   },
   build: {
-    sourcemap: true,
+    sourcemap: false,
     commonjsOptions: {
       // CJS default export === module.exports (libsodium mutiert dieses Objekt nach ready()).
       defaultIsModuleExports: true,

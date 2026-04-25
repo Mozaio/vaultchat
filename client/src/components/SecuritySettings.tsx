@@ -50,6 +50,10 @@ interface SecuritySettingsProps {
   onRelayOnlyChange?: (value: boolean) => void;
   myFingerprint?: string | null;
   onExportBackup?: () => void;
+  sendTypingIndicators?: boolean;
+  onSendTypingIndicatorsChange?: (value: boolean) => void;
+  sendReadReceipts?: boolean;
+  onSendReadReceiptsChange?: (value: boolean) => void;
 }
 
 /**
@@ -62,6 +66,10 @@ export function SecuritySettings({
   onRelayOnlyChange,
   myFingerprint,
   onExportBackup,
+  sendTypingIndicators = true,
+  onSendTypingIndicatorsChange,
+  sendReadReceipts = true,
+  onSendReadReceiptsChange,
 }: SecuritySettingsProps) {
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [replayStats, setReplayStats] = useState(getReplayStats());
@@ -132,6 +140,34 @@ export function SecuritySettings({
               </span>
             </span>
           </label>
+          <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <input
+              type="checkbox"
+              checked={sendTypingIndicators}
+              onChange={(e) => onSendTypingIndicatorsChange?.(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Tippstatus senden
+              <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
+                Optionales Metadatum. Deaktivieren reduziert sichtbare Aktivitätsmuster.
+              </span>
+            </span>
+          </label>
+          <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <input
+              type="checkbox"
+              checked={sendReadReceipts}
+              onChange={(e) => onSendReadReceiptsChange?.(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Lese-/Zustellbestätigungen senden
+              <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
+                Bleibt Ende-zu-Ende verschlüsselt, verrät Kontakten aber Aktivität.
+              </span>
+            </span>
+          </label>
         </div>
 
         <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
@@ -153,7 +189,7 @@ export function SecuritySettings({
               border: "1px solid var(--border)",
             }}
           >
-            Backup (JSON) herunterladen
+            Verschlüsseltes Backup herunterladen
           </button>
         </div>
 

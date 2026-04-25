@@ -1,7 +1,12 @@
 type PreKeyBundle = {
   userId: string;
   identityKey: string;
-  signedPreKey: { keyId: number; publicKey: string; signature: string };
+  signedPreKey: {
+    keyId: number;
+    publicKey: string;
+    signature: string;
+    signingPublicKey?: string;
+  };
   oneTimePreKeys: Map<number, string>;
   nextKeyId: number;
 };
@@ -12,7 +17,8 @@ export function initPreKeyBundle(
   userId: string,
   identityKey: string,
   signedPreKeyPublic: string,
-  signedPreKeySignature: string
+  signedPreKeySignature: string,
+  signingPublicKey?: string
 ): void {
   bundles.set(userId, {
     userId,
@@ -21,6 +27,7 @@ export function initPreKeyBundle(
       keyId: 1,
       publicKey: signedPreKeyPublic,
       signature: signedPreKeySignature,
+      ...(signingPublicKey ? { signingPublicKey } : {}),
     },
     oneTimePreKeys: new Map(),
     nextKeyId: 1,
@@ -39,7 +46,13 @@ export function uploadOneTimePreKeys(
 
 export function getPreKeyBundle(userId: string): {
   identityKey: string;
-  signedPreKey: { keyId: number; publicKey: string; signature: string };
+  signedPreKey: {
+    keyId: number;
+    publicKey: string;
+    signature: string;
+    signingPublicKey?: string;
+  };
+  remainingPreKeys: number;
   oneTimePreKey: { keyId: number; publicKey: string } | null;
 } | null {
   const b = bundles.get(userId);
@@ -50,7 +63,12 @@ export function getPreKeyBundle(userId: string): {
     b.oneTimePreKeys.delete(keyId);
     break;
   }
-  return { identityKey: b.identityKey, signedPreKey: b.signedPreKey, oneTimePreKey: otp };
+  return {
+    identityKey: b.identityKey,
+    signedPreKey: b.signedPreKey,
+    remainingPreKeys: b.oneTimePreKeys.size,
+    oneTimePreKey: otp,
+  };
 }
 
 export function getRemainingPreKeyCount(userId: string): number {
