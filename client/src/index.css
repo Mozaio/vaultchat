@@ -1976,55 +1976,330 @@ body,
 }
 
 /* ============================================================
-   SCROLLBAR
+   RESPONSIVE BREAKPOINTS
    ============================================================ */
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(113, 113, 122, 0.4) transparent;
+/* Mobile: max-width: 768px */
+/* Tablet: 769px - 1024px */
+/* Desktop: > 1024px */
+
+/* ============================================================
+   MOBILE SIDEBAR (Slide-Over)
+   ============================================================ */
+
+.sidebar {
+  position: relative;
+  z-index: 50;
+  transition: transform 0.25s ease;
+  width: 300px;
+  flex-shrink: 0;
 }
 
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 49;
+  backdrop-filter: blur(2px);
 }
 
-*::-webkit-scrollbar-track {
-  background: transparent;
+.sidebar-backdrop.open {
+  display: block;
 }
 
-*::-webkit-scrollbar-thumb {
-  background: rgba(113, 113, 122, 0.35);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(113, 113, 122, 0.55);
-}
-
-/* Dark mode scrollbar adjustment */
-:root.dark * {
-  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
-}
-
-:root.dark *::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
-}
-
-:root.dark *::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.4);
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    inset: 0;
+    transform: translateX(-100%);
+    width: 85vw;
+    max-width: 320px;
+    height: 100dvh;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 49;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  
+  .sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  /* Landscape mobile */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .sidebar {
+      width: 240px;
+    }
+  }
 }
 
 /* ============================================================
-   RESPONSIVE
+   BOTTOM NAVIGATION (Mobile only)
+   ============================================================ */
+
+.bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bg-sidebar);
+  border-top: 1px solid var(--border);
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 100;
+}
+
+.bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  border-radius: var(--radius);
+}
+
+.bottom-nav-item:hover {
+  color: var(--text);
+}
+
+.bottom-nav-item.active {
+  color: var(--accent);
+}
+
+.bottom-nav-label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.bottom-nav-indicator {
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+  }
+  
+  /* Adjust chat area for bottom nav */
+  .chat-wrapper {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ============================================================
+   TOUCH TARGETS (min 44x44px)
+   ============================================================ */
+
+/* All interactive elements should be at least 44x44px */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.icon-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+}
+
+/* Icon buttons with proper touch targets */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.icon-btn.accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.icon-btn.accent:hover {
+  background: var(--accent);
+  color: white;
+}
+
+/* ============================================================
+   INPUT AREA MOBILE
+   ============================================================ */
+
+.chat-input-area {
+  padding: 0.5rem 1rem;
+  background: var(--bg-sidebar);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.chat-input-textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 10px 14px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text);
+  font-size: 0.9375rem;
+  resize: none;
+  overflow-y: auto;
+  transition: all 0.2s ease;
+  line-height: 1.4;
+}
+
+.chat-input-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.chat-input-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .chat-input-area {
+    position: fixed;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    padding: 0.5rem 0.75rem;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border);
+    z-index: 40;
+  }
+  
+  .messages-container {
+    padding-bottom: calc(6rem + 56px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Landscape mobile - compact layout */
+@media (max-width: 768px) and (orientation: landscape) {
+  .bottom-nav {
+    display: none !important;
+  }
+  
+  .chat-input-area {
+    position: relative;
+    bottom: auto;
+  }
+  
+  .messages-container {
+    padding-bottom: 6rem;
+  }
+}
+
+/* ============================================================
+   RESPONSIVE TYPOGRAPHY & SPACING
    ============================================================ */
 
 @media (max-width: 768px) {
   .landing-hero {
     padding: 1.5rem;
   }
+  .landing-title {
+    font-size: 2rem;
+  }
+  .auth-card {
+    margin: 1rem;
+    padding: 1.5rem;
+    border-radius: var(--radius-lg);
+  }
+  
+  /* Message bubbles on mobile */
+  .message-bubble {
+    max-width: 85%;
+    padding: 8px 12px;
+    font-size: 0.875rem;
+  }
+  
+  /* Contact items */
+  .contact-item {
+    padding: 0.5rem;
+    min-height: 60px;
+  }
+  
+  /* Chat header */
+  .chat-header {
+    padding: 0.5rem 0.75rem;
+    min-height: 3rem;
+  }
+}
+
+/* ============================================================
+   FOCUS STYLES (Accessibility)
+   ============================================================ */
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Remove default focus for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
   .landing-title {
     font-size: 2rem;
   }
