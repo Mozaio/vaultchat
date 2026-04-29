@@ -8,7 +8,17 @@ type MailboxDm = {
   expiresAt: number;
 };
 
+type MailboxGroup = {
+  id: string;
+  toUserId: string;
+  groupId: string;
+  ciphertext: string;
+  createdAt: number;
+  expiresAt: number;
+};
+
 const dmByRecipient = new Map<string, MailboxDm[]>();
+const groupByRecipient = new Map<string, MailboxGroup[]>();
 
 const DEFAULT_TTL_MS = Number(process.env.VAULTCHAT_MAILBOX_TTL_MS ?? 7 * 24 * 60 * 60 * 1000);
 const MAX_PER_RECIPIENT = Number(process.env.VAULTCHAT_MAILBOX_MAX_PER_USER ?? 500);
@@ -42,14 +52,49 @@ export function popMailboxDms(userId: string): MailboxDm[] {
   return list.filter((x) => x.expiresAt > now);
 }
 
+export function enqueueMailboxGroup(input: {
+  toUserId: string;
+  groupId: string;
+  ciphertext: string;
+  id?: string;
+  createdAt?: number;
+}): MailboxGroup {
+  const createdAt = input.createdAt ?? Date.now();
+  const item: MailboxGroup = {
+    id: input.id ?? randomUUID(),
+    toUserId: input.toUserId,
+    groupId: input.groupId,
+    ciphertext: input.ciphertext,
+    createdAt,
+    expiresAt: createdAt + DEFAULT_TTL_MS,
+  };
+  const list = (groupByRecipient.get(input.toUserId) ?? []).filter(
+    (x) => x.expiresAt > Date.now()
+  );
+  list.push(item);
+  while (list.length > MAX_PER_RECIPIENT) list.shift();
+  groupByRecipient.set(input.toUserId, list);
+  return item;
+}
+
+export function popMailboxGroups(userId: string): MailboxGroup[] {
+  const now = Date.now();
+  const list = groupByRecipient.get(userId) ?? [];
+  groupByRecipient.delete(userId);
+  return list.filter((x) => x.expiresAt > now);
+}
+
 export function getMailboxStats() {
   const now = Date.now();
   let queued = 0;
   for (const list of dmByRecipient.values()) {
     queued += list.filter((item) => item.expiresAt > now).length;
   }
+  for (const list of groupByRecipient.values()) {
+    queued += list.filter((item) => item.expiresAt > now).length;
+  }
   return {
-    recipients: dmByRecipient.size,
+    recipients: new Set([...dmByRecipient.keys(), ...groupByRecipient.keys()]).size,
     queued,
     ttlMs: DEFAULT_TTL_MS,
     maxPerRecipient: MAX_PER_RECIPIENT,

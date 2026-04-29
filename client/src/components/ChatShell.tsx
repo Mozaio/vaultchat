@@ -91,6 +91,13 @@ type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
 const EMOJI_CHOICES = ["😀", "😂", "😍", "👍", "🔥", "🎉", "😮", "😢", "🙏", "✅"];
 
+type PendingGroupFrame = {
+  id: string;
+  groupId: string;
+  ciphertext: string;
+  createdAt: number;
+};
+
 type SharedMediaItem = {
   id: string;
   kind: "file" | "voice";
@@ -291,6 +298,7 @@ export function ChatShell({
   const groupsRef = useRef<api.ApiGroup[]>([]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seen = useRef(new Set<string>());
+  const pendingGroupFramesRef = useRef<PendingGroupFrame[]>([]);
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
   const dmInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -782,6 +790,70 @@ export function ChatShell({
     [rebuildGroup, session.user.id]
   );
 
+  const handleIncomingGroupFrame = useCallback(
+    async (frame: PendingGroupFrame, allowQueue = true) => {
+      if (seen.current.has(frame.id)) return true;
+      let plain: PlainPayload;
+      try {
+        plain = await decryptGroupPayload(frame.groupId, frame.ciphertext);
+      } catch {
+        if (allowQueue) {
+          pendingGroupFramesRef.current = [
+            ...pendingGroupFramesRef.current.filter((x) => x.id !== frame.id),
+            frame,
+          ].slice(-100);
+        }
+        return false;
+      }
+      seen.current.add(frame.id);
+      const fromUserId = plain.senderUserId ?? "";
+      const ttl = plain.ttlMs ?? 0;
+      await idbPutGroupMsg({
+        id: frame.id,
+        groupId: frame.groupId,
+        fromUserId,
+        plainJson: JSON.stringify(plain),
+        at: frame.createdAt,
+        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
+      });
+      const arr = rawGroupRef.current.get(frame.groupId) ?? [];
+      arr.push({
+        id: frame.id,
+        fromMe: fromUserId === session.user.id,
+        fromUserId,
+        plainJson: JSON.stringify(plain),
+        at: frame.createdAt,
+        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
+      });
+      rawGroupRef.current.set(frame.groupId, arr);
+      if (groupRef.current?.id === frame.groupId) rebuildGroup(frame.groupId);
+      if (groupRef.current?.id !== frame.groupId && !mutedGroups.has(frame.groupId)) {
+        const groupName = groupsRef.current.find((x) => x.id === frame.groupId)?.name ?? "Gruppe";
+        maybeNotify(groupName, previewForPayload(plain));
+      }
+      return true;
+    },
+    [maybeNotify, mutedGroups, rebuildGroup, session.user.id]
+  );
+
+  const retryPendingGroupFrames = useCallback(
+    async (groupId?: string) => {
+      const pending = pendingGroupFramesRef.current;
+      if (pending.length === 0) return;
+      const stillPending: PendingGroupFrame[] = [];
+      for (const frame of pending) {
+        if (groupId && frame.groupId !== groupId) {
+          stillPending.push(frame);
+          continue;
+        }
+        const handled = await handleIncomingGroupFrame(frame, false);
+        if (!handled && !seen.current.has(frame.id)) stillPending.push(frame);
+      }
+      pendingGroupFramesRef.current = stillPending;
+    },
+    [handleIncomingGroupFrame]
+  );
+
   /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
   const flushOutbox = useCallback(async () => {
     const ws = wsRef.current;
@@ -965,6 +1037,7 @@ export function ChatShell({
                 );
               }
               await loadGroups();
+              await retryPendingGroupFrames(plain.groupId);
               return;
             }
 
@@ -1019,43 +1092,12 @@ export function ChatShell({
             }
           }
           if (data.type === "group" && typeof data.id === "string") {
-            const id = String(data.id);
-            const gid = String(data.groupId);
-            if (seen.current.has(id)) return;
-            const ct = String(data.ciphertext);
-            let plain: PlainPayload;
-            try {
-              plain = await decryptGroupPayload(gid, ct);
-            } catch {
-              return;
-            }
-            seen.current.add(id);
-            const fromUserId = plain.senderUserId ?? "";
-            const at = Number(data.createdAt);
-            const ttl = plain.ttlMs ?? 0;
-            await idbPutGroupMsg({
-              id,
-              groupId: gid,
-              fromUserId,
-              plainJson: JSON.stringify(plain),
-              at,
-              ...(ttl ? { expiresAt: at + ttl } : {}),
+            await handleIncomingGroupFrame({
+              id: String(data.id),
+              groupId: String(data.groupId),
+              ciphertext: String(data.ciphertext),
+              createdAt: Number(data.createdAt ?? Date.now()),
             });
-            const arr = rawGroupRef.current.get(gid) ?? [];
-            arr.push({
-              id,
-              fromMe: fromUserId === session.user.id,
-              fromUserId,
-              plainJson: JSON.stringify(plain),
-              at,
-              ...(ttl ? { expiresAt: at + ttl } : {}),
-            });
-            rawGroupRef.current.set(gid, arr);
-            if (groupRef.current?.id === gid) rebuildGroup(gid);
-            if (groupRef.current?.id !== gid && !mutedGroups.has(gid)) {
-              const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? "Gruppe";
-              maybeNotify(groupName, previewForPayload(plain));
-            }
           }
         } catch {
           /* ignore malformed frames */
@@ -1083,6 +1125,8 @@ export function ChatShell({
     session,
     loadGroups,
     sendDmWire,
+    handleIncomingGroupFrame,
+    retryPendingGroupFrames,
     rebuildDm,
     rebuildGroup,
     resolveUser,

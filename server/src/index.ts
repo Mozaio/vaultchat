@@ -21,7 +21,13 @@ import {
 } from "./memoryStore.js";
 import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
 import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
-import { enqueueMailboxDm, getMailboxStats, popMailboxDms } from "./mailboxStore.js";
+import {
+  enqueueMailboxDm,
+  enqueueMailboxGroup,
+  getMailboxStats,
+  popMailboxDms,
+  popMailboxGroups,
+} from "./mailboxStore.js";
 import {
   getPreKeyBundle,
   getPreKeyStats,
@@ -600,6 +606,20 @@ function flushMailboxToSocket(userId: string, ws: WebSocket) {
       })
     );
   }
+  const pendingGroups = popMailboxGroups(userId);
+  for (const item of pendingGroups) {
+    if (ws.readyState !== ws.OPEN) break;
+    ws.send(
+      JSON.stringify({
+        type: "group",
+        id: item.id,
+        groupId: item.groupId,
+        ciphertext: item.ciphertext,
+        createdAt: item.createdAt,
+        mailbox: true,
+      })
+    );
+  }
 }
 
 /**
@@ -774,13 +794,23 @@ wss.on("connection", (ws, req) => {
       let delivered = 0;
       for (const mid of g.memberIds) {
         if (mid === jwtUser!.userId) continue;
-        const n = sendToUser(mid, {
+        const frame = {
           type: "group",
           id,
           groupId: g.id,
           ciphertext: parsed.data.ciphertext,
           createdAt,
-        });
+        };
+        const n = sendToUser(mid, frame);
+        if (n === 0) {
+          enqueueMailboxGroup({
+            id,
+            toUserId: mid,
+            groupId: g.id,
+            ciphertext: parsed.data.ciphertext,
+            createdAt,
+          });
+        }
         if (n > 0) delivered++;
       }
       ws.send(

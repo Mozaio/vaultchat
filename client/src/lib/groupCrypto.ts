@@ -371,10 +371,29 @@ export async function decryptGroupPayload(
       await setGroupKeyState(groupId, state);
     }
     
-    // Verwende decryptGroupMessage mit dem korrekten senderId
-    // (Die Funktion parst das Wire-Format erneut, das ist ein Overhead aber sicher)
-    return decryptGroupMessage(groupId, senderId, new Uint8Array(0), b64)
-      .then(r => r.plaintext);
+    try {
+      const result = await decryptGroupMessage(groupId, senderId, new Uint8Array(0), b64);
+      return result.plaintext;
+    } catch (err) {
+      const legacyKey = await getGroupKey(groupId);
+      if (!legacyKey) throw err;
+      const repaired: GroupKeyState = {
+        groupId,
+        rootKey: base64FromUint8(legacyKey),
+        senderStates: {
+          [senderId]: {
+            senderKey: base64FromUint8(legacyKey),
+            chainCounter: 0,
+            ephemeralPub: "",
+            ephemeralPriv: "",
+          },
+        },
+        memberPublicKeys: state.memberPublicKeys ?? {},
+      };
+      await setGroupKeyState(groupId, repaired);
+      const retried = await decryptGroupMessage(groupId, senderId, new Uint8Array(0), b64);
+      return retried.plaintext;
+    }
   }
   
   // Legacy format
