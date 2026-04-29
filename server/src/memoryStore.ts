@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
+import {
+  loadPersistedGroups,
+  loadPersistedUsers,
+  persistUsersAndGroups,
+} from "./serverState.js";
 
-/** Volatile in-memory directory. Keine Persistenz — Neustart = leer. */
+/** User/group directory. RAM-only unless VAULTCHAT_STATE_FILE is configured. */
 
 export type StoredUser = {
   id: string;
@@ -17,9 +22,19 @@ export type StoredGroup = {
   createdAt: number;
 };
 
-const users = new Map<string, StoredUser>();
-const usersByName = new Map<string, string>();
-const groups = new Map<string, StoredGroup>();
+const users = new Map<string, StoredUser>(
+  loadPersistedUsers().map((user) => [user.id, user])
+);
+const usersByName = new Map<string, string>(
+  [...users.values()].map((user) => [user.username.toLowerCase(), user.id])
+);
+const groups = new Map<string, StoredGroup>(
+  loadPersistedGroups().map((group) => [group.id, group])
+);
+
+function persistDirectory() {
+  persistUsersAndGroups([...users.values()], [...groups.values()]);
+}
 
 export function findUserByUsername(username: string) {
   const id = usersByName.get(username.toLowerCase());
@@ -45,6 +60,7 @@ export function createUser(input: {
   };
   users.set(user.id, user);
   usersByName.set(user.username.toLowerCase(), user.id);
+  persistDirectory();
   return user;
 }
 
@@ -55,6 +71,13 @@ export function listUsersSafe() {
     publicKey: u.publicKey,
     createdAt: u.createdAt,
   }));
+}
+
+export function getDirectoryStats() {
+  return {
+    users: users.size,
+    groups: groups.size,
+  };
 }
 
 export function createGroup(input: {
@@ -68,6 +91,7 @@ export function createGroup(input: {
     createdAt: Date.now(),
   };
   groups.set(g.id, g);
+  persistDirectory();
   return g;
 }
 
@@ -85,6 +109,7 @@ export function addGroupMember(groupId: string, actorId: string, memberId: strin
   if (!g.memberIds.includes(actorId)) return null;
   if (!users.get(memberId)) return null;
   if (!g.memberIds.includes(memberId)) g.memberIds.push(memberId);
+  persistDirectory();
   return g;
 }
 
@@ -99,8 +124,10 @@ export function removeGroupMember(
   g.memberIds = g.memberIds.filter((id) => id !== memberId);
   if (g.memberIds.length === 0) {
     groups.delete(groupId);
+    persistDirectory();
     return { id: groupId, name: g.name, memberIds: [], createdAt: g.createdAt };
   }
+  persistDirectory();
   return g;
 }
 

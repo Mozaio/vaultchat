@@ -9,16 +9,21 @@
 import { useState, useEffect } from "react";
 import {
   startPeriodicWipe,
-  stopPeriodicWipe,
   immediateWipe,
-  registerKeyForProtection,
-  unregisterKeyForProtection,
   setSecurityMode,
 } from "../lib/exfilProtection";
 import {
   resetAllReplayProtection,
   getReplayStats,
 } from "../lib/replayProtection";
+import type { ServerStatus } from "../lib/api";
+import {
+  IconAlertTriangle,
+  IconCheck,
+  IconLock,
+  IconRefreshCw,
+  IconShieldCheck,
+} from "./Icons";
 
 export type SecurityLevel = "normal" | "extreme";
 
@@ -49,11 +54,19 @@ interface SecuritySettingsProps {
   relayOnly?: boolean;
   onRelayOnlyChange?: (value: boolean) => void;
   myFingerprint?: string | null;
+  serverStatus?: ServerStatus | null;
+  serverStatusError?: string | null;
   onExportBackup?: () => void;
   sendTypingIndicators?: boolean;
   onSendTypingIndicatorsChange?: (value: boolean) => void;
   sendReadReceipts?: boolean;
   onSendReadReceiptsChange?: (value: boolean) => void;
+  notificationEnabled?: boolean;
+  onNotificationEnabledChange?: (value: boolean) => void;
+  notificationPreview?: boolean;
+  onNotificationPreviewChange?: (value: boolean) => void;
+  notificationPermission?: NotificationPermission | "unsupported";
+  onRequestNotificationPermission?: () => void | Promise<void>;
 }
 
 /**
@@ -65,11 +78,19 @@ export function SecuritySettings({
   relayOnly = false,
   onRelayOnlyChange,
   myFingerprint,
+  serverStatus,
+  serverStatusError,
   onExportBackup,
-  sendTypingIndicators = true,
+  sendTypingIndicators = false,
   onSendTypingIndicatorsChange,
-  sendReadReceipts = true,
+  sendReadReceipts = false,
   onSendReadReceiptsChange,
+  notificationEnabled = false,
+  onNotificationEnabledChange,
+  notificationPreview = false,
+  onNotificationPreviewChange,
+  notificationPermission = "default",
+  onRequestNotificationPermission,
 }: SecuritySettingsProps) {
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [replayStats, setReplayStats] = useState(getReplayStats());
@@ -91,8 +112,8 @@ export function SecuritySettings({
       // Extreme Mode: Start aggressive wiping
       startPeriodicWipe();
     } else {
-      // Normal Mode: Reduced wiping
-      stopPeriodicWipe();
+      // Normal Mode: keep wiping enabled, only with less aggressive intervals.
+      startPeriodicWipe();
     }
   };
 
@@ -105,12 +126,22 @@ export function SecuritySettings({
     setReplayStats(getReplayStats());
   };
 
+  const productionReady =
+    serverStatus?.profile === "production" &&
+    serverStatus.state.mode === "persistent" &&
+    serverStatus.state.writable &&
+    serverStatus.registration.mode !== "open" &&
+    serverStatus.privacy.sealedDmMailbox &&
+    !serverStatus.privacy.messageContentPersistentOnServer &&
+    !serverStatus.privacy.urlTokenAuthEnabled;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="app-surface rounded-2xl p-6 max-w-md w-full">
+      <div className="app-surface max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-            🔒 Sicherheitseinstellungen
+          <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: "var(--text)" }}>
+            <IconLock size={18} />
+            Sicherheitseinstellungen
           </h2>
           <button
             type="button"
@@ -118,8 +149,69 @@ export function SecuritySettings({
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             style={{ color: "var(--text-muted)" }}
           >
-            ✕
+            x
           </button>
+        </div>
+
+        <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                Produktstatus
+              </h3>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                Server- und Datenschutz-Gates fuer den produktiven Betrieb.
+              </p>
+            </div>
+            {serverStatus ? (
+              <span
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
+                style={{
+                  background: productionReady ? "var(--accent-soft)" : "rgba(245, 158, 11, 0.12)",
+                  color: productionReady ? "var(--accent)" : "#f59e0b",
+                }}
+              >
+                {productionReady ? <IconShieldCheck size={14} /> : <IconAlertTriangle size={14} />}
+                {productionReady ? "Produktionsbereit" : "Haertung offen"}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                <IconRefreshCw size={14} />
+                Pruefe
+              </span>
+            )}
+          </div>
+          {serverStatus ? (
+            <div className="space-y-2">
+              <StatusRow ok={serverStatus.profile === "production"} label="Profil" value={serverStatus.profile} />
+              <StatusRow
+                ok={serverStatus.state.mode === "persistent" && serverStatus.state.writable}
+                label="Server-State"
+                value={serverStatus.state.mode === "persistent" ? "persistent" : "fluechtig"}
+              />
+              <StatusRow
+                ok={serverStatus.registration.mode !== "open"}
+                label="Registrierung"
+                value={serverStatus.registration.mode}
+              />
+              <StatusRow
+                ok={!serverStatus.privacy.urlTokenAuthEnabled}
+                label="WebSocket-Token"
+                value={serverStatus.privacy.urlTokenAuthEnabled ? "URL erlaubt" : "nur Auth-Frame"}
+              />
+              <StatusRow
+                ok={!serverStatus.privacy.messageContentPersistentOnServer}
+                label="Server-Nachrichteninhalt"
+                value={serverStatus.privacy.messageContentPersistentOnServer ? "persistiert" : "nicht persistiert"}
+              />
+            </div>
+          ) : (
+            <p className="text-xs" style={{ color: serverStatusError ? "#fca5a5" : "var(--text-muted)" }}>
+              {serverStatusError
+                ? `Status nicht verfuegbar: ${serverStatusError}`
+                : "Status wird geladen."}
+            </p>
+          )}
         </div>
 
         <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
@@ -168,6 +260,52 @@ export function SecuritySettings({
               </span>
             </span>
           </label>
+          <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+            <div className="flex items-start justify-between gap-3">
+              <label className="flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+                <input
+                  type="checkbox"
+                  checked={notificationEnabled}
+                  onChange={(e) => onNotificationEnabledChange?.(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  Systembenachrichtigungen
+                  <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
+                    Fragt Berechtigung nur nach Klick an. Ohne Vorschau bleibt der Inhalt privat.
+                  </span>
+                </span>
+              </label>
+              {notificationPermission !== "granted" && notificationPermission !== "unsupported" && (
+                <button
+                  type="button"
+                  onClick={() => void onRequestNotificationPermission?.()}
+                  className="rounded-lg px-2 py-1 text-xs font-medium"
+                  style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                >
+                  Erlauben
+                </button>
+              )}
+            </div>
+            <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+              <input
+                type="checkbox"
+                checked={notificationPreview}
+                disabled={!notificationEnabled}
+                onChange={(e) => onNotificationPreviewChange?.(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                Vorschau in Benachrichtigungen anzeigen
+                <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
+                  Komfort gegen Privatsphaere: Titel und Nachrichtentext koennen im OS sichtbar werden.
+                </span>
+              </span>
+            </label>
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
+              Browser-Status: {notificationPermission}
+            </p>
+          </div>
         </div>
 
         <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
@@ -219,7 +357,7 @@ export function SecuritySettings({
                   : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
               }`}
             >
-              🔥 Extrem
+              Extrem
             </button>
           </div>
         </div>
@@ -250,7 +388,7 @@ export function SecuritySettings({
               color: "var(--text-secondary)" 
             }}
           >
-            🧹 Jetzt Memory wischen
+            Jetzt Memory wischen
           </button>
           
           <button
@@ -262,7 +400,7 @@ export function SecuritySettings({
               color: "var(--text-secondary)" 
             }}
           >
-            🔄 Replay-Schutz zurücksetzen
+            Replay-Schutz zuruecksetzen
           </button>
         </div>
 
@@ -284,12 +422,36 @@ export function SecuritySettings({
             border: "1px solid rgba(127, 29, 29, 0.5)" 
           }}>
             <p className="text-xs" style={{ color: "#fca5a5" }}>
-              ⚠️ <strong>Extrem-Modus</strong> kann die Performance beeinträchtigen,
+              <strong>Extrem-Modus</strong> kann die Performance beeinträchtigen,
               da der Speicher häufiger gewiped wird.
             </p>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: string }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-xs"
+      style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+    >
+      <span className="inline-flex min-w-0 items-center gap-2" style={{ color: "var(--text-secondary)" }}>
+        {ok ? (
+          <IconCheck size={14} style={{ color: "var(--accent)", flexShrink: 0 }} />
+        ) : (
+          <IconAlertTriangle size={14} style={{ color: "#f59e0b", flexShrink: 0 }} />
+        )}
+        <span className="truncate">{label}</span>
+      </span>
+      <span
+        className="max-w-[45%] truncate font-mono"
+        style={{ color: ok ? "var(--accent)" : "#f59e0b" }}
+      >
+        {value}
+      </span>
     </div>
   );
 }

@@ -41,3 +41,17 @@ export function popMailboxDms(userId: string): MailboxDm[] {
   dmByRecipient.delete(userId);
   return list.filter((x) => x.expiresAt > now);
 }
+
+export function getMailboxStats() {
+  const now = Date.now();
+  let queued = 0;
+  for (const list of dmByRecipient.values()) {
+    queued += list.filter((item) => item.expiresAt > now).length;
+  }
+  return {
+    recipients: dmByRecipient.size,
+    queued,
+    ttlMs: DEFAULT_TTL_MS,
+    maxPerRecipient: MAX_PER_RECIPIENT,
+  };
+}

@@ -27,11 +27,18 @@ services:
         value: "20"
       - key: VAULTCHAT_JWT_SECRET
         generateValue: true
-      # Optional: wenn gesetzt, nur diese Origin erlauben.
-      # Wenn leer/ungueltig, faellt der Server auf `true` (alle Origins) zurueck.
-      # Fuer einen schnellen Start auf Free-Tier besser leer lassen; spaeter
-      # auf die exakte Client-URL setzen.
+      # Exakt auf die Client-URL setzen, sonst blockt der Browser die API
+      # bei production-artigem CORS-Verhalten.
       - key: VAULTCHAT_CORS_ORIGIN
+        value: https://vaultchat-client.onrender.com
+      - key: VAULTCHAT_CLIENT_ORIGINS
+        value: https://vaultchat-client.onrender.com
+      - key: VAULTCHAT_CONNECT_ORIGINS
+        value: https://vaultchat-client.onrender.com
+      # Free Render Web Services haben ein ephemeres Dateisystem.
+      # Fuer Restart-stabile Accounts/PreKeys nur setzen, wenn ein Paid Disk
+      # oder ein vergleichbar persistenter Mount vorhanden ist.
+      - key: VAULTCHAT_STATE_FILE
         sync: false
       # ALLE folgenden Variablen sind OPTIONAL.
       # Leer lassen -> STUN-Fallback (Google) wird verwendet.
@@ -47,7 +54,6 @@ services:
       # aber Calls funktionieren dann nur mit gesetztem TURN-Server).
       - key: VAULTCHAT_FORCE_RELAY
         sync: false
-
   # --- FRONTEND: Vite-SPA statisch ---
   # Static Sites werden global ueber Renders CDN ausgeliefert und akzeptieren
   # daher KEIN `region`- und KEIN `plan`-Feld.
@@ -61,19 +67,22 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # Diese beiden Variablen MUESSEN in Render auf die echte Server-URL
-      # gesetzt werden (z. B. https://<dein-server>.onrender.com).
-      # Wir lassen sie bewusst leer, damit kein falscher Default deployed wird.
+      # Diese beiden Variablen zeigen auf den erreichbaren VaultChat-Server.
       - key: VITE_API_BASE
-        sync: false
+        value: https://vaultchat-server-g0p2.onrender.com
       - key: VITE_WS_URL
-        sync: false
+        value: wss://vaultchat-server-g0p2.onrender.com
+      - key: VITE_VAULTCHAT_ENABLE_X3DH
+        value: "1"
     routes:
       # SPA-Fallback: alle unbekannten Pfade -> index.html
       - type: rewrite
         source: /*
         destination: /index.html
     headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://vaultchat-server-g0p2.onrender.com wss://vaultchat-server-g0p2.onrender.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'"
       - path: /*
         name: Strict-Transport-Security
         value: max-age=63072000; includeSubDomains; preload

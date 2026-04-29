@@ -1,0 +1,35 @@
+services:
+  vaultchat:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${VAULTCHAT_PORT:-8787}:8787"
+    environment:
+      NODE_ENV: production
+      VAULTCHAT_DEPLOYMENT_PROFILE: production
+      VAULTCHAT_JWT_SECRET: ${VAULTCHAT_JWT_SECRET:?set a 32+ character secret}
+      VAULTCHAT_CORS_ORIGIN: ${VAULTCHAT_CORS_ORIGIN:?set your client origin}
+      VAULTCHAT_CLIENT_ORIGINS: ${VAULTCHAT_CLIENT_ORIGINS:?set your client origin}
+      VAULTCHAT_CONNECT_ORIGINS: ${VAULTCHAT_CONNECT_ORIGINS:?set your client origin}
+      VAULTCHAT_STATE_FILE: /data/vaultchat-state.json
+      VAULTCHAT_REGISTRATION_MODE: ${VAULTCHAT_REGISTRATION_MODE:?set open, invite, or closed}
+      VAULTCHAT_INVITE_CODES: ${VAULTCHAT_INVITE_CODES:-}
+      VAULTCHAT_INVITE_CODE_HASHES: ${VAULTCHAT_INVITE_CODE_HASHES:-}
+      VAULTCHAT_ALLOW_OPEN_REGISTRATION: ${VAULTCHAT_ALLOW_OPEN_REGISTRATION:-0}
+      VAULTCHAT_SERVE_SPA: "1"
+      VAULTCHAT_FORCE_RELAY: ${VAULTCHAT_FORCE_RELAY:-0}
+      VAULTCHAT_TURN_URL: ${VAULTCHAT_TURN_URL:-}
+      VAULTCHAT_TURN_USER: ${VAULTCHAT_TURN_USER:-}
+      VAULTCHAT_TURN_PASS: ${VAULTCHAT_TURN_PASS:-}
+      PORT: "8787"
+    volumes:
+      - vaultchat_state:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/readyz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  vaultchat_state:

@@ -51,8 +51,9 @@ Nach ca. 2–3 Minuten:
    - Alle eingeloggten User muessen sich **neu einloggen** (JWTs bleiben gueltig,
      aber die serverseitige Online-Routing-Tabelle ist weg → WS neu aufbauen).
    - Nachrichten, die waehrend des Schlafens gesendet werden sollten,
-     bleiben in der **Client-Outbox** und werden automatisch nachgesendet,
-     sobald beide Peers wieder verbunden sind.
+     bleiben in der **Client-Outbox**. Ist der Server wach, kann er zusaetzlich
+     sealed DM-Envelopes temporaer in der Mailbox halten; Inhalte bleiben E2EE,
+     aber Empfaenger-ID, Groesse und Zeitfenster sind Server-Metadaten.
 
 2. **Gegen das Einschlafen — UptimeRobot (gratis) als Pinger:**
    - Konto auf [uptimerobot.com](https://uptimerobot.com) anlegen.
@@ -65,14 +66,37 @@ Nach ca. 2–3 Minuten:
 3. **Static Site schlaeft nie.** Der Client ist also immer erreichbar,
    unabhaengig vom Server-Status.
 
-4. **Keine Persistenz.** Redeploys und Sleeps wischen den RAM. Das ist Teil
-   der Zero-Knowledge-Architektur. Die User-Backup-JSON (Export-Button in der
-   AuthPanel) ist die einzige Art, Identitaeten nach einem Redeploy wieder
-   zu nutzen. Das ist ein **Feature**, kein Bug.
-
+4. **Persistenz sauber trennen.** Nachrichten bleiben nicht dauerhaft auf dem
+   Server. Fuer Signal-aehnliche Nutzung muessen Account-Verzeichnis,
+   Gruppenmitgliedschaften und PreKey-Bundles aber Restart-stabil sein.
+   Render Free unterstuetzt keine Persistent Disks; das Blueprint laesst
+   `VAULTCHAT_STATE_FILE` deshalb absichtlich leer. Mit Render Paid Disk oder
+   einem eigenen persistenten Mount kannst du `VAULTCHAT_STATE_FILE` setzen.
+   Ohne persistentes Volume faellt VaultChat in den RAM-only-Modus zurueck;
+   dann brechen Kontakte/PreKeys nach Redeploys oder Sleeps.
 ### Logs & Debugging
 - Render UI → Service → **Logs**.
 - WebSocket-Traffic siehst du im Browser-DevTools unter **Network → WS**.
+- `/healthz` prueft nur, ob der Prozess lebt; `/readyz` prueft auch
+  Produkt-Konfiguration und State-Writability.
+
+---
+
+## Produktionspfad — eigener Server / Docker
+
+Fuer ein echtes Produkt nutze einen Host mit persistentem Volume und starte:
+
+```bash
+cp .env.production.example .env.production
+# Werte in .env.production setzen
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+Das setzt `VAULTCHAT_DEPLOYMENT_PROFILE=production`. Der Server startet dann
+nicht, wenn JWT-Secret, Origins, State-Persistenz oder Relay/TURN-Regeln nicht
+zur Sicherheitskonfiguration passen. Fuer den ersten echten Launch ist
+`VAULTCHAT_REGISTRATION_MODE=invite` empfohlen; eingelöste Invite-Codes werden
+bei gesetztem `VAULTCHAT_STATE_FILE` als Hash gesperrt.
 
 ---
 

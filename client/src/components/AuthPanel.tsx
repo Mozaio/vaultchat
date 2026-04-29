@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   buildSessionFromLogin,
   buildSessionFromRegister,
@@ -65,6 +65,9 @@ function humanError(err: unknown): string {
     return "Server antwortet nicht rechtzeitig (Timeout). Auf Render Free evtl. schläft der Server gerade; versuche es nach 20-30 Sekunden erneut.";
   }
   if (msg === "username_taken") return "Benutzername bereits vergeben.";
+  if (msg === "invite_required") return "Registrierung erfordert einen Einladungscode.";
+  if (msg === "invalid_invite") return "Einladungscode ist ungueltig.";
+  if (msg === "registration_closed") return "Registrierung ist aktuell geschlossen.";
   if (msg === "invalid_body") return "Eingaben ungültig. Prüfe Benutzername/Passwort.";
   if (msg === "invalid_credentials") return "Login fehlgeschlagen: Benutzername oder Passwort falsch.";
   return msg;
@@ -82,9 +85,17 @@ export function AuthPanel({
   const [mode, setMode] = useState<Mode>(hasLocal ? "unlock" : "login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [registrationMode, setRegistrationMode] = useState<"open" | "invite" | "closed">("open");
   const [importJson, setImportJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    void api.publicConfig()
+      .then((config) => setRegistrationMode(config.registration.mode))
+      .catch(() => {});
+  }, []);
 
   async function handleUnlock() {
     setError(null);
@@ -140,7 +151,8 @@ export function AuthPanel({
     try {
       const { session, local } = await buildSessionFromRegister(
         username,
-        password
+        password,
+        inviteCode.trim() || undefined
       );
       await onSession(session, local);
     } catch (err) {
@@ -401,10 +413,35 @@ export function AuthPanel({
                 </p>
               )}
             </div>
+            {registrationMode !== "open" && (
+              <div className="auth-input-group">
+                <label>Einladungscode</label>
+                <input
+                  type="password"
+                  className="auth-input"
+                  value={inviteCode}
+                  onChange={(e) => setInviteCode(e.target.value)}
+                  autoComplete="one-time-code"
+                  disabled={registrationMode === "closed"}
+                  required={registrationMode === "invite"}
+                />
+                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  {registrationMode === "closed"
+                    ? "Registrierung ist derzeit geschlossen."
+                    : "Dieser Server nimmt neue Konten nur mit Einladung an."}
+                </p>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => void handleRegister()}
-              disabled={busy || !validateUsername(username).valid || password.length < 10}
+              disabled={
+                busy ||
+                registrationMode === "closed" ||
+                (registrationMode === "invite" && inviteCode.trim().length < 8) ||
+                !validateUsername(username).valid ||
+                password.length < 10
+              }
               className="auth-button"
             >
               {busy ? "…" : "Konto erstellen"}

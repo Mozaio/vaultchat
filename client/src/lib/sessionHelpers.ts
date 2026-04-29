@@ -35,7 +35,8 @@ export async function buildSessionFromLogin(
 
 export async function buildSessionFromRegister(
   username: string,
-  password: string
+  password: string,
+  inviteCode?: string
 ): Promise<{ session: Session; local: LocalIdentity }> {
   const kp = await generateBoxKeypair();
   const publicKey = publicKeyBase64(kp.publicKey);
@@ -44,6 +45,7 @@ export async function buildSessionFromRegister(
     username,
     password,
     publicKey,
+    ...(inviteCode ? { inviteCode } : {}),
   });
   const local: LocalIdentity = {
     userId: user.id,

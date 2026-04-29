@@ -30,14 +30,21 @@ test("one-time prekeys are consumed exactly once", () => {
 
 test("signed prekey remains available when one-time prekeys are exhausted", () => {
   const userId = "user-prekey-signed-only";
-  initPreKeyBundle(userId, "identity-2", "signed-public-2", "signed-signature-2");
+  initPreKeyBundle(
+    userId,
+    "identity-2",
+    "signed-public-2",
+    "signed-signature-2",
+    undefined,
+    42
+  );
 
   const bundle = getPreKeyBundle(userId);
 
   assert.deepEqual(bundle, {
     identityKey: "identity-2",
     signedPreKey: {
-      keyId: 1,
+      keyId: 42,
       publicKey: "signed-public-2",
       signature: "signed-signature-2",
     },

@@ -1,18 +1,19 @@
 # VaultChat
 
-Sicherheitsorientierter **Browser-Chat** mit selbstentwickeltem **Double Ratchet v4 (AEAD + AAD)**, **Sealed Sender** für DMs und Gruppen, **Zero-Knowledge-Relay**, **TOFU-Pinning mit MITM-Erkennung**, **automatischer Gruppenschlüssel-Rotation**, **verschlüsselter lokaler Historie (at rest)**, **Offline-Outbox ohne Server-Mailbox**, **Auto-Lock**, **Längen-Padding**, **verschwindenden Nachrichten**, **Sprachnachrichten**, **WebRTC-Calls mit TURN- und Relay-Only-Modus** und einer **Sicherheitsnummer mit Emoji-Sequenz** für Out-of-Band-Verifikation.
+Sicherheitsorientierter **Browser-Chat** mit selbstentwickeltem **Double Ratchet v4 (AEAD + AAD)**, **Sealed Sender** für DMs und Gruppen, **Zero-Knowledge-Relay**, **TOFU-Pinning mit MITM-Erkennung**, **automatischer Gruppenschlüssel-Rotation**, **verschlüsselter lokaler Historie (at rest)**, **Client-Outbox plus verschluesselter Offline-Mailbox mit TTL**, **Auto-Lock**, **Längen-Padding**, **verschwindenden Nachrichten**, **Sprachnachrichten**, **WebRTC-Calls mit TURN- und Relay-Only-Modus** und einer **Sicherheitsnummer mit Emoji-Sequenz** für Out-of-Band-Verifikation.
 
-- Der Server speichert **nichts** dauerhaft und kennt bei DMs weder Absender noch Inhalt (Sealed Sender).
+- Der Server speichert keine Nachrichten dauerhaft. Optional persistiert er nur Account-Verzeichnis, Gruppenmitgliedschaften und PreKey-Bundles (`VAULTCHAT_STATE_FILE`), damit Identitaeten und sichere neue Sessions Restart-stabil bleiben. DM-Absender und Inhalte bleiben fuer den Relay-Server verborgen (Sealed Sender).
 - Die Chat-Historie liegt **nur im Browser** und ist dort mit einem aus dem Identity-Secret abgeleiteten Local Data Key verschlüsselt.
 - Alle Inhalte, Reaktionen, Antworten, Bearbeitungen, Löschungen, Lesebestätigungen, Gruppen-Keys und Voice Notes sind **Ende-zu-Ende verschlüsselt** — der Server sieht sie nicht.
 
 **Ehrlicher Anspruch:** kein auditierter Signal-Ersatz. Siehe [`THREAT_MODEL.md`](./THREAT_MODEL.md).
+Produktions-Gates und der Weg aus dem Demo-/Preview-Modus sind in [`PRODUCT_READINESS.md`](./PRODUCT_READINESS.md) dokumentiert.
 
 ## Feature-Übersicht
 
 | Bereich | Status |
 |---|---|
-| Registrierung / Login mit Argon2id (Server nur RAM) | ✔ |
+| Registrierung / Login mit Argon2id (optional persistentes Directory) | ✔ |
 | 1:1-DM mit **Double Ratchet v4** (XChaCha20-Poly1305 + AAD-Header-Binding) | ✔ |
 | **Sealed Sender** DM-Envelope — Server kennt Absender nicht | ✔ |
 | **Sealed Group Sender** — `fromUserId` nie auf der Leitung | ✔ |
@@ -24,7 +25,7 @@ Sicherheitsorientierter **Browser-Chat** mit selbstentwickeltem **Double Ratchet
 | Verschwindende Nachrichten (pro Chat, 30 s – 7 Tage) | ✔ |
 | Sprachnachrichten (Opus via MediaRecorder) | ✔ |
 | Datei-Versand (Data-URL, verschlüsselt) | ✔ |
-| **Offline-Outbox** (client-seitig, verschlüsselt) mit Retry | ✔ |
+| **Offline-Outbox** client-seitig + serverseitige sealed DM-Mailbox mit TTL/Limit | ✔ |
 | **Auto-Lock** nach Inaktivität (10 min) + manueller Lock | ✔ |
 | **Code-Hash-Pinning** (SHA-384) + UI-Warnung bei Drift | ✔ |
 | WebRTC-Anrufe mit **TURN-Konfiguration** + **Relay-Only-Modus** | ✔ |
@@ -48,7 +49,7 @@ npm run dev
 - API/WS: `http://127.0.0.1:8787`
 - Web: `http://127.0.0.1:5173`
 
-Hinweis: Server-Nutzer und Gruppen leben nur im **RAM** — nach Neustart neu registrieren.
+Hinweis: Ohne `VAULTCHAT_STATE_FILE` leben Server-Nutzer, Gruppen und PreKeys nur im **RAM**. Fuer produktive Deployments sollte diese Datei auf einem persistenten Volume liegen.
 
 ## Produktion
 
@@ -58,6 +59,9 @@ export VAULTCHAT_JWT_SECRET="$(openssl rand -base64 48)"
 export VAULTCHAT_CORS_ORIGIN="https://chat.example.org"
 export VAULTCHAT_CLIENT_ORIGINS="https://chat.example.org"
 export VAULTCHAT_CONNECT_ORIGINS="https://chat.example.org"
+# Optional, aber fuer produktive Signal-aehnliche Nutzung empfohlen:
+# persistiert nur Directory/Gruppen/PreKeys, keine Nachrichteninhalte.
+export VAULTCHAT_STATE_FILE="/var/lib/vaultchat/server-state.json"
 # Optional: TURN-Server für WebRTC-Calls hinter NAT
 export VAULTCHAT_TURN_URL="turn:turn.example.org:3478"
 export VAULTCHAT_TURN_USER="…"
@@ -98,10 +102,19 @@ docker compose up --build
 | Variable | Zweck |
 |---|---|
 | `VAULTCHAT_JWT_SECRET` | Pflicht in Prod — signiert JWTs |
+| `VAULTCHAT_DEPLOYMENT_PROFILE` | `development`, `preview` oder `production`; Production aktiviert Fail-Fast-Konfigurationschecks |
+| `VAULTCHAT_ALLOW_EPHEMERAL_STATE` | `1` erlaubt bewusst RAM-only State trotz Production Profile |
+| `VAULTCHAT_REGISTRATION_MODE` | `open`, `invite` oder `closed`; Production sollte `invite` oder `closed` nutzen |
+| `VAULTCHAT_INVITE_CODES` | Kommagetrennte Einladungscodes fuer `invite` Mode; mit `VAULTCHAT_STATE_FILE` werden genutzte Codes als SHA-256-Hashes gesperrt |
+| `VAULTCHAT_INVITE_CODE_HASHES` | Kommagetrennte SHA-256-Hex-Hashes von Einladungscodes |
+| `VAULTCHAT_ALLOW_OPEN_REGISTRATION` | `1` erlaubt offene Registrierung trotz Production Profile |
 | `VAULTCHAT_CORS_ORIGIN` | CORS-Origin, kommagetrennt; in Produktion default geschlossen |
 | `VAULTCHAT_CLIENT_ORIGINS` | Zusätzliche erlaubte CSP-Origins |
 | `VAULTCHAT_CONNECT_ORIGINS` | Zusätzliche erlaubte `connect-src` Origins |
+| `VAULTCHAT_STATE_FILE` | Optionaler JSON-State fuer Nutzer, Gruppen und PreKey-Bundles; keine Nachrichten-Persistenz |
 | `VAULTCHAT_SERVE_SPA` | `1` = statisches Frontend aus `/client/dist` ausliefern |
+| `VAULTCHAT_MAILBOX_TTL_MS` | TTL fuer temporaer gespeicherte sealed DM-Envelopes |
+| `VAULTCHAT_MAILBOX_MAX_PER_USER` | Obergrenze temporaerer sealed DM-Envelopes pro Empfaenger |
 | `VAULTCHAT_STUN_URL` | Override des Default-STUN (Google) |
 | `VAULTCHAT_TURN_URL` | TURN-URL (`turn:...` / `turns:...`) |
 | `VAULTCHAT_TURN_USER` | TURN-Username |

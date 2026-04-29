@@ -1,24 +1,27 @@
-function inferRenderServerOrigin(): string {
+const LEGACY_RENDER_SERVER_PLACEHOLDER = "https://vaultchat-server.onrender.com";
+const KNOWN_RENDER_SERVER_ORIGIN = "https://vaultchat-server-g0p2.onrender.com";
+
+export function inferRenderServerOrigin(): string {
   const host = location.host;
+  if (host === "vaultchat-client.onrender.com" || host === "vaultchat-client-g0p2.onrender.com") {
+    return KNOWN_RENDER_SERVER_ORIGIN;
+  }
   // Beispiele:
   //   vaultchat-client.onrender.com       -> vaultchat-server.onrender.com
   //   vaultchat-client-g0p2.onrender.com  -> vaultchat-server-g0p2.onrender.com
   const m = host.match(/^(.*)-client(-[a-z0-9]+)?(\.onrender\.com)$/i);
   if (m) return `https://${m[1]}-server${m[2] ?? ""}${m[3]}`;
-  if (host === "vaultchat-client.onrender.com" || host === "vaultchat-client-g0p2.onrender.com") {
-    return "https://vaultchat-server-g0p2.onrender.com";
-  }
   return "";
 }
 
-const base = () => {
+export const apiBase = () => {
   const explicit = (import.meta.env.VITE_API_BASE ?? "").trim().replace(/\/$/, "");
   // Historischer Platzhalter aus älteren Blueprints -> bewusst ignorieren.
-  if (explicit && explicit !== "https://vaultchat-server.onrender.com") return explicit;
+  if (explicit && explicit !== LEGACY_RENDER_SERVER_PLACEHOLDER) return explicit;
   const wsLike = (import.meta.env.VITE_WS_URL ?? "").trim().replace(/\/$/, "");
   if (wsLike) {
     const asHttp = wsLike.replace(/^wss:\/\//i, "https://").replace(/^ws:\/\//i, "http://");
-    if (asHttp !== "https://vaultchat-server.onrender.com") return asHttp;
+    if (asHttp !== LEGACY_RENDER_SERVER_PLACEHOLDER) return asHttp;
   }
   return inferRenderServerOrigin();
 };
@@ -48,7 +51,7 @@ async function req<T>(
   const t = setTimeout(() => ctrl.abort(), 20_000);
   let r: Response;
   try {
-    r = await fetch(`${base()}${path}`, {
+    r = await fetch(`${apiBase()}${path}`, {
       ...init,
       signal: ctrl.signal,
       headers: { ...headers, ...init?.headers },
@@ -72,7 +75,7 @@ async function req<T>(
       /* Body ist kein JSON — msg bleibt raw. */
     }
     if (msg.includes("Cannot POST /api/") || msg.includes("Cannot GET /api/")) {
-      throw new Error(`api_base_misconfigured:${base() || "(same-origin)"}`);
+      throw new Error(`api_base_misconfigured:${apiBase() || "(same-origin)"}`);
     }
     throw new Error(msg);
   }
@@ -83,11 +86,59 @@ export async function register(body: {
   username: string;
   password: string;
   publicKey: string;
+  inviteCode?: string;
 }) {
   return req<{ token: string; user: ApiUser }>("/api/register", {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export type PublicConfig = {
+  registration: {
+    mode: "open" | "invite" | "closed";
+    inviteRequired: boolean;
+  };
+};
+
+export async function publicConfig() {
+  return req<PublicConfig>("/api/public-config");
+}
+
+export type ServerStatus = {
+  profile: "development" | "preview" | "production";
+  state: {
+    mode: "ephemeral" | "persistent";
+    writable: boolean;
+  };
+  directory: {
+    users: number;
+    groups: number;
+  };
+  preKeys: {
+    bundles: number;
+    oneTimePreKeys: number;
+  };
+  mailbox: {
+    queued: number;
+    recipients: number;
+    ttlMs: number;
+    maxPerRecipient: number;
+  };
+  realtime: {
+    onlineUsers: number;
+    sockets: number;
+  };
+  privacy: {
+    sealedDmMailbox: boolean;
+    messageContentPersistentOnServer: boolean;
+    urlTokenAuthEnabled: boolean;
+  };
+  registration: PublicConfig["registration"];
+};
+
+export async function serverStatus(token: string) {
+  return req<ServerStatus>("/api/server/status", { token });
 }
 
 export async function login(body: { username: string; password: string }) {

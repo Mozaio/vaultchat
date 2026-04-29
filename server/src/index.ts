@@ -12,6 +12,7 @@ import {
   createUser,
   findUserById,
   findUserByUsername,
+  getDirectoryStats,
   getGroup,
   leaveGroup,
   listGroupsForUser,
@@ -19,14 +20,24 @@ import {
   removeGroupMember,
 } from "./memoryStore.js";
 import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
-import { registerClient, sendToUser } from "./wsHub.js";
-import { enqueueMailboxDm, popMailboxDms } from "./mailboxStore.js";
+import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
+import { enqueueMailboxDm, getMailboxStats, popMailboxDms } from "./mailboxStore.js";
 import {
   getPreKeyBundle,
+  getPreKeyStats,
   getRemainingPreKeyCount,
   initPreKeyBundle,
   uploadOneTimePreKeys,
 } from "./prekeyStore.js";
+import {
+  assertRuntimeConfig,
+  loadRuntimeConfig,
+  validateRuntimeConfig,
+} from "./config.js";
+import { getStateStatus } from "./serverState.js";
+import { publicRegistrationConfig, redeemInviteCode, validateInviteCode } from "./registration.js";
+
+assertRuntimeConfig();
 
 const app = express();
 const port = Number(process.env.PORT ?? 8787);
@@ -131,10 +142,39 @@ app.get("/healthz", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
+app.get("/readyz", (_req, res) => {
+  const config = loadRuntimeConfig();
+  const configProblems = validateRuntimeConfig(config);
+  const state = getStateStatus();
+  const problems = [
+    ...configProblems,
+    ...(state.writable ? [] : [`state file is not writable: ${state.error ?? "unknown"}`]),
+  ];
+  res.status(problems.length ? 503 : 200).json({
+    ok: problems.length === 0,
+    profile: config.profile,
+    state: {
+      mode: state.mode,
+      configured: state.mode === "persistent",
+      writable: state.writable,
+    },
+    problems,
+  });
+});
+
+const USERNAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]{1,31}$/;
+const INVALID_USERNAME_PAIR_RE = /__|--|-_|_-/;
+
 const RegisterBody = z.object({
-  username: z.string().min(2).max(32).regex(/^[a-zA-Z0-9_]+$/),
+  username: z
+    .string()
+    .min(2)
+    .max(32)
+    .regex(USERNAME_RE)
+    .refine((name) => !/[_-]$/.test(name) && !INVALID_USERNAME_PAIR_RE.test(name)),
   password: z.string().min(10).max(256),
   publicKey: z.string().min(16),
+  inviteCode: z.string().max(256).optional(),
 });
 
 const LoginBody = z.object({
@@ -159,6 +199,11 @@ app.post("/api/register", authLimiter, async (req, res) => {
     res.status(400).json({ error: "invalid_body" });
     return;
   }
+  const invite = validateInviteCode(parsed.data.inviteCode);
+  if (!invite.ok) {
+    res.status(invite.error === "registration_closed" ? 403 : 401).json({ error: invite.error });
+    return;
+  }
   const { username, password, publicKey } = parsed.data;
   const passwordHash = await hashPassword(password);
   const user = createUser({ username, passwordHash, publicKey });
@@ -166,6 +211,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
     res.status(409).json({ error: "username_taken" });
     return;
   }
+  redeemInviteCode(parsed.data.inviteCode);
   const token = signToken({ userId: user.id, username: user.username });
   res.json({
     token,
@@ -212,6 +258,39 @@ app.get("/api/me", async (req, res) => {
     id: user.id,
     username: user.username,
     publicKey: user.publicKey,
+  });
+});
+
+app.get("/api/public-config", (_req, res) => {
+  res.json({
+    registration: publicRegistrationConfig(),
+  });
+});
+
+app.get("/api/server/status", async (req, res) => {
+  const t = bearer(req);
+  if (!t || !verifyToken(t)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const config = loadRuntimeConfig();
+  const state = getStateStatus();
+  res.json({
+    profile: config.profile,
+    state: {
+      mode: state.mode,
+      writable: state.writable,
+    },
+    directory: getDirectoryStats(),
+    preKeys: getPreKeyStats(),
+    mailbox: getMailboxStats(),
+    realtime: getWsStats(),
+    privacy: {
+      sealedDmMailbox: true,
+      messageContentPersistentOnServer: false,
+      urlTokenAuthEnabled: process.env.VAULTCHAT_ALLOW_WS_URL_TOKEN === "1",
+    },
+    registration: publicRegistrationConfig(),
   });
 });
 
@@ -483,7 +562,8 @@ app.post("/api/keys", async (req, res) => {
     user.publicKey,
     parsed.data.signedPreKey.publicKey,
     parsed.data.signedPreKey.signature,
-    parsed.data.signedPreKey.signingPublicKey
+    parsed.data.signedPreKey.signingPublicKey,
+    parsed.data.signedPreKey.keyId
   );
   uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
   res.json({ ok: true, remaining: getRemainingPreKeyCount(jwtUser.userId) });
@@ -764,8 +844,10 @@ async function start() {
     attachSpa(app);
   }
   server.listen(port, () => {
+    const config = loadRuntimeConfig();
+    const state = getStateStatus();
     console.log(
-      `[vaultchat] API + WS (RAM only, keine Nachrichten-Persistenz) :${port}`
+      `[vaultchat] API + WS :${port} profile=${config.profile} state=${state.mode} messages=persistent:false`
     );
   });
 }

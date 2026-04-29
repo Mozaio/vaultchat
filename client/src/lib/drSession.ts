@@ -9,7 +9,7 @@
  * Session-Initialisierung:
  *  - Neue Peers: X3DH-Prekey-Frame im ersten Sealed-Sender-Envelope.
  *  - Bestehende Peers: normaler Double-Ratchet-Wire.
- *  - Legacy-Fallback: direkter Identity-DH, explizit als `legacy` markiert.
+ *  - Legacy-Fallback: direkter Identity-DH nur bei explizitem Opt-in.
  */
 import { base64FromUint8, uint8FromBase64 } from "./b64";
 import {
@@ -52,6 +52,14 @@ export type DmEncryptResult = {
   innerB64: string;
   mode: "x3dh" | "ratchet" | "legacy";
 };
+
+function x3dhEnabled(): boolean {
+  return import.meta.env.VITE_VAULTCHAT_ENABLE_X3DH !== "0";
+}
+
+function legacyDhAllowed(): boolean {
+  return import.meta.env.VITE_VAULTCHAT_ALLOW_LEGACY_DH === "1";
+}
 
 function encodeX3dhFrame(frame: X3dhPreKeyFrame): string {
   const body = enc.encode(JSON.stringify(frame));
@@ -113,11 +121,11 @@ export async function ensureDrSession(
 }
 
 /**
- * X3DH-basierte Session-Initialisierung (mit Fallback).
+ * X3DH-basierte Session-Initialisierung.
  *
- * Versuche, ein Pre-Key-Bundle für den Peer zu laden und X3DH durchzuführen.
- * Wenn keine Pre-Keys verfügbar sind (z.B. alter Client ohne Upload), falle
- * auf den traditionellen `ensureDrSession` (direkter DH) zurück.
+ * Versuche, ein Pre-Key-Bundle fuer den Peer zu laden und X3DH durchzufuehren.
+ * Ohne PreKeys wird nur mit `VITE_VAULTCHAT_ALLOW_LEGACY_DH=1` auf direkten
+ * DH zurueckgefallen. Der sichere Default ist Fail-Closed.
  *
  * Der daraus resultierende Root-Key ist anders als bei `ensureDrSession`,
  * weil `drInitFromX3DH` ein separates KDF-Label verwendet → kein Kollisionsrisiko.
@@ -166,7 +174,7 @@ export async function ensureDrSessionWithX3dh(
     await metaSet(metaKey(peerId), JSON.stringify(stateWithMeta));
     return stateWithMeta;
   } catch {
-    // Fallback: direkter DH (wie bisher)
+    if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
     const fresh: PersistedDRState = {
       ...(await drInit(myIdentitySk, peerPublicKeyB64, peerId)),
       initMode: "legacy",
@@ -207,9 +215,9 @@ export async function drEncryptJsonForDm(
   plainJson: string,
   token: string
 ): Promise<DmEncryptResult> {
-  const x3dhEnabled = import.meta.env.VITE_VAULTCHAT_ENABLE_X3DH === "1";
+  const useX3dh = x3dhEnabled();
   const existing = await loadState(peerId, peerPublicKeyB64, {
-    requireLegacy: !x3dhEnabled,
+    requireLegacy: !useX3dh,
   });
   if (existing) {
     const padded = pad(enc.encode(plainJson));
@@ -218,7 +226,8 @@ export async function drEncryptJsonForDm(
     return { innerB64: base64FromUint8(wire), mode: "ratchet" };
   }
 
-  if (!x3dhEnabled) {
+  if (!useX3dh) {
+    if (!legacyDhAllowed()) throw new Error("x3dh_required");
     const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
     const padded = pad(enc.encode(plainJson));
     const { state, wire } = await drEncrypt(st, padded);
@@ -253,6 +262,7 @@ export async function drEncryptJsonForDm(
       mode: "x3dh",
     };
   } catch {
+    if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
     const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
     const padded = pad(enc.encode(plainJson));
     const { state, wire } = await drEncrypt(st, padded);
@@ -280,10 +290,13 @@ export async function drDecryptJson(
   peerPublicKeyB64: string,
   wireB64: string
 ): Promise<string> {
-  const x3dhEnabled = import.meta.env.VITE_VAULTCHAT_ENABLE_X3DH === "1";
+  const useX3dh = x3dhEnabled();
   const st =
-    (await loadState(peerId, peerPublicKeyB64, { requireLegacy: !x3dhEnabled })) ??
-    (await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64));
+    (await loadState(peerId, peerPublicKeyB64, { requireLegacy: !useX3dh })) ??
+    (legacyDhAllowed()
+      ? await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64)
+      : null);
+  if (!st) throw new Error("missing_ratchet_session");
   const wire = uint8FromBase64(wireB64);
   const { state, plaintext } = await drDecrypt(st, myIdentitySk, wire);
   // IMPORTANT: save state only after successful decode+unpad,

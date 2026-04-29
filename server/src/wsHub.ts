@@ -32,3 +32,12 @@ export function sendToUser(userId: string, payload: unknown) {
   }
   return n;
 }
+
+export function getWsStats() {
+  let sockets = 0;
+  for (const set of byUser.values()) sockets += set.size;
+  return {
+    onlineUsers: byUser.size,
+    sockets,
+  };
+}

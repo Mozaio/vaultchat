@@ -155,6 +155,17 @@ function userGradient(userId: string): string {
   return `linear-gradient(135deg, ${base} 0%, ${base}dd 100%)`;
 }
 
+function humanDmSendError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg === "prekey_bundle_unavailable" || msg === "x3dh_required") {
+    return "Sicherer X3DH-Schluesselaustausch fehlgeschlagen. Der Kontakt muss einmal online sein oder seine PreKeys neu hochladen.";
+  }
+  if (msg === "missing_ratchet_session") {
+    return "Keine sichere Ratchet-Session gefunden. Starte den Chat neu, sobald der Kontakt PreKeys verfuegbar hat.";
+  }
+  return msg;
+}
+
 /** WhatsApp/Telegram style date separator label */
 function fmtDateLabel(at: number): string {
   const d = new Date(at);
@@ -222,7 +233,9 @@ export function ChatShell({
   const [ttlGroup, setTtlGroup] = useState<number>(0);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [peerPin, setPeerPin] = useState<PeerPin | null>(null);
-  const [relayOnly, setRelayOnly] = useState(false);
+  const [relayOnly, setRelayOnly] = useState(
+    () => localStorage.getItem("vaultchat.privacy.relayOnly") === "on"
+  );
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -242,11 +255,22 @@ export function ChatShell({
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sendTypingIndicators, setSendTypingIndicators] = useState(
-    () => localStorage.getItem("vaultchat.privacy.typing") !== "off"
+    () => localStorage.getItem("vaultchat.privacy.typing") === "on"
   );
   const [sendReadReceipts, setSendReadReceipts] = useState(
-    () => localStorage.getItem("vaultchat.privacy.receipts") !== "off"
+    () => localStorage.getItem("vaultchat.privacy.receipts") === "on"
   );
+  const [notificationEnabled, setNotificationEnabled] = useState(
+    () => localStorage.getItem("vaultchat.privacy.notifications") === "on"
+  );
+  const [notificationPreview, setNotificationPreview] = useState(
+    () => localStorage.getItem("vaultchat.privacy.notificationPreview") === "on"
+  );
+  const [notificationPermission, setNotificationPermission] = useState(
+    () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission)
+  );
+  const [serverStatus, setServerStatus] = useState<api.ServerStatus | null>(null);
+  const [serverStatusError, setServerStatusError] = useState<string | null>(null);
 
   const callRef = useRef<{
     close: () => void;
@@ -256,6 +280,7 @@ export function ChatShell({
   const pendingRtcRef = useRef<Map<string, RtcPayload[]>>(new Map());
 
   const wsRef = useRef<WebSocket | null>(null);
+  const wsAuthenticatedRef = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
   const peerRef = useRef<api.ApiUser | null>(null);
@@ -311,6 +336,31 @@ export function ChatShell({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [status, rtc] = await Promise.all([
+          api.serverStatus(session.token),
+          api.getRtcConfig(session.token),
+        ]);
+        if (cancelled) return;
+        setServerStatus(status);
+        setServerStatusError(null);
+        if (rtc.forceRelay) {
+          setRelayOnly(true);
+          localStorage.setItem("vaultchat.privacy.relayOnly", "on");
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setServerStatusError(err instanceof Error ? err.message : "server_status_unavailable");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.token]);
+
+  useEffect(() => {
     if (!incomingOffer) return;
     const t = window.setTimeout(() => {
       setIncomingOffer(null);
@@ -320,19 +370,18 @@ export function ChatShell({
   }, [incomingOffer]);
 
   const maybeNotify = useCallback((title: string, body: string) => {
+    if (!notificationEnabled) return;
     if (!("Notification" in window) || document.visibilityState === "visible") return;
-    if (Notification.permission === "granted") {
+    if (Notification.permission !== "granted") return;
+    if (notificationPreview) {
       new Notification(title, { body, tag: "vaultchat-message" });
-      return;
-    }
-    if (Notification.permission === "default") {
-      void Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          new Notification(title, { body, tag: "vaultchat-message" });
-        }
+    } else {
+      new Notification("VaultChat", {
+        body: "Neue verschluesselte Nachricht",
+        tag: "vaultchat-message",
       });
     }
-  }, []);
+  }, [notificationEnabled, notificationPreview]);
 
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
   const showSidebar = !isMobile || !showConversation;
@@ -612,6 +661,7 @@ export function ChatShell({
   }, []);
 
   const sendRtc = useCallback((toUserId: string, payload: RtcPayload) => {
+    if (!wsAuthenticatedRef.current) return;
     wsRef.current?.send(JSON.stringify({ type: "rtc", toUserId, payload }));
   }, []);
 
@@ -630,13 +680,19 @@ export function ChatShell({
         setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
         return null;
       }
-      const encrypted = await drEncryptJsonForDm(
-        session.secretKey,
-        toUser.id,
-        toUser.publicKey,
-        JSON.stringify(payload),
-        tokenRef.current
-      );
+      let encrypted: Awaited<ReturnType<typeof drEncryptJsonForDm>>;
+      try {
+        encrypted = await drEncryptJsonForDm(
+          session.secretKey,
+          toUser.id,
+          toUser.publicKey,
+          JSON.stringify(payload),
+          tokenRef.current
+        );
+      } catch (err) {
+        setError(humanDmSendError(err));
+        return null;
+      }
       const envelope = await sealSender(
         session.user.id,
         encrypted.innerB64,
@@ -675,7 +731,7 @@ export function ChatShell({
       await refreshPendingCount();
 
       const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
+      if (ws && ws.readyState === WebSocket.OPEN && wsAuthenticatedRef.current) {
         ws.send(
           JSON.stringify({ type: "dm", toUserId: toUser.id, envelope, cid })
         );
@@ -688,7 +744,7 @@ export function ChatShell({
   const sendGroupWire = useCallback(
     async (g: api.ApiGroup, payload: PlainPayload, suppressLocal = false) => {
       const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthenticatedRef.current) {
         setError("Keine Verbindung.");
         return null;
       }
@@ -727,7 +783,7 @@ export function ChatShell({
   /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
   const flushOutbox = useCallback(async () => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthenticatedRef.current) return;
     const pending = await outboxList();
     for (const row of pending) {
       const meta = await outboxGetMeta(row.cid).catch(() => null);
@@ -753,30 +809,21 @@ export function ChatShell({
   }, [refreshPendingCount]);
 
   useEffect(() => {
+    let stopped = false;
     const url = getWsUrl();
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    wsAuthenticatedRef.current = false;
     ws.onopen = () => {
       const activeWs = wsRef.current;
       if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
       activeWs.send(JSON.stringify({ type: "auth", token: tokenRef.current }));
-      setConnected(true);
-      void flushOutbox();
-
-      // Starte Cover Traffic (Dummy-Envelopes bei Inaktivität)
-      const peerList = usersRef.current.map((u) => ({
-        id: u.id,
-        publicKey: u.publicKey,
-      }));
-      if (peerList.length > 0) {
-        coverRef.current = startCoverTraffic(activeWs, peerList, () => {
-          return activeWs.readyState === WebSocket.OPEN && session !== null;
-        });
-      }
     };
     ws.onclose = () => {
       setConnected(false);
+      wsAuthenticatedRef.current = false;
       wsRef.current = null;
+      if (stopped) return;
       // Stop cover traffic
       if (coverRef.current) {
         coverRef.current.stop();
@@ -802,6 +849,29 @@ export function ChatShell({
       void (async () => {
         try {
           const data = JSON.parse(String(ev.data)) as Record<string, unknown>;
+
+          if (data.type === "auth_ok") {
+            const activeWs = wsRef.current;
+            if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
+            wsAuthenticatedRef.current = true;
+            reconnectAttempts.current = 0;
+            setConnected(true);
+            void flushOutbox();
+            if (coverRef.current) {
+              coverRef.current.stop();
+              coverRef.current = null;
+            }
+            const peerList = usersRef.current.map((u) => ({
+              id: u.id,
+              publicKey: u.publicKey,
+            }));
+            if (peerList.length > 0) {
+              coverRef.current = startCoverTraffic(activeWs, peerList, () => {
+                return activeWs.readyState === WebSocket.OPEN;
+              });
+            }
+            return;
+          }
 
           if (data.type === "dm_ack") {
             const cid = typeof data.cid === "string" ? data.cid : null;
@@ -988,8 +1058,17 @@ export function ChatShell({
       void flushOutbox();
     }, 15_000);
     return () => {
+      stopped = true;
       ws.close();
       clearInterval(interval);
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+      if (coverRef.current) {
+        coverRef.current.stop();
+        coverRef.current = null;
+      }
       if (typingTimer.current) clearTimeout(typingTimer.current);
     };
   }, [
@@ -1618,8 +1697,13 @@ export function ChatShell({
         <SecuritySettings
           onClose={() => setSecurityOpen(false)}
           relayOnly={relayOnly}
-          onRelayOnlyChange={setRelayOnly}
+          onRelayOnlyChange={(value) => {
+            setRelayOnly(value);
+            localStorage.setItem("vaultchat.privacy.relayOnly", value ? "on" : "off");
+          }}
           myFingerprint={myFp}
+          serverStatus={serverStatus}
+          serverStatusError={serverStatusError}
           sendTypingIndicators={sendTypingIndicators}
           onSendTypingIndicatorsChange={(value) => {
             setSendTypingIndicators(value);
@@ -1629,6 +1713,29 @@ export function ChatShell({
           onSendReadReceiptsChange={(value) => {
             setSendReadReceipts(value);
             localStorage.setItem("vaultchat.privacy.receipts", value ? "on" : "off");
+          }}
+          notificationEnabled={notificationEnabled}
+          onNotificationEnabledChange={(value) => {
+            setNotificationEnabled(value);
+            localStorage.setItem("vaultchat.privacy.notifications", value ? "on" : "off");
+          }}
+          notificationPreview={notificationPreview}
+          onNotificationPreviewChange={(value) => {
+            setNotificationPreview(value);
+            localStorage.setItem("vaultchat.privacy.notificationPreview", value ? "on" : "off");
+          }}
+          notificationPermission={notificationPermission}
+          onRequestNotificationPermission={async () => {
+            if (!("Notification" in window)) {
+              setNotificationPermission("unsupported");
+              return;
+            }
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+            if (permission === "granted") {
+              setNotificationEnabled(true);
+              localStorage.setItem("vaultchat.privacy.notifications", "on");
+            }
           }}
           onExportBackup={async () => {
             const local = loadLocalIdentity();
