@@ -118,6 +118,7 @@ export type PlainPayload = {
   /** Text-Body bzw. Data-URL für Datei/Voice. Leer für Meta-Frames. */
   body?: string;
   fileName?: string;
+  fileSize?: number;
   mime?: string;
   /** Laufzeit in Millisekunden für Sprachnachrichten. */
   durationMs?: number;

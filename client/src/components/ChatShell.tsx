@@ -1139,6 +1139,7 @@ export function ChatShell({
       kind: "file",
       body,
       fileName: file.name,
+      fileSize: file.size,
       mime: file.type,
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
     };
@@ -2552,7 +2553,7 @@ export function ChatShell({
             </header>
             <div
               ref={groupScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4 relative"
+              className="messages-container !px-4 !py-4 relative"
             >
               {newGroupMessageWaiting && (
                 <button

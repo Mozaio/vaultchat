@@ -5,6 +5,8 @@ import {
   IconDownload,
   IconTimer,
   IconSmile,
+  IconMoreVertical,
+  IconMessageSquare,
   IconCheck,
   IconCheckCheck,
 } from "./Icons";
@@ -29,7 +31,7 @@ export type ChatMsg = {
   deliveredToPeer?: boolean;
 };
 
-const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮"];
+const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "🙏", "✅"];
 
 function fmtDuration(ms?: number): string {
   if (!ms) return "";
@@ -108,6 +110,24 @@ export function MessageBubble({
   const body = msg.plain.body ?? "";
   const reacts = msg.reactions ?? {};
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
+  const canCopy = msg.plain.kind === "text" && Boolean(body);
+
+  useEffect(() => {
+    if (!menuOpen && !reactOpen) return;
+    const onPointerDown = (ev: PointerEvent) => {
+      if (bubbleRef.current?.contains(ev.target as Node)) return;
+      setMenuOpen(false);
+      setReactOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [menuOpen, reactOpen]);
+
+  function toggleReaction(emoji: string) {
+    onReact(msg, msg.myReaction === emoji ? "" : emoji);
+    setReactOpen(false);
+    setMenuOpen(false);
+  }
 
   return (
     <div
@@ -142,6 +162,7 @@ export function MessageBubble({
             msg.fromMe ? "sent" : "received"
           } max-w-full ${msg.deleted ? "italic opacity-60" : ""} ${
             isGrouped ? "grouped" : ""
+          } ${isLastInGroup ? "last-in-group" : ""
           }`}
         >
           {msg.deleted ? (
@@ -235,33 +256,64 @@ export function MessageBubble({
 
           {/* Menu button */}
           {!msg.deleted && (
-            <button
-              type="button"
-              aria-label="Menü"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((v) => !v);
-                setReactOpen(false);
-              }}
-              className={`message-menu-button ${
+            <div
+              className={`message-action-bar ${
                 msg.fromMe ? "from-me" : "from-peer"
               }`}
             >
-              ⋯
-            </button>
+              <button
+                type="button"
+                aria-label="Reagieren"
+                title="Reagieren"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setReactOpen((v) => !v);
+                  setMenuOpen(false);
+                }}
+                className="message-action-button"
+              >
+                <IconSmile size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label="Antworten"
+                title="Antworten"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReply(msg);
+                  setMenuOpen(false);
+                  setReactOpen(false);
+                }}
+                className="message-action-button"
+              >
+                <IconMessageSquare size={15} />
+              </button>
+              <button
+                type="button"
+                aria-label="Mehr"
+                title="Mehr"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpen((v) => !v);
+                  setReactOpen(false);
+                }}
+                className="message-action-button"
+              >
+                <IconMoreVertical size={15} />
+              </button>
+            </div>
           )}
 
           {menuOpen && !msg.deleted && (
             <div
-              className={`absolute top-8 z-30 w-40 rounded-lg border p-1 text-xs shadow-xl ${
+              className={`message-context-menu ${
                 msg.fromMe ? "-right-2" : "-left-2"
               }`}
-              style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
+              onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
-                style={{ color: "var(--text)" }}
+                className="message-context-item"
                 onClick={() => {
                   onReply(msg);
                   setMenuOpen(false);
@@ -271,19 +323,18 @@ export function MessageBubble({
               </button>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
-                style={{ color: "var(--text)" }}
+                className="message-context-item"
                 onClick={() => {
                   setReactOpen(true);
+                  setMenuOpen(false);
                 }}
               >
                 😊 Reagieren
               </button>
-              {msg.plain.kind === "text" && body && (
+              {canCopy && (
                 <button
                   type="button"
-                  className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
-                  style={{ color: "var(--text)" }}
+                  className="message-context-item"
                   onClick={() => {
                     onCopy(body);
                     setMenuOpen(false);
@@ -295,8 +346,7 @@ export function MessageBubble({
               {msg.fromMe && msg.plain.kind === "text" && (
                 <button
                   type="button"
-                  className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-[var(--bg-hover)]"
-                  style={{ color: "var(--text)" }}
+                  className="message-context-item"
                   onClick={() => {
                     setEditing(true);
                     setMenuOpen(false);
@@ -308,8 +358,7 @@ export function MessageBubble({
               {msg.fromMe && (
                 <button
                   type="button"
-                  className="block w-full rounded px-2 py-1.5 text-left transition hover:bg-red-950/50"
-                  style={{ color: "var(--danger)" }}
+                  className="message-context-item danger"
                   onClick={() => {
                     onDelete(msg);
                     setMenuOpen(false);
@@ -323,23 +372,19 @@ export function MessageBubble({
 
           {reactOpen && !msg.deleted && (
             <div
-              className={`absolute top-8 z-10 flex gap-1 rounded-lg border p-1 text-lg shadow-xl ${
+              className={`reaction-popover ${
                 msg.fromMe ? "right-0" : "left-0"
               }`}
-              style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
+              onClick={(e) => e.stopPropagation()}
             >
               {QUICK_EMOJIS.map((e) => (
                 <button
                   key={e}
                   type="button"
-                  className={`rounded px-1 transition hover:bg-[var(--bg-hover)] ${
-                    msg.myReaction === e ? "bg-[var(--accent-soft)]" : ""
-                  }`}
-                  onClick={() => {
-                    onReact(msg, msg.myReaction === e ? "" : e);
-                    setReactOpen(false);
-                    setMenuOpen(false);
-                  }}
+                  className={`reaction-button ${msg.myReaction === e ? "active" : ""}`}
+                  aria-pressed={msg.myReaction === e}
+                  title={msg.myReaction === e ? "Reaktion entfernen" : `Mit ${e} reagieren`}
+                  onClick={() => toggleReaction(e)}
                 >
                   {e}
                 </button>
@@ -354,13 +399,9 @@ export function MessageBubble({
               <button
                 key={e}
                 type="button"
-                onClick={() => onReact(msg, msg.myReaction === e ? "" : e)}
-                className={`rounded-full border px-2 py-0.5 text-xs ${
-                  msg.myReaction === e
-                    ? "border-emerald-500/50 bg-emerald-900/40 text-emerald-100"
-                    : ""
-                }`}
-                style={msg.myReaction === e ? {} : { borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+                onClick={() => toggleReaction(e)}
+                className={`reaction-chip ${msg.myReaction === e ? "active" : ""}`}
+                aria-pressed={msg.myReaction === e}
                 title={peerLabel}
               >
                 {e} {n}
