@@ -305,23 +305,24 @@ function CodeIntegrityBanner({
   if (dismissed) return null;
   if (check.state === "pinned_ok") {
     return (
-      <div className="border-b border-emerald-900/40 bg-emerald-950/30 px-4 py-1 text-[11px] text-emerald-300">
-        Code-Hash gepinnt · SHA-384 {check.hash.slice(0, 16)}…
+      <div className="code-integrity-banner ok">
+        <span className="font-semibold">Build verifiziert</span>
+        <span className="font-mono">SHA-384 {check.hash.slice(0, 12)}...</span>
         <button
           type="button"
-          className="ml-2 underline hover:text-emerald-200"
+          className="code-integrity-action"
           onClick={() => setDismissed(true)}
         >
-          ausblenden
+          Ausblenden
         </button>
       </div>
     );
   }
   if (check.state === "unknown") {
     return (
-      <div className="border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-xs text-amber-200">
+      <div className="code-integrity-banner warn">
         <span>
-          Dieser Code-Hash wurde noch nicht gepinnt. SHA-384:{" "}
+          Build noch nicht verifiziert. SHA-384{" "}
           <span className="font-mono">{check.hash}</span>
         </span>
         <button
@@ -335,18 +336,17 @@ function CodeIntegrityBanner({
             await onPinned();
             setDismissed(true);
           }}
-          className="ml-3 rounded border border-emerald-600 px-2 py-0.5 text-emerald-300 hover:bg-emerald-900/30"
+          className="code-integrity-action"
         >
-          Jetzt pinnen
+          Verifizieren
         </button>
       </div>
     );
   }
   return (
-    <div className="border-b border-red-900/60 bg-red-950/50 px-4 py-2 text-xs text-red-200">
+    <div className="code-integrity-banner danger">
       <p className="font-semibold">
-        ⚠ Code-Hash weicht vom gepinnten Wert ab. Neues Bundle könnte bösartig
-        sein.
+        Build-Integritaet stimmt nicht mit dem verifizierten Wert ueberein.
       </p>
       <p className="font-mono">Aktuell: {check.hash}</p>
       <p className="font-mono">Gepinnt: {check.pinned}</p>
@@ -362,9 +362,9 @@ function CodeIntegrityBanner({
             await onPinned();
             setDismissed(true);
           }}
-          className="rounded border border-amber-600 px-2 py-0.5 text-amber-200 hover:bg-amber-900/30"
+          className="code-integrity-action"
         >
-          Akzeptieren & neu pinnen
+          Neu verifizieren
         </button>
       </div>
     </div>

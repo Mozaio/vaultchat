@@ -1811,8 +1811,8 @@ export function ChatShell({
             ["all", "Alle"],
             ["dm", "DMs"],
             ["group", "Gruppen"],
-            ["fav", "Favoriten"],
-            ["unread", "Ungelesen"],
+            ["fav", "Favorit"],
+            ["unread", "Neu"],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -2988,7 +2988,7 @@ function InfoPanel({
         >
           <IconBell size={18} />
           <span>
-            {isMuted ? "Stumm" : "Benachrichtigungen"}
+            {isMuted ? "Stumm" : "Aktiv"}
           </span>
         </button>
         <button

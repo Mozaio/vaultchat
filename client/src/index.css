@@ -589,6 +589,51 @@ select:focus-visible {
   max-width: min(78%, 36rem) !important;
 }
 
+.code-integrity-banner {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.code-integrity-banner.ok {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.code-integrity-banner.warn {
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.code-integrity-banner.danger {
+  align-items: flex-start;
+  flex-direction: column;
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.code-integrity-action {
+  margin-left: auto;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.code-integrity-action:hover,
+.code-integrity-action:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .message-wrapper.sent {
   justify-content: flex-end;
 }
@@ -1184,11 +1229,11 @@ select:focus-visible {
 }
 
 .filter-chips {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  white-space: nowrap;
-  scrollbar-width: none;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.4rem;
+  overflow: visible;
+  white-space: normal;
   padding-bottom: 0.25rem;
 }
 
@@ -1199,11 +1244,14 @@ select:focus-visible {
 .filter-chip {
   border: none;
   border-radius: var(--radius-full);
-  padding: 4px 14px;
+  min-width: 0;
+  padding: 0.42rem 0.35rem;
   font-size: 12px;
   color: var(--text-secondary);
   background: var(--bg-hover);
   transition: background 0.15s ease, color 0.15s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .filter-chip.active {
@@ -1395,7 +1443,7 @@ select:focus-visible {
 }
 
 .info-action-button {
-  min-height: 44px;
+  min-height: 48px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-hover);
@@ -1405,8 +1453,9 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  padding: 0.5rem 0.35rem;
+  padding: 0.55rem 0.35rem;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  min-width: 0;
 }
 
 .info-action-button:hover,
@@ -1419,6 +1468,10 @@ select:focus-visible {
 .info-action-button span {
   font-size: 11px;
   line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .info-item {
@@ -1729,13 +1782,80 @@ select:focus-visible {
   border-radius: var(--radius);
   padding: 0;
   cursor: pointer;
-  font-size: 1.125rem;
   line-height: 1;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-secondary);
+}
+
+.theme-toggle svg {
+  flex-shrink: 0;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.settings-toggle-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: flex-start;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.settings-toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.settings-switch {
+  position: relative;
+  width: 2.35rem;
+  height: 1.35rem;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-hover);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.17rem;
+  left: 0.18rem;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--text-muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.settings-toggle-input:checked + .settings-switch {
+  border-color: rgba(52, 211, 153, 0.6);
+  background: var(--accent-soft);
+}
+
+.settings-toggle-input:checked + .settings-switch::after {
+  transform: translateX(1rem);
+  background: var(--accent);
+}
+
+.settings-toggle-input:disabled + .settings-switch {
+  opacity: 0.45;
+}
+
+.settings-toggle-row:has(.settings-toggle-input:focus-visible) .settings-switch {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .theme-toggle:hover {

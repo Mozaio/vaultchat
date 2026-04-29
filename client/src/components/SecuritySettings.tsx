@@ -137,7 +137,7 @@ export function SecuritySettings({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="app-surface max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl p-6">
+      <div className="app-surface max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: "var(--text)" }}>
             <IconLock size={18} />
@@ -218,13 +218,14 @@ export function SecuritySettings({
           <h3 className="mb-2 text-sm font-medium" style={{ color: "var(--text)" }}>
             Datenschutz & Anrufe
           </h3>
-          <label className="flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <label className="settings-toggle-row">
             <input
               type="checkbox"
               checked={relayOnly}
               onChange={(e) => onRelayOnlyChange?.(e.target.checked)}
-              className="mt-1"
+              className="settings-toggle-input"
             />
+            <span className="settings-switch" aria-hidden="true" />
             <span>
               Anrufe nur über TURN (Relay) leiten
               <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
@@ -232,13 +233,14 @@ export function SecuritySettings({
               </span>
             </span>
           </label>
-          <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <label className="settings-toggle-row mt-3">
             <input
               type="checkbox"
               checked={sendTypingIndicators}
               onChange={(e) => onSendTypingIndicatorsChange?.(e.target.checked)}
-              className="mt-1"
+              className="settings-toggle-input"
             />
+            <span className="settings-switch" aria-hidden="true" />
             <span>
               Tippstatus senden
               <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
@@ -246,13 +248,14 @@ export function SecuritySettings({
               </span>
             </span>
           </label>
-          <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <label className="settings-toggle-row mt-3">
             <input
               type="checkbox"
               checked={sendReadReceipts}
               onChange={(e) => onSendReadReceiptsChange?.(e.target.checked)}
-              className="mt-1"
+              className="settings-toggle-input"
             />
+            <span className="settings-switch" aria-hidden="true" />
             <span>
               Lese-/Zustellbestätigungen senden
               <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
@@ -262,13 +265,14 @@ export function SecuritySettings({
           </label>
           <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
             <div className="flex items-start justify-between gap-3">
-              <label className="flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+              <label className="settings-toggle-row">
                 <input
                   type="checkbox"
                   checked={notificationEnabled}
                   onChange={(e) => onNotificationEnabledChange?.(e.target.checked)}
-                  className="mt-1"
+                  className="settings-toggle-input"
                 />
+                <span className="settings-switch" aria-hidden="true" />
                 <span>
                   Systembenachrichtigungen
                   <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
@@ -287,14 +291,15 @@ export function SecuritySettings({
                 </button>
               )}
             </div>
-            <label className="mt-3 flex cursor-pointer items-start gap-3 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <label className="settings-toggle-row mt-3">
               <input
                 type="checkbox"
                 checked={notificationPreview}
                 disabled={!notificationEnabled}
                 onChange={(e) => onNotificationPreviewChange?.(e.target.checked)}
-                className="mt-1"
+                className="settings-toggle-input"
               />
+              <span className="settings-switch" aria-hidden="true" />
               <span>
                 Vorschau in Benachrichtigungen anzeigen
                 <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
