@@ -12,6 +12,9 @@ export type StoredUser = {
   username: string;
   passwordHash: string;
   publicKey: string;
+  recoveryEmailHash?: string;
+  plan: "personal" | "pro" | "team";
+  requestedPlan?: "personal" | "pro" | "team";
   createdAt: number;
 };
 
@@ -23,7 +26,14 @@ export type StoredGroup = {
 };
 
 const users = new Map<string, StoredUser>(
-  loadPersistedUsers().map((user) => [user.id, user])
+  loadPersistedUsers().map((user) => [
+    user.id,
+    {
+      ...user,
+      plan: user.plan ?? "personal",
+      ...(user.requestedPlan ? { requestedPlan: user.requestedPlan } : {}),
+    },
+  ])
 );
 const usersByName = new Map<string, string>(
   [...users.values()].map((user) => [user.username.toLowerCase(), user.id])
@@ -49,6 +59,9 @@ export function createUser(input: {
   username: string;
   passwordHash: string;
   publicKey: string;
+  recoveryEmailHash?: string;
+  plan?: "personal" | "pro" | "team";
+  requestedPlan?: "personal" | "pro" | "team";
 }): StoredUser | null {
   if (usersByName.has(input.username.toLowerCase())) return null;
   const user: StoredUser = {
@@ -56,6 +69,9 @@ export function createUser(input: {
     username: input.username,
     passwordHash: input.passwordHash,
     publicKey: input.publicKey,
+    ...(input.recoveryEmailHash ? { recoveryEmailHash: input.recoveryEmailHash } : {}),
+    plan: input.plan ?? "personal",
+    ...(input.requestedPlan ? { requestedPlan: input.requestedPlan } : {}),
     createdAt: Date.now(),
   };
   users.set(user.id, user);

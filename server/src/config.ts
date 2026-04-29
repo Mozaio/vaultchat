@@ -5,6 +5,7 @@ export type RuntimeConfig = {
   nodeEnv: string;
   profile: DeploymentProfile;
   hasStrongJwtSecret: boolean;
+  hasEmailHashSecret: boolean;
   corsOrigins: string[];
   clientOrigins: string[];
   connectOrigins: string[];
@@ -42,6 +43,9 @@ export function loadRuntimeConfig(): RuntimeConfig {
     hasStrongJwtSecret: Boolean(
       process.env.VAULTCHAT_JWT_SECRET && process.env.VAULTCHAT_JWT_SECRET.length >= 32
     ),
+    hasEmailHashSecret: Boolean(
+      process.env.VAULTCHAT_EMAIL_HASH_SECRET && process.env.VAULTCHAT_EMAIL_HASH_SECRET.length >= 32
+    ),
     corsOrigins: splitEnvList(process.env.VAULTCHAT_CORS_ORIGIN),
     clientOrigins: splitEnvList(process.env.VAULTCHAT_CLIENT_ORIGINS),
     connectOrigins: splitEnvList(process.env.VAULTCHAT_CONNECT_ORIGINS),
@@ -66,6 +70,9 @@ export function validateRuntimeConfig(config = loadRuntimeConfig()): string[] {
   if (config.profile === "production") {
     if (!config.hasStrongJwtSecret) {
       problems.push("production profile requires VAULTCHAT_JWT_SECRET");
+    }
+    if (!config.hasEmailHashSecret) {
+      problems.push("production profile requires VAULTCHAT_EMAIL_HASH_SECRET for recovery email hashing");
     }
     if (config.corsOrigins.length === 0) {
       problems.push("production profile requires VAULTCHAT_CORS_ORIGIN");

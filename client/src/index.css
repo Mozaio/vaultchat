@@ -1673,6 +1673,67 @@ select:focus-visible {
   color: var(--danger);
 }
 
+.auth-choice-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sidebar);
+  padding: 0.875rem;
+}
+
+.auth-badge {
+  flex-shrink: 0;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0.2rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.auth-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.auth-plan-card {
+  min-height: 6rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.65rem;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.auth-plan-card:hover,
+.auth-plan-card.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.auth-plan-card.active {
+  transform: translateY(-1px);
+}
+
+.auth-plan-price {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.auth-plan-audience {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
 .auth-header {
   margin-bottom: 2rem;
 }
@@ -2044,6 +2105,9 @@ input[type="checkbox"] {
     margin: 1rem;
     padding: 1.5rem;
     border-radius: var(--radius-lg);
+  }
+  .auth-plan-grid {
+    grid-template-columns: 1fr;
   }
 }
 

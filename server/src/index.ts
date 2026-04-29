@@ -2,7 +2,7 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
-import { createPublicKey, randomUUID, verify as verifySignature } from "node:crypto";
+import { createHmac, createPublicKey, randomUUID, verify as verifySignature } from "node:crypto";
 import { createServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
@@ -170,6 +170,7 @@ app.get("/readyz", (_req, res) => {
 
 const USERNAME_RE = /^[a-zA-Z][a-zA-Z0-9_-]{1,31}$/;
 const INVALID_USERNAME_PAIR_RE = /__|--|-_|_-/;
+const Plan = z.enum(["personal", "pro", "team"]);
 
 const RegisterBody = z.object({
   username: z
@@ -180,6 +181,8 @@ const RegisterBody = z.object({
     .refine((name) => !/[_-]$/.test(name) && !INVALID_USERNAME_PAIR_RE.test(name)),
   password: z.string().min(10).max(256),
   publicKey: z.string().min(16),
+  recoveryEmail: z.string().email().max(254).optional(),
+  requestedPlan: Plan.optional(),
   inviteCode: z.string().max(256).optional(),
 });
 
@@ -212,7 +215,16 @@ app.post("/api/register", authLimiter, async (req, res) => {
   }
   const { username, password, publicKey } = parsed.data;
   const passwordHash = await hashPassword(password);
-  const user = createUser({ username, passwordHash, publicKey });
+  const user = createUser({
+    username,
+    passwordHash,
+    publicKey,
+    plan: "personal",
+    requestedPlan: parsed.data.requestedPlan,
+    ...(parsed.data.recoveryEmail
+      ? { recoveryEmailHash: recoveryEmailHash(parsed.data.recoveryEmail) }
+      : {}),
+  });
   if (!user) {
     res.status(409).json({ error: "username_taken" });
     return;
@@ -221,7 +233,13 @@ app.post("/api/register", authLimiter, async (req, res) => {
   const token = signToken({ userId: user.id, username: user.username });
   res.json({
     token,
-    user: { id: user.id, username: user.username, publicKey: user.publicKey },
+    user: {
+      id: user.id,
+      username: user.username,
+      publicKey: user.publicKey,
+      plan: user.plan,
+      recoveryEmailConfigured: Boolean(user.recoveryEmailHash),
+    },
   });
 });
 
@@ -240,7 +258,13 @@ app.post("/api/login", authLimiter, async (req, res) => {
   const token = signToken({ userId: user.id, username: user.username });
   res.json({
     token,
-    user: { id: user.id, username: user.username, publicKey: user.publicKey },
+    user: {
+      id: user.id,
+      username: user.username,
+      publicKey: user.publicKey,
+      plan: user.plan ?? "personal",
+      recoveryEmailConfigured: Boolean(user.recoveryEmailHash),
+    },
   });
 });
 
@@ -264,12 +288,15 @@ app.get("/api/me", async (req, res) => {
     id: user.id,
     username: user.username,
     publicKey: user.publicKey,
+    plan: user.plan ?? "personal",
+    recoveryEmailConfigured: Boolean(user.recoveryEmailHash),
   });
 });
 
 app.get("/api/public-config", (_req, res) => {
   res.json({
     registration: publicRegistrationConfig(),
+    product: publicProductConfig(),
   });
 });
 
@@ -293,10 +320,13 @@ app.get("/api/server/status", async (req, res) => {
     realtime: getWsStats(),
     privacy: {
       sealedDmMailbox: true,
+      sealedGroupMailbox: true,
       messageContentPersistentOnServer: false,
+      recoveryEmailStoredAsHash: true,
       urlTokenAuthEnabled: process.env.VAULTCHAT_ALLOW_WS_URL_TOKEN === "1",
     },
     registration: publicRegistrationConfig(),
+    product: publicProductConfig(),
   });
 });
 
@@ -620,6 +650,45 @@ function flushMailboxToSocket(userId: string, ws: WebSocket) {
       })
     );
   }
+}
+
+function recoveryEmailHash(email: string): string {
+  const pepper = process.env.VAULTCHAT_EMAIL_HASH_SECRET ?? process.env.VAULTCHAT_JWT_SECRET ?? "dev-email-hash-secret";
+  return createHmac("sha256", pepper)
+    .update(email.trim().toLowerCase())
+    .digest("hex");
+}
+
+function publicProductConfig() {
+  return {
+    identity: {
+      emailMode: "optional_hash_only" as const,
+      backupRequiredForNewDevices: true,
+    },
+    plans: [
+      {
+        id: "personal",
+        name: "Personal",
+        priceEurMonthly: 0,
+        audience: "Private Nutzung",
+        highlights: ["E2E-Chats", "Gruppen", "verschluesselte Backups"],
+      },
+      {
+        id: "pro",
+        name: "Pro",
+        priceEurMonthly: 5,
+        audience: "Power-User und Creator",
+        highlights: ["mehr Geraete", "laengere Mailbox-Aufbewahrung", "Priority Support"],
+      },
+      {
+        id: "team",
+        name: "Team",
+        priceEurMonthly: 9,
+        audience: "Teams pro Mitglied",
+        highlights: ["Einladungsverwaltung", "Admin-Policy", "Compliance-Export ohne Inhalte"],
+      },
+    ],
+  };
 }
 
 /**

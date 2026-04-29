@@ -120,6 +120,7 @@ das mehrere Wochen bis Monate, je nach Nutzung. Kein Sleep, keine Wartezeit.
 4. **Variables:**
    ```
    VAULTCHAT_JWT_SECRET   = <openssl rand -hex 32>
+   VAULTCHAT_EMAIL_HASH_SECRET = <openssl rand -hex 32>
    VAULTCHAT_CORS_ORIGIN  = https://<client-railway-domain>   (spaeter setzen)
    VAULTCHAT_TURN_URL     = (optional, nur fuer Calls hinter strikten NATs)
    VAULTCHAT_TURN_USER    = (optional)

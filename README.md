@@ -102,6 +102,7 @@ docker compose up --build
 | Variable | Zweck |
 |---|---|
 | `VAULTCHAT_JWT_SECRET` | Pflicht in Prod — signiert JWTs |
+| `VAULTCHAT_EMAIL_HASH_SECRET` | Separater Pepper fuer optionale Recovery-E-Mail-HMACs; nicht mit `VAULTCHAT_JWT_SECRET` wiederverwenden |
 | `VAULTCHAT_DEPLOYMENT_PROFILE` | `development`, `preview` oder `production`; Production aktiviert Fail-Fast-Konfigurationschecks |
 | `VAULTCHAT_ALLOW_EPHEMERAL_STATE` | `1` erlaubt bewusst RAM-only State trotz Production Profile |
 | `VAULTCHAT_REGISTRATION_MODE` | `open`, `invite` oder `closed`; Production sollte `invite` oder `closed` nutzen |

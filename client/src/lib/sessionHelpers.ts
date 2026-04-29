@@ -36,7 +36,11 @@ export async function buildSessionFromLogin(
 export async function buildSessionFromRegister(
   username: string,
   password: string,
-  inviteCode?: string
+  inviteCode?: string,
+  options?: {
+    recoveryEmail?: string;
+    requestedPlan?: "personal" | "pro" | "team";
+  }
 ): Promise<{ session: Session; local: LocalIdentity }> {
   const kp = await generateBoxKeypair();
   const publicKey = publicKeyBase64(kp.publicKey);
@@ -45,6 +49,8 @@ export async function buildSessionFromRegister(
     username,
     password,
     publicKey,
+    ...(options?.recoveryEmail ? { recoveryEmail: options.recoveryEmail } : {}),
+    ...(options?.requestedPlan ? { requestedPlan: options.requestedPlan } : {}),
     ...(inviteCode ? { inviteCode } : {}),
   });
   const local: LocalIdentity = {

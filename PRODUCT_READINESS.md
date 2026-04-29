@@ -15,6 +15,7 @@ NODE_ENV=production
 In this profile the server fails fast unless:
 
 - `VAULTCHAT_JWT_SECRET` is set and strong enough.
+- `VAULTCHAT_EMAIL_HASH_SECRET` is set separately if optional recovery email is enabled.
 - CORS, client, and connect origins are explicit.
 - Account/group/prekey state is persistent via `VAULTCHAT_STATE_FILE`, unless
   ephemeral state is deliberately accepted with `VAULTCHAT_ALLOW_EPHEMERAL_STATE=1`.

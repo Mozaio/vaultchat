@@ -6,6 +6,9 @@ export type PersistedUser = {
   username: string;
   passwordHash: string;
   publicKey: string;
+  recoveryEmailHash?: string;
+  plan?: "personal" | "pro" | "team";
+  requestedPlan?: "personal" | "pro" | "team";
   createdAt: number;
 };
 

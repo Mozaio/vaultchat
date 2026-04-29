@@ -30,6 +30,8 @@ export type ApiUser = {
   id: string;
   username: string;
   publicKey: string;
+  plan?: "personal" | "pro" | "team";
+  recoveryEmailConfigured?: boolean;
 };
 
 export type ApiGroup = {
@@ -86,6 +88,8 @@ export async function register(body: {
   username: string;
   password: string;
   publicKey: string;
+  recoveryEmail?: string;
+  requestedPlan?: "personal" | "pro" | "team";
   inviteCode?: string;
 }) {
   return req<{ token: string; user: ApiUser }>("/api/register", {
@@ -98,6 +102,19 @@ export type PublicConfig = {
   registration: {
     mode: "open" | "invite" | "closed";
     inviteRequired: boolean;
+  };
+  product?: {
+    identity: {
+      emailMode: "optional_hash_only";
+      backupRequiredForNewDevices: boolean;
+    };
+    plans: {
+      id: "personal" | "pro" | "team";
+      name: string;
+      priceEurMonthly: number;
+      audience: string;
+      highlights: string[];
+    }[];
   };
 };
 
@@ -131,9 +148,12 @@ export type ServerStatus = {
   };
   privacy: {
     sealedDmMailbox: boolean;
+    sealedGroupMailbox?: boolean;
     messageContentPersistentOnServer: boolean;
+    recoveryEmailStoredAsHash?: boolean;
     urlTokenAuthEnabled: boolean;
   };
+  product?: PublicConfig["product"];
   registration: PublicConfig["registration"];
 };
 

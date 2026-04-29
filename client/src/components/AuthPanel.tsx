@@ -16,6 +16,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { IconAlertTriangle, IconLock, IconShieldCheck, IconTimer } from "./Icons";
 
 type Mode = "unlock" | "login" | "register" | "import";
+type ProductPlanId = "personal" | "pro" | "team";
 
 // Discord-like username validation
 function validateUsername(username: string): { valid: boolean; error?: string } {
@@ -86,14 +87,20 @@ export function AuthPanel({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<ProductPlanId>("personal");
   const [registrationMode, setRegistrationMode] = useState<"open" | "invite" | "closed">("open");
+  const [productConfig, setProductConfig] = useState<api.PublicConfig["product"] | null>(null);
   const [importJson, setImportJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void api.publicConfig()
-      .then((config) => setRegistrationMode(config.registration.mode))
+      .then((config) => {
+        setRegistrationMode(config.registration.mode);
+        setProductConfig(config.product ?? null);
+      })
       .catch(() => {});
   }, []);
 
@@ -152,7 +159,11 @@ export function AuthPanel({
       const { session, local } = await buildSessionFromRegister(
         username,
         password,
-        inviteCode.trim() || undefined
+        inviteCode.trim() || undefined,
+        {
+          requestedPlan: selectedPlan,
+          recoveryEmail: recoveryEmail.trim() || undefined,
+        }
       );
       await onSession(session, local);
     } catch (err) {
@@ -199,7 +210,7 @@ export function AuthPanel({
           className="relative z-[1] mt-10 max-w-md text-sm"
           style={{ color: "var(--text-muted)" }}
         >
-          Tipp: Exportiere direkt nach der Registrierung dein JSON-Backup.
+          Keine Pflicht-E-Mail. Fuer Recovery kannst du optional eine E-Mail als Server-Hash hinterlegen.
         </p>
       </div>
 
@@ -432,6 +443,79 @@ export function AuthPanel({
                 </p>
               </div>
             )}
+            <div className="auth-choice-panel">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                    Authentizitaet & Recovery
+                  </p>
+                  <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                    Optional. Der Server speichert keinen Klartext, sondern nur einen HMAC-Hash.
+                  </p>
+                </div>
+                <span className="auth-badge">Privacy-first</span>
+              </div>
+              <div className="auth-input-group mt-3">
+                <label>Recovery-E-Mail optional</label>
+                <input
+                  type="email"
+                  className="auth-input"
+                  value={recoveryEmail}
+                  onChange={(e) => setRecoveryEmail(e.target.value)}
+                  autoComplete="email"
+                  placeholder="name@example.com"
+                />
+                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  Hilft spaeter bei Support/Account-Nachweis. Fuer neue Geraete brauchst du trotzdem dein Backup.
+                </p>
+              </div>
+            </div>
+            <div className="auth-choice-panel">
+              <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                Plan waehlen
+              </p>
+              <div className="auth-plan-grid mt-3">
+                {(productConfig?.plans ?? [
+                  {
+                    id: "personal" as const,
+                    name: "Personal",
+                    priceEurMonthly: 0,
+                    audience: "Private Nutzung",
+                    highlights: ["E2E-Chats", "Gruppen", "Backups"],
+                  },
+                  {
+                    id: "pro" as const,
+                    name: "Pro",
+                    priceEurMonthly: 5,
+                    audience: "Power-User",
+                    highlights: ["mehr Geraete", "Priority Support"],
+                  },
+                  {
+                    id: "team" as const,
+                    name: "Team",
+                    priceEurMonthly: 9,
+                    audience: "Teams",
+                    highlights: ["Einladungen", "Admin-Policy"],
+                  },
+                ]).map((plan) => (
+                  <button
+                    key={plan.id}
+                    type="button"
+                    className={`auth-plan-card ${selectedPlan === plan.id ? "active" : ""}`}
+                    onClick={() => setSelectedPlan(plan.id)}
+                  >
+                    <span className="font-semibold">{plan.name}</span>
+                    <span className="auth-plan-price">
+                      {plan.priceEurMonthly === 0 ? "Free" : `${plan.priceEurMonthly} EUR/Monat`}
+                    </span>
+                    <span className="auth-plan-audience">{plan.audience}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                Payment ist noch nicht aktiv. Diese Auswahl bereitet Pricing, Limits und spaetere Abrechnung vor.
+              </p>
+            </div>
             <button
               type="button"
               onClick={() => void handleRegister()}
