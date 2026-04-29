@@ -89,18 +89,21 @@ export async function initGroupKeyState(
   groupId: string,
   memberIds: string[],
   mySenderId: string,
-  myIdentitySk: Uint8Array
+  myIdentitySk: Uint8Array,
+  importedRootKey?: Uint8Array
 ): Promise<GroupKeyState> {
   await sodiumReady();
   const sodium = getSodium();
-  
+  void memberIds;
+  void myIdentitySk;
+
   // Generate new root key
-  const rootKey = sodium.randombytes_buf(32);
-  
+  const rootKey = importedRootKey ? new Uint8Array(importedRootKey) : sodium.randombytes_buf(32);
+
   // Generate sender key for myself
   const senderKp = sodium.crypto_box_keypair();
   const senderState: GroupSenderState = {
-    senderKey: base64FromUint8(sodium.randombytes_buf(32)),
+    senderKey: base64FromUint8(rootKey),
     chainCounter: 0,
     ephemeralPub: base64FromUint8(senderKp.publicKey),
     ephemeralPriv: base64FromUint8(senderKp.privateKey),
@@ -134,15 +137,12 @@ export async function rotateGroupKey(
 
   // Generate new root key
   const newRootKey = sodium.randombytes_buf(32);
-  const newSenderKey = sodium.randombytes_buf(32);
-  
-  // Derive first chain key from new root
-  const [nextKey, firstMessageKey] = await deriveChainKey(newRootKey, 0);
+  const newSenderKey = newRootKey;
   
   // Update own sender state
   const senderKp = sodium.crypto_box_keypair();
   state.senderStates[mySenderId] = {
-    senderKey: base64FromUint8(newSenderKey),
+    senderKey: base64FromUint8(newRootKey),
     chainCounter: 0,
     ephemeralPub: base64FromUint8(senderKp.publicKey),
     ephemeralPriv: base64FromUint8(senderKp.privateKey),
@@ -317,7 +317,7 @@ export async function decryptGroupMessage(
     chainKey = next;
   }
   
-  const [, messageKey] = await deriveChainKey(chainKey, counter);
+  const [nextChainKey, messageKey] = await deriveChainKey(chainKey, counter);
   
   // Decrypt
   const plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
@@ -330,7 +330,7 @@ export async function decryptGroupMessage(
   
   // Update chain counter
   senderState.chainCounter = counter + 1;
-  senderState.senderKey = base64FromUint8(chainKey);
+  senderState.senderKey = base64FromUint8(nextChainKey);
   await setGroupKeyState(groupId, state);
   
   return {
@@ -404,6 +404,16 @@ export async function encryptGroupPayload(
     // Use new PFS encrypt — benutze die tatsächliche senderUserId aus dem Payload
     // (wird in ChatShell als session.user.id gesetzt)
     const senderId = payload.senderUserId ?? Object.keys(state.senderStates)[0];
+    if (!state.senderStates[senderId]) {
+      const senderKp = sodium.crypto_box_keypair();
+      state.senderStates[senderId] = {
+        senderKey: state.rootKey,
+        chainCounter: 0,
+        ephemeralPub: base64FromUint8(senderKp.publicKey),
+        ephemeralPriv: base64FromUint8(senderKp.privateKey),
+      };
+      await setGroupKeyState(groupId, state);
+    }
     const result = await encryptGroupMessage(groupId, senderId, payload);
     return result.ciphertext;
   }

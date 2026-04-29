@@ -89,6 +89,8 @@ import {
 type Tab = "dm" | "group";
 type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
+const EMOJI_CHOICES = ["😀", "😂", "😍", "👍", "🔥", "🎉", "😮", "😢", "🙏", "✅"];
+
 type SharedMediaItem = {
   id: string;
   kind: "file" | "voice";
@@ -949,12 +951,18 @@ export function ChatShell({
             if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
               const keyBytes = uint8FromBase64(plain.keyB64);
               await setGroupKey(plain.groupId, keyBytes);
-              // Auch PFS-Key-State initialisieren, damit encryptGroupPayload
-              // den PFS-Pfad (GC2) nutzen kann statt Legacy (GC1)
               const existingState = await getGroupKeyState(plain.groupId);
-              if (!existingState) {
-                const peers = usersRef.current.map(u => u.id);
-                await initGroupKeyState(plain.groupId, peers, session.user.id, session.secretKey);
+              if (!existingState || existingState.rootKey !== plain.keyB64) {
+                const groupMembers =
+                  groupsRef.current.find((x) => x.id === plain.groupId)?.memberIds ??
+                  usersRef.current.map((u) => u.id);
+                await initGroupKeyState(
+                  plain.groupId,
+                  groupMembers,
+                  session.user.id,
+                  session.secretKey,
+                  keyBytes
+                );
               }
               await loadGroups();
               return;
@@ -1318,6 +1326,7 @@ export function ChatShell({
     });
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
+    await initGroupKeyState(g.id, memberIds, session.user.id, session.secretKey, key);
     await loadGroups();
     await distributeGroupKey(g, memberIds, base64FromUint8(key));
     setNewGroupName("");
@@ -1331,6 +1340,7 @@ export function ChatShell({
   async function rotateGroupKey(g: api.ApiGroup, newMembers: string[]) {
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
+    await initGroupKeyState(g.id, newMembers, session.user.id, session.secretKey, key);
     await distributeGroupKey(g, newMembers, base64FromUint8(key));
   }
 
@@ -2318,7 +2328,7 @@ export function ChatShell({
                 </button>
                 {emojiOpen && (
                   <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
-                    {["😀","😂","😍","👍","🔥","🎉","😮","😢","🙏","✅"].map((e) => (
+                    {EMOJI_CHOICES.map((e) => (
                       <button
                         key={e}
                         type="button"
@@ -2442,7 +2452,7 @@ export function ChatShell({
                   <div>
                   <p className="font-medium" style={{ color: "var(--text)" }}>{group.name}</p>
                   <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    E2EE symmetrisch · {group.memberIds.length} Mitglieder
+                    Ende-zu-Ende verschluesselt · {group.memberIds.length} Mitglieder
                   </p>
                   </div>
                 </div>
@@ -2567,32 +2577,55 @@ export function ChatShell({
                   ↓ Neue Nachrichten
                 </button>
               )}
-              {groupMessages.map((m) => (
-                <MessageBubble
-                  key={m.plain.cid ?? m.id}
-                  msg={m}
-                  peerLabel={
-                    users.find((u) => u.id === m.fromUserId)?.username ?? group.name
-                  }
-                  replyToPreview={replyPreviewForMessage(
-                    groupMessages,
-                    m,
-                    users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied"
-                  )}
-                  onReply={(x) =>
-                    setReplyGroup({
-                      cid: x.plain.cid ?? "",
-                      author: x.fromMe ? "Du" : "Mitglied",
-                      text: previewForPayload(x.plain),
-                      expiresAt: x.expiresAt,
-                    })
-                  }
-                  onReact={(x, e) => void reactGroup(x, e)}
-                  onEdit={(x, body) => void editGroup(x, body)}
-                  onDelete={(x) => void deleteGroup(x)}
-                  onCopy={copyText}
-                />
-              ))}
+              {groupMessages.flatMap((m, i) => {
+                const author =
+                  users.find((u) => u.id === m.fromUserId)?.username ??
+                  (m.fromMe ? "Du" : "Mitglied");
+                const previous = groupMessages[i - 1];
+                const next = groupMessages[i + 1];
+                const items: JSX.Element[] = [];
+                if (
+                  i === 0 ||
+                  new Date(m.at).toDateString() !== new Date(previous.at).toDateString()
+                ) {
+                  items.push(
+                    <div key={`date-${m.id}`} className="date-separator">
+                      <span>{fmtDateLabel(m.at)}</span>
+                    </div>
+                  );
+                }
+                items.push(
+                  <MessageBubble
+                    key={m.plain.cid ?? m.id}
+                    msg={m}
+                    peerLabel={author}
+                    replyToPreview={replyPreviewForMessage(groupMessages, m, author)}
+                    isGrouped={
+                      i > 0 &&
+                      previous.fromMe === m.fromMe &&
+                      previous.fromUserId === m.fromUserId
+                    }
+                    isLastInGroup={
+                      i === groupMessages.length - 1 ||
+                      next.fromMe !== m.fromMe ||
+                      next.fromUserId !== m.fromUserId
+                    }
+                    onReply={(x) =>
+                      setReplyGroup({
+                        cid: x.plain.cid ?? "",
+                        author: x.fromMe ? "Du" : author,
+                        text: previewForPayload(x.plain),
+                        expiresAt: x.expiresAt,
+                      })
+                    }
+                    onReact={(x, e) => void reactGroup(x, e)}
+                    onEdit={(x, body) => void editGroup(x, body)}
+                    onDelete={(x) => void deleteGroup(x)}
+                    onCopy={copyText}
+                  />
+                );
+                return items;
+              })}
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
@@ -2614,7 +2647,41 @@ export function ChatShell({
                   </button>
                 </div>
               )}
-              <div className="flex items-end gap-2">
+              <div className="relative flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEmojiOpen((v) => !v)}
+                  className="chat-tool-button"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  title="Emoji"
+                >
+                  <IconSmile size={18} />
+                </button>
+                {emojiOpen && (
+                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
+                    {EMOJI_CHOICES.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        className="rounded px-1.5 py-1 transition hover:bg-[var(--bg-hover)]"
+                        title={`Emoji ${e} einfuegen`}
+                        onClick={() => {
+                          setGroupText((current) => {
+                            const nextText = current ? `${current}${e}` : e;
+                            window.requestAnimationFrame(() => {
+                              resizeTextarea(groupInputRef.current);
+                              groupInputRef.current?.focus();
+                            });
+                            return nextText;
+                          });
+                          setEmojiOpen(false);
+                        }}
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   ref={groupInputRef}
                   className="chat-input-textarea"

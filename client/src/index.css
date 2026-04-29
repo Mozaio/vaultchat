@@ -1022,7 +1022,7 @@ select:focus-visible {
 
 /* ── Input Area (WhatsApp/Telegram pill style) ── */
 .chat-input-area {
-  padding: 0.5rem 1rem;
+  padding: 0.625rem 1rem;
   background: var(--bg-sidebar);
   border-top: 1px solid var(--border);
   display: flex;
@@ -1031,9 +1031,14 @@ select:focus-visible {
   flex-shrink: 0;
 }
 
+.chat-input-area > .relative,
+.chat-input-area > .flex {
+  width: 100%;
+}
+
 .chat-tool-button {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg-elevated);
@@ -1051,13 +1056,13 @@ select:focus-visible {
 }
 
 .chat-input-textarea {
-  min-height: 44px;
+  min-height: 42px;
   max-height: 120px;
   flex: 1 1 auto;
   resize: none;
   overflow-y: auto;
   border: 1.5px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   color: var(--text);
   padding: 0.7rem 0.9rem;
@@ -1252,6 +1257,7 @@ select:focus-visible {
   transition: background 0.15s ease, color 0.15s ease;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .filter-chip.active {
@@ -1283,6 +1289,7 @@ select:focus-visible {
 
 .contact-item.active {
   background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.16);
 }
 
 .contact-item.active::before {
@@ -1390,7 +1397,7 @@ select:focus-visible {
 }
 
 .info-panel-shell.open {
-  width: 280px;
+  width: 320px;
   border-left-color: var(--border);
   opacity: 1;
   transform: translateX(0);
