@@ -759,7 +759,21 @@ export function ChatShell({
         return null;
       }
       const p: PlainPayload = { ...payload, senderUserId: session.user.id };
-      const ciphertext = await encryptGroupPayload(g.id, p);
+      let ciphertext: string;
+      try {
+        ciphertext = await encryptGroupPayload(g.id, p);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message === "no_group_key" || message === "no_group_state" || message === "no_sender_state") {
+          setError(
+            "Gruppenschluessel fehlt auf diesem Geraet. Warte auf die Schluesselverteilung oder lasse dich erneut zur Gruppe hinzufuegen."
+          );
+          void loadGroups().catch(() => {});
+          return null;
+        }
+        setError("Gruppennachricht konnte nicht verschluesselt werden.");
+        return null;
+      }
       const at = Date.now();
       const tmpId = `local-g-${newCid()}`;
       const ttl = p.ttlMs ?? 0;
@@ -787,7 +801,7 @@ export function ChatShell({
       ws.send(JSON.stringify({ type: "group", groupId: g.id, ciphertext }));
       return tmpId;
     },
-    [rebuildGroup, session.user.id]
+    [loadGroups, rebuildGroup, session.user.id]
   );
 
   const handleIncomingGroupFrame = useCallback(
@@ -1237,7 +1251,8 @@ export function ChatShell({
         : {}),
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
     };
-    await sendGroupWire(group, payload);
+    const sentId = await sendGroupWire(group, payload);
+    if (!sentId) return;
     setGroupText("");
     resetTextarea(groupInputRef.current);
     setReplyGroup(null);
@@ -1328,7 +1343,8 @@ export function ChatShell({
       kind: "delete",
       refCid,
     };
-    await sendGroupWire(group, payload);
+    const sentId = await sendGroupWire(group, payload);
+    if (!sentId) return;
     await idbDeleteGroupMsg(m.id);
     const arr = (rawGroupRef.current.get(group.id) ?? []).filter(
       (x) => x.id !== m.id
