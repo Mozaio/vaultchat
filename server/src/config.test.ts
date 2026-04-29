@@ -6,6 +6,7 @@ const baseConfig: RuntimeConfig = {
   nodeEnv: "production",
   profile: "production",
   hasStrongJwtSecret: true,
+  hasEmailHashSecret: true,
   corsOrigins: ["https://chat.example.org"],
   clientOrigins: ["https://chat.example.org"],
   connectOrigins: ["https://chat.example.org"],
