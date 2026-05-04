@@ -1983,6 +1983,14 @@ export function ChatShell({
           </div>
         </div>
 
+        <div className="sidebar-security-strip mx-3 mt-3">
+          <span className={connected ? "online" : "offline"} />
+          <div className="min-w-0">
+            <p>{connected ? "Realtime verbunden" : "Verbindung wird aufgebaut"}</p>
+            <small>{relayOnly ? "Relay-only aktiv" : "E2E aktiv, Relay optional"}</small>
+          </div>
+        </div>
+
         <div className="px-3 pt-2">
           <div className="search-box flex items-center gap-2 !py-2">
             <span className="app-muted" aria-hidden>
@@ -2069,6 +2077,10 @@ export function ChatShell({
         {sidebarFilter === "group" && (
           <>
             <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
+              <div className="group-create-header">
+                <p>Neue private Gruppe</p>
+                <span>Key-Rotation bei jeder Aenderung</span>
+              </div>
               <input
                 className="app-input w-full !py-2 text-sm"
                 placeholder="Gruppenname"
@@ -2712,6 +2724,11 @@ export function ChatShell({
                     <span className="group-voice-badge">
                       {relayOnly ? "Relay aktiv" : "Direkt/Relay"}
                     </span>
+                  </div>
+                  <div className="chat-context-badges">
+                    <span>IP-Schutz</span>
+                    <span>E2E Signaling</span>
+                    <span>Private Member List</span>
                   </div>
                   <div className="group-voice-members">
                     {group.memberIds

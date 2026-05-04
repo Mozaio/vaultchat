@@ -213,6 +213,20 @@ export function AuthPanel({
             desc="Schlüssel nach Inaktivität gelöscht"
           />
         </div>
+        <div className="landing-trust-grid">
+          <div>
+            <span>Keine Pflicht-E-Mail</span>
+            <strong>Identitaet bleibt minimal</strong>
+          </div>
+          <div>
+            <span>Lokale Schluessel</span>
+            <strong>Backup statt Server-Zugriff</strong>
+          </div>
+          <div>
+            <span>Privacy Controls</span>
+            <strong>Typing, Receipts, Relay</strong>
+          </div>
+        </div>
         <p
           className="relative z-[1] mt-10 max-w-md text-sm"
           style={{ color: "var(--text-muted)" }}
@@ -253,6 +267,11 @@ export function AuthPanel({
                   ? "Lokale Schluessel mit deinem Passwort entsperren."
                   : "Privater Messenger mit lokalem Schluessel-Backup."}
               </p>
+              <div className="auth-assurance-row">
+                <span>Zero-Knowledge Login</span>
+                <span>Argon2id</span>
+                <span>E2E Backup</span>
+              </div>
             </div>
             <ThemeToggle />
           </div>

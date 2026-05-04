@@ -482,6 +482,20 @@ select:focus-visible {
   background-size: 24px 24px, auto, auto;
 }
 
+.chat-empty-state-card {
+  width: min(100%, 34rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-glass);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: clamp(1.5rem, 4vw, 2.25rem);
+}
+
 .chat-empty-state-icon {
   color: var(--accent);
   margin-bottom: 0.25rem;
@@ -534,6 +548,9 @@ select:focus-visible {
 }
 
 .feature-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   padding: 4px 12px;
   border-radius: var(--radius-full);
   background: var(--accent-soft);
@@ -1208,6 +1225,65 @@ select:focus-visible {
   border-bottom: 1px solid var(--border);
 }
 
+.sidebar-security-strip {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--accent-soft), transparent), var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.8rem;
+}
+
+.sidebar-security-strip > span {
+  width: 0.6rem;
+  height: 0.6rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--warning);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+}
+
+.sidebar-security-strip > span.online {
+  background: var(--success);
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+}
+
+.sidebar-security-strip p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.sidebar-security-strip small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  line-height: 1.3;
+}
+
+.group-create-header {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  padding: 0.65rem 0.75rem;
+}
+
+.group-create-header p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.group-create-header span {
+  display: block;
+  margin-top: 0.1rem;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
 /* Search box */
 .search-box {
   background: var(--bg-elevated);
@@ -1559,6 +1635,16 @@ select:focus-visible {
   overflow: hidden;
 }
 
+.landing-hero::after {
+  content: "";
+  position: absolute;
+  inset: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  pointer-events: none;
+  opacity: 0.45;
+}
+
 .landing-hero::before {
   content: none;
 }
@@ -1666,6 +1752,40 @@ select:focus-visible {
   text-overflow: ellipsis;
 }
 
+.landing-trust-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  width: min(100%, 42rem);
+  margin-top: 2rem;
+}
+
+.landing-trust-grid div {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-glass);
+  padding: 0.85rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.landing-trust-grid span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.landing-trust-grid strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
 /* Auth Card */
 .auth-card {
   background: var(--bg-elevated);
@@ -1677,7 +1797,7 @@ select:focus-visible {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   box-shadow: var(--shadow-xl);
   position: relative;
   z-index: 1;
@@ -1698,6 +1818,23 @@ select:focus-visible {
 .auth-error span {
   font-size: 13px;
   color: var(--danger);
+}
+
+.auth-assurance-row {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.auth-assurance-row span {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0.2rem 0.45rem;
+  font-size: 0.66rem;
+  font-weight: 800;
 }
 
 .auth-choice-panel {
@@ -1800,7 +1937,9 @@ select:focus-visible {
   margin-top: 0.75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg-elevated);
+  background:
+    linear-gradient(135deg, var(--accent-soft), transparent 58%),
+    var(--bg-elevated);
   padding: 0.875rem;
   color: var(--text);
   box-shadow: var(--shadow-sm);
@@ -1834,6 +1973,23 @@ select:focus-visible {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.55rem;
+}
+
+.chat-context-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+
+.chat-context-badges span {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  padding: 0.12rem 0.45rem;
+  font-size: 0.62rem;
+  font-weight: 800;
 }
 
 .composer-notice {
@@ -2248,6 +2404,12 @@ input[type="checkbox"] {
     margin: 1rem;
     padding: 1.5rem;
     border-radius: var(--radius-lg);
+  }
+  .landing-trust-grid {
+    grid-template-columns: 1fr;
+  }
+  .landing-hero::after {
+    inset: 0.75rem;
   }
   .auth-plan-grid {
     grid-template-columns: 1fr;
