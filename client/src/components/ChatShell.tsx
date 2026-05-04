@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Session } from "../lib/sessionHelpers";
 import * as api from "../lib/api";
 import { decryptIncomingSealedDm } from "../lib/incomingDm";
@@ -106,6 +106,27 @@ type SharedMediaItem = {
   href: string;
   at: number;
 };
+
+function SidebarEmptyState({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="sidebar-empty-state">
+      <div className="sidebar-empty-icon">
+        <IconUsers size={18} />
+      </div>
+      <p>{title}</p>
+      <span>{body}</span>
+      {action}
+    </div>
+  );
+}
 
 function loadStringSet(key: string): Set<string> {
   try {
@@ -1853,6 +1874,9 @@ export function ChatShell({
     [visibleGroups, group, tab, lastGroupPreviewByGroup, fmtListTime]
   );
 
+  const canCreateGroup = newGroupName.trim().length > 0 && newGroupMembers.length > 0;
+  const hasContacts = users.length > 0;
+
   return (
     <div className="flex h-full w-full flex-col bg-[var(--bg)] p-0 md:p-4">
       {searchOpen && (
@@ -1953,7 +1977,7 @@ export function ChatShell({
       <aside
         className={`${
           showSidebar ? "flex" : "hidden"
-        } w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
+        } sidebar-shell w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -1971,6 +1995,15 @@ export function ChatShell({
           </div>
           <div className="flex gap-1.5">
             <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setSecurityOpen(true)}
+              className="btn btn-secondary btn-icon !h-9 !w-9"
+              title="Sicherheitseinstellungen"
+              aria-label="Sicherheitseinstellungen"
+            >
+              <IconSettings size={15} />
+            </button>
             <button
               type="button"
               onClick={onLock}
@@ -2018,6 +2051,7 @@ export function ChatShell({
               key={value}
               type="button"
               className={`filter-chip ${sidebarFilter === value ? "active" : ""}`}
+              aria-label={`Filter: ${label}`}
               onClick={() => {
                 const next = value as SidebarFilter;
                 setSidebarFilter(next);
@@ -2055,7 +2089,27 @@ export function ChatShell({
                 sidebarFilter === "all" ? "max-h-[42%]" : "flex-1"
               }`}
             >
-              {peerList}
+              {peerList.length > 0 ? (
+                peerList
+              ) : (
+                <SidebarEmptyState
+                  title={query.trim() ? "Keine Kontakte gefunden" : "Noch keine Kontakte"}
+                  body={
+                    query.trim()
+                      ? "Passe die Suche an oder fuege einen neuen Kontakt hinzu."
+                      : "Fuege deinen ersten Kontakt hinzu, um eine verschluesselte Unterhaltung zu starten."
+                  }
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => setShowAddContact(true)}
+                      className="btn btn-secondary !mt-3 !px-3 !py-2 !text-xs"
+                    >
+                      Kontakt hinzufuegen
+                    </button>
+                  }
+                />
+              )}
             </div>
           </>
         )}
@@ -2065,11 +2119,10 @@ export function ChatShell({
             {peerList.length > 0 ? (
               peerList
             ) : (
-              <div className="flex h-full items-center justify-center px-6 text-center">
-                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Markiere Kontakte als Favorit, damit sie hier erscheinen.
-                </p>
-              </div>
+              <SidebarEmptyState
+                title="Keine Favoriten"
+                body="Markiere wichtige Kontakte als Favorit, damit sie hier erscheinen."
+              />
             )}
           </div>
         )}
@@ -2091,6 +2144,8 @@ export function ChatShell({
                 multiple
                 className="app-input h-24 !py-1 text-xs"
                 value={newGroupMembers}
+                disabled={!hasContacts}
+                aria-label="Gruppenmitglieder aus Kontakten auswaehlen"
                 onChange={(e) => {
                   const o = [...e.target.selectedOptions].map((x) => x.value);
                   setNewGroupMembers(o);
@@ -2102,9 +2157,20 @@ export function ChatShell({
                   </option>
                 ))}
               </select>
+              {!hasContacts && (
+                <p className="sidebar-form-hint">
+                  Fuege zuerst Kontakte hinzu. Gruppen koennen nur mit verifizierten Kontakten erstellt werden.
+                </p>
+              )}
+              {hasContacts && !canCreateGroup && (
+                <p className="sidebar-form-hint">
+                  Name und mindestens ein Kontakt sind erforderlich.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => void createGroup()}
+                disabled={!canCreateGroup}
                 className="btn btn-primary w-full"
               >
                 Gruppe erstellen
@@ -2120,7 +2186,18 @@ export function ChatShell({
                 Gruppen
               </p>
             )}
-            {groupList}
+            {groupList.length > 0 ? (
+              groupList
+            ) : sidebarFilter === "group" ? (
+              <SidebarEmptyState
+                title={query.trim() ? "Keine Gruppen gefunden" : "Noch keine Gruppen"}
+                body={
+                  query.trim()
+                    ? "Passe die Suche an oder erstelle eine neue private Gruppe."
+                    : "Erstelle eine Gruppe, sobald du mindestens einen Kontakt hinzugefuegt hast."
+                }
+              />
+            ) : null}
           </div>
         )}
 
@@ -2148,6 +2225,7 @@ export function ChatShell({
             onClick={() => setSecurityOpen(true)}
             className="sidebar-footer-action"
             title="Einstellungen"
+            aria-label="Einstellungen oeffnen"
           >
             <IconSettings size={16} />
           </button>
@@ -2156,6 +2234,7 @@ export function ChatShell({
             onClick={() => setUserMenuOpen((v) => !v)}
             className="sidebar-footer-action"
             title="Mehr"
+            aria-label="Profilmenue oeffnen"
           >
             <IconMoreVertical size={16} />
           </button>
@@ -3152,6 +3231,7 @@ export function ChatShell({
               onClick={() => setTab("dm")}
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
               style={tab === "dm" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              aria-label="Mobile Ansicht: Direktnachrichten"
             >
               Direkt
             </button>
@@ -3160,6 +3240,7 @@ export function ChatShell({
               onClick={() => setTab("group")}
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
               style={tab === "group" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              aria-label="Mobile Ansicht: Gruppen"
             >
               Gruppen
             </button>

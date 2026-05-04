@@ -1,14 +1,7 @@
-/**
- * Verbessertes AddContactModal mit Telegram-Style Live-Suche
- * 
- * Features:
- * - Live-Suche während der Eingabe (ab 2 Zeichen)
- * - Keine Liste aller Nutzer mehr
- * - Klare Fehlermeldungen
- * - Schnelle Auswahl aus Suchergebnissen
- */
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { searchUsers, type ApiUser } from "../lib/api";
+
+const MIN_SEARCH_CHARS = 3;
 
 interface AddContactModalProps {
   isOpen: boolean;
@@ -31,9 +24,8 @@ export function AddContactModal({
   const [error, setError] = useState<string | null>(null);
   const [searchTimeout, setSearchTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  // Live-Suche mit Debounce
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (searchQuery.trim().length < 2) {
+    if (searchQuery.trim().length < MIN_SEARCH_CHARS) {
       setResults([]);
       return;
     }
@@ -43,34 +35,33 @@ export function AddContactModal({
 
     try {
       const { users } = await searchUsers(sessionToken, searchQuery);
-      setResults(users);
-    } catch (err) {
+      setResults(users.filter((user) => user.id !== sessionUserId));
+    } catch {
       setError("Suche fehlgeschlagen. Bitte erneut versuchen.");
       setResults([]);
     } finally {
       setIsSearching(false);
     }
-  }, [sessionToken]);
+  }, [sessionToken, sessionUserId]);
 
-  // Debounced Search
   useEffect(() => {
     if (searchTimeout) {
       clearTimeout(searchTimeout);
     }
 
-    if (query.trim().length < 2) {
+    if (query.trim().length < MIN_SEARCH_CHARS) {
       setResults([]);
       return;
     }
 
     const timeout = setTimeout(() => {
       performSearch(query);
-    }, 300); // 300ms Debounce
+    }, 300);
 
     setSearchTimeout(timeout);
 
     return () => {
-      if (timeout) clearTimeout(timeout);
+      clearTimeout(timeout);
     };
   }, [query, performSearch]);
 
@@ -90,39 +81,46 @@ export function AddContactModal({
 
   if (!isOpen) return null;
 
+  const trimmedQuery = query.trim();
+
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={handleClose}
     >
-      <div 
+      <div
         className="app-surface w-full max-w-md rounded-2xl p-6"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
-        {/* Header */}
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-            Kontakt hinzufügen
-          </h2>
+          <div>
+            <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+              Kontakt hinzufuegen
+            </h2>
+            <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+              Suche nur nach Username. Keine Telefonnummer noetig.
+            </p>
+          </div>
           <button
             type="button"
             onClick={handleClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
+            aria-label="Kontakt-Dialog schliessen"
           >
-            ✕
+            x
           </button>
         </div>
 
-        {/* Search Input */}
         <div className="mb-4">
           <div className="relative">
             <input
               type="text"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(event) => setQuery(event.target.value)}
               placeholder="Username suchen..."
               className="app-input w-full pr-10"
               autoFocus
+              aria-label="Kontakt nach Username suchen"
             />
             {isSearching && (
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
@@ -131,29 +129,28 @@ export function AddContactModal({
             )}
           </div>
           <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Mindestens 2 Zeichen für die Suche eingeben
+            Mindestens {MIN_SEARCH_CHARS} Zeichen fuer die Suche eingeben.
           </p>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="mb-4 rounded-lg bg-red-900/30 p-3 text-sm text-red-300">
             {error}
           </div>
         )}
 
-        {/* Search Results */}
         <div className="max-h-64 overflow-y-auto">
-          {query.trim().length < 2 && (
+          {trimmedQuery.length < MIN_SEARCH_CHARS && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-              <p className="text-sm">🔍 Tippe mindestens 2 Zeichen um zu suchen</p>
+              <p className="text-sm">Tippe mindestens {MIN_SEARCH_CHARS} Zeichen, um zu suchen.</p>
+              <p className="mt-1 text-xs">Registrierte Nutzer koennen direkt hinzugefuegt werden.</p>
             </div>
           )}
 
-          {query.trim().length >= 2 && !isSearching && results.length === 0 && (
+          {trimmedQuery.length >= MIN_SEARCH_CHARS && !isSearching && results.length === 0 && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-              <p className="text-sm">Keine Ergebnisse gefunden</p>
-              <p className="mt-1 text-xs">Versuche einen anderen Username</p>
+              <p className="text-sm">Keine Ergebnisse gefunden.</p>
+              <p className="mt-1 text-xs">Eigene Accounts werden nicht als Kontakt angezeigt.</p>
             </div>
           )}
 
@@ -166,7 +163,7 @@ export function AddContactModal({
                   onClick={() => handleSelectUser(user)}
                   className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition hover:bg-[var(--bg-hover)]"
                 >
-                  <div 
+                  <div
                     className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium"
                     style={{ background: "var(--accent)", color: "white" }}
                   >
@@ -177,11 +174,11 @@ export function AddContactModal({
                       {user.username}
                     </p>
                     <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>
-                      Klicken um Chat zu starten
+                      Kontakt hinzufuegen und Chat starten
                     </p>
                   </div>
                   <span className="text-lg" style={{ color: "var(--accent)" }}>
-                    →
+                    -&gt;
                   </span>
                 </button>
               ))}
@@ -189,10 +186,9 @@ export function AddContactModal({
           )}
         </div>
 
-        {/* Footer Hint */}
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
+        <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--border)" }}>
           <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-            💡 Der Benutzer muss bereits registriert sein
+            Kontakte werden lokal ausgewaehlt. Der Server sieht keine privaten Nachrichten.
           </p>
         </div>
       </div>

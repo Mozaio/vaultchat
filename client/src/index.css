@@ -288,6 +288,18 @@ select:focus-visible {
   white-space: nowrap;
 }
 
+.btn:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
   color: var(--text-on-accent);
@@ -1298,6 +1310,53 @@ select:focus-visible {
   margin-top: 0.1rem;
   color: var(--text-muted);
   font-size: 0.7rem;
+}
+
+.sidebar-form-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.sidebar-empty-state {
+  min-height: 9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+}
+
+.sidebar-empty-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: 0.7rem;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sidebar-empty-state p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.sidebar-empty-state span {
+  display: block;
+  max-width: 15rem;
+  margin-top: 0.3rem;
+  font-size: 0.74rem;
+  line-height: 1.45;
 }
 
 /* Search box */
@@ -2456,6 +2515,9 @@ input[type="checkbox"] {
 }
 
 @media (max-width: 768px) {
+  .sidebar-shell {
+    padding-bottom: 4.75rem;
+  }
   .sidebar {
     position: fixed;
     inset: 0;
