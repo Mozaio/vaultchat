@@ -33,6 +33,9 @@ function validateUsername(username: string): { valid: boolean; error?: string } 
   if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
     return { valid: false, error: "Nur Buchstaben, Zahlen, _ und - erlaubt" };
   }
+  if (!/^[a-zA-Z]/.test(username)) {
+    return { valid: false, error: "Muss mit einem Buchstaben beginnen" };
+  }
   // Can't start or end with underscore/hyphen
   if (/^[_-]|[_-]$/.test(username)) {
     return { valid: false, error: "Darf nicht mit _ oder - beginnen/enden" };
@@ -40,6 +43,9 @@ function validateUsername(username: string): { valid: boolean; error?: string } 
   // No double underscore/hyphen
   if (/__|--|-_|_-|__/.test(username)) {
     return { valid: false, error: "Keine doppelte Zeichen wie __ oder -- erlaubt" };
+  }
+  if (["admin", "support", "vaultchat", "system", "signal", "telegram", "discord"].includes(username.toLowerCase())) {
+    return { valid: false, error: "Dieser Name ist reserviert" };
   }
   return { valid: true };
 }
@@ -423,6 +429,22 @@ export function AuthPanel({
                 <p className="mt-1 text-xs text-amber-500">
                   Noch {10 - password.length} Zeichen erforderlich
                 </p>
+              )}
+              {password.length > 0 && (
+                <div className="auth-safety-checks">
+                  <div className={`flex items-center gap-2 text-xs ${password.length >= 10 ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={password.length >= 10} />
+                    <span>Mindestens 10 Zeichen</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/[A-Z]/.test(password) && /[a-z]/.test(password) ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={/[A-Z]/.test(password) && /[a-z]/.test(password)} />
+                    <span>Gross- und Kleinbuchstaben</span>
+                  </div>
+                  <div className={`flex items-center gap-2 text-xs ${/\d/.test(password) || /[^a-zA-Z0-9]/.test(password) ? "text-emerald-400" : "text-zinc-500"}`}>
+                    <CheckIcon valid={/\d/.test(password) || /[^a-zA-Z0-9]/.test(password)} />
+                    <span>Zahl oder Sonderzeichen</span>
+                  </div>
+                </div>
               )}
             </div>
             {registrationMode !== "open" && (

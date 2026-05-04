@@ -498,6 +498,33 @@ select:focus-visible {
   color: var(--text-muted);
 }
 
+.chat-inline-empty {
+  min-height: 16rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.55rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.chat-inline-empty svg {
+  color: var(--accent);
+}
+
+.chat-inline-empty p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.chat-inline-empty span {
+  max-width: 25rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
 .chat-empty-state-pills {
   display: flex;
   flex-wrap: wrap;
@@ -1705,6 +1732,16 @@ select:focus-visible {
   gap: 0.75rem;
 }
 
+.auth-safety-checks {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-sidebar);
+  padding: 0.75rem;
+}
+
 .auth-badge {
   flex-shrink: 0;
   border: 1px solid rgba(52, 211, 153, 0.35);
@@ -1797,6 +1834,47 @@ select:focus-visible {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.55rem;
+}
+
+.composer-notice {
+  width: 100%;
+  margin-bottom: 0.65rem;
+  border: 1px solid rgba(251, 191, 36, 0.34);
+  border-radius: var(--radius-sm);
+  background: rgba(251, 191, 36, 0.09);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.composer-notice svg {
+  flex-shrink: 0;
+  color: rgb(251, 191, 36);
+}
+
+.composer-notice span {
+  min-width: 0;
+  flex: 1;
+}
+
+.composer-notice button {
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  display: grid;
+  place-items: center;
+}
+
+.composer-notice button:hover,
+.composer-notice button:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .auth-header {

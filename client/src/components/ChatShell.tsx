@@ -67,6 +67,7 @@ import { AddContactModal } from "./AddContactModal";
 import { SecuritySettings } from "./SecuritySettings";
 import { ChatEmptyState } from "./ChatEmptyState";
 import {
+  IconAlertTriangle,
   IconBell,
   IconFileText,
   IconInfo,
@@ -173,6 +174,20 @@ function humanDmSendError(err: unknown): string {
     return "Keine sichere Ratchet-Session gefunden. Starte den Chat neu, sobald der Kontakt PreKeys verfuegbar hat.";
   }
   return msg;
+}
+
+function maxE2eFileBytes(): number {
+  const e2eMaxB64 = 128 * 1024 * 1024;
+  return Math.floor(e2eMaxB64 / 1.5);
+}
+
+async function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 /** WhatsApp/Telegram style date separator label */
@@ -1211,20 +1226,14 @@ export function ChatShell({
   async function sendDmFile(file: File) {
     if (!peer) return;
     /** Server: 128 MB verschlüsselter Umschlag; Data-URL + DR + Seal wachsen ~1,4–1,5×. */
-    const e2eMaxB64 = 128 * 1024 * 1024;
-    const maxFile = Math.floor(e2eMaxB64 / 1.5);
+    const maxFile = maxE2eFileBytes();
     if (file.size > maxFile) {
       setError(
         `Datei zu groß: Der E2E-Server-Rahmen beträgt 128 MB (Umschlag). Wegen Data-URL und Verschlüsselung bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB.`
       );
       return;
     }
-    const body = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    const body = await readFileAsDataUrl(file);
     const payload: PlainPayload = {
       v: 2,
       cid: newCid(),
@@ -1282,6 +1291,51 @@ export function ChatShell({
     setGroupText("");
     resetTextarea(groupInputRef.current);
     setReplyGroup(null);
+  }
+
+  async function sendGroupFile(file: File) {
+    if (!group) return;
+    const maxFile = maxE2eFileBytes();
+    if (file.size > maxFile) {
+      setError(
+        `Datei zu gross: Bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB senden.`
+      );
+      return;
+    }
+    setError(null);
+    const body = await readFileAsDataUrl(file);
+    const payload: PlainPayload = {
+      v: 2,
+      cid: newCid(),
+      kind: "file",
+      body,
+      fileName: file.name,
+      fileSize: file.size,
+      mime: file.type,
+      ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
+    };
+    await sendGroupWire(group, payload);
+  }
+
+  async function sendGroupVoice() {
+    if (!group) return;
+    if (voice.recording) {
+      const rec = await voice.stop();
+      if (!rec) return;
+      const payload: PlainPayload = {
+        v: 2,
+        cid: newCid(),
+        kind: "voice",
+        body: rec.dataUrl,
+        mime: rec.mime,
+        durationMs: rec.durationMs,
+        ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
+      };
+      await sendGroupWire(group, payload);
+    } else {
+      const ok = await voice.start();
+      if (!ok) setError("Mikrofon-Zugriff verweigert.");
+    }
   }
 
   async function reactDm(m: ChatMsg, emoji: string) {
@@ -1614,6 +1668,25 @@ export function ChatShell({
     return out;
   }, [messages.length, users.length]);
 
+  const lastGroupPreviewByGroup = useMemo(() => {
+    const out = new Map<string, { text: string; at: number }>();
+    for (const [gid, msgs] of rawGroupRef.current.entries()) {
+      const last = msgs[msgs.length - 1];
+      if (!last) continue;
+      try {
+        const p = JSON.parse(last.plainJson) as PlainPayload;
+        const author =
+          last.fromUserId === session.user.id
+            ? "Du"
+            : usersRef.current.find((u) => u.id === last.fromUserId)?.username ?? "Mitglied";
+        out.set(gid, { text: `${author}: ${previewForPayload(p)}`, at: last.at });
+      } catch {
+        out.set(gid, { text: "Neue Nachricht", at: last.at });
+      }
+    }
+    return out;
+  }, [groupMessages.length, groups.length, users.length, session.user.id]);
+
   const fmtListTime = useCallback((at?: number) => {
     if (!at) return "";
     const d = new Date(at);
@@ -1744,32 +1817,40 @@ export function ChatShell({
 
   const groupList = useMemo(
     () =>
-      visibleGroups.map((g) => (
-        <button
-          key={g.id}
-          type="button"
-          onClick={() => {
-            setTab("group");
-            setGroup(g);
-            setPeer(null);
-            setInfoOpen(false);
-          }}
-          className={`contact-item w-full !mx-0 ${
-            group?.id === g.id && tab === "group"
-              ? "active"
-              : ""
-          }`}
-        >
-          <div className="contact-avatar !h-9 !w-9 !text-sm">
-            {g.name.slice(0, 1).toUpperCase()}
-          </div>
-          <div className="contact-info min-w-0">
-            <span className="contact-name">{g.name}</span>
-            <p className="contact-preview">{g.memberIds.length} Mitglieder</p>
-          </div>
-        </button>
-      )),
-    [visibleGroups, group, tab]
+      visibleGroups.map((g) => {
+        const prev = lastGroupPreviewByGroup.get(g.id);
+        return (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => {
+              setTab("group");
+              setGroup(g);
+              setPeer(null);
+              setInfoOpen(false);
+            }}
+            className={`contact-item w-full !mx-0 ${
+              group?.id === g.id && tab === "group"
+                ? "active"
+                : ""
+            }`}
+          >
+            <div className="contact-avatar !h-9 !w-9 !text-sm">
+              {g.name.slice(0, 1).toUpperCase()}
+            </div>
+            <div className="contact-info min-w-0">
+              <span className="contact-name">{g.name}</span>
+              <p className="contact-preview">
+                {prev?.text ?? `${g.memberIds.length} Mitglieder`}
+              </p>
+            </div>
+            <div className="contact-meta">
+              <span className="contact-time">{fmtListTime(prev?.at)}</span>
+            </div>
+          </button>
+        );
+      }),
+    [visibleGroups, group, tab, lastGroupPreviewByGroup, fmtListTime]
   );
 
   return (
@@ -2346,6 +2427,13 @@ export function ChatShell({
                   ↓ Neue Nachrichten
                 </button>
               )}
+              {messages.length === 0 && (
+                <div className="chat-inline-empty">
+                  <IconShieldCheck size={24} />
+                  <p>Schreibe die erste verschluesselte Nachricht.</p>
+                  <span>Nur deine Geraete und dieser Kontakt koennen den Inhalt lesen.</span>
+                </div>
+              )}
               {messages.flatMap((m, i) => {
                 const items: JSX.Element[] = [];
                 if (
@@ -2398,7 +2486,7 @@ export function ChatShell({
             </div>
 
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {error && <ComposerNotice message={error} onDismiss={() => setError(null)} />}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
@@ -2740,6 +2828,13 @@ export function ChatShell({
                   ↓ Neue Nachrichten
                 </button>
               )}
+              {groupMessages.length === 0 && (
+                <div className="chat-inline-empty">
+                  <IconUsers size={24} />
+                  <p>Diese Gruppe ist bereit.</p>
+                  <span>Nachrichten, Dateien und Sprachnachrichten werden Ende-zu-Ende verschluesselt.</span>
+                </div>
+              )}
               {groupMessages.flatMap((m, i) => {
                 const author =
                   users.find((u) => u.id === m.fromUserId)?.username ??
@@ -2791,7 +2886,7 @@ export function ChatShell({
               })}
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {error && <ComposerNotice message={error} onDismiss={() => setError(null)} />}
               {replyGroup && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
@@ -2845,6 +2940,35 @@ export function ChatShell({
                     ))}
                   </div>
                 )}
+                <label
+                  className="chat-tool-button cursor-pointer"
+                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  title="Datei an Gruppe senden"
+                >
+                  <IconPaperclip size={18} />
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void sendGroupFile(f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => void sendGroupVoice()}
+                  className={`chat-tool-button ${
+                    voice.recording
+                      ? "border-red-500 bg-red-700/60 text-white"
+                      : ""
+                  }`}
+                  style={voice.recording ? {} : { borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  title={voice.recording ? "Aufnahme stoppen und senden" : "Sprachnachricht aufnehmen"}
+                >
+                  {voice.recording ? "■" : <IconMic size={18} />}
+                </button>
                 <textarea
                   ref={groupInputRef}
                   className="chat-input-textarea"
@@ -2865,7 +2989,7 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => void sendGroupText()}
-                  disabled={!groupText.trim()}
+                  disabled={voice.recording || !groupText.trim()}
                   className="btn-send"
                 >
                   <IconSend size={16} />
@@ -3125,6 +3249,24 @@ function PeerRow({
         ) : null}
       </div>
     </button>
+  );
+}
+
+function ComposerNotice({
+  message,
+  onDismiss,
+}: {
+  message: string;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="composer-notice" role="status">
+      <IconAlertTriangle size={16} />
+      <span>{message}</span>
+      <button type="button" onClick={onDismiss} title="Hinweis schliessen">
+        ×
+      </button>
+    </div>
   );
 }
 
