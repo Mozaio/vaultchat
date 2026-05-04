@@ -2011,7 +2011,7 @@ export function ChatShell({
               title="Sofort sperren (LDK aus dem Speicher entfernen)"
             >
               <IconLock size={14} />
-              Sperren
+              <span className="sidebar-lock-label">Sperren</span>
             </button>
           </div>
         </div>

@@ -2518,6 +2518,9 @@ input[type="checkbox"] {
   .sidebar-shell {
     padding-bottom: 4.75rem;
   }
+  .sidebar-lock-label {
+    display: none;
+  }
   .sidebar {
     position: fixed;
     inset: 0;
