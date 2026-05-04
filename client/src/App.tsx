@@ -321,9 +321,11 @@ function CodeIntegrityBanner({
   if (check.state === "unknown") {
     return (
       <div className="code-integrity-banner warn">
-        <span>
-          Build noch nicht verifiziert. SHA-384{" "}
-          <span className="font-mono">{check.hash}</span>
+        <span className="code-integrity-copy">
+          <strong>Build noch nicht verifiziert</strong>
+          <span className="font-mono" title={`SHA-384 ${check.hash}`}>
+            SHA-384 {check.hash.slice(0, 16)}...
+          </span>
         </span>
         <button
           type="button"

@@ -397,9 +397,9 @@ export function AuthPanel({
         {mode === "register" && !hasLocal && (
           <div className="space-y-4">
             <div className="auth-input-group">
-              <label className="flex items-center justify-between">
+              <label className="auth-label-row">
                 <span>Benutzername</span>
-                <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                <span>
                   Discord-like Format
                 </span>
               </label>
