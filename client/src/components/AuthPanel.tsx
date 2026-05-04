@@ -89,6 +89,7 @@ export function AuthPanel({
   const [inviteCode, setInviteCode] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<ProductPlanId>("personal");
+  const [showAdvancedAuth, setShowAdvancedAuth] = useState(false);
   const [registrationMode, setRegistrationMode] = useState<"open" | "invite" | "closed">("open");
   const [productConfig, setProductConfig] = useState<api.PublicConfig["product"] | null>(null);
   const [importJson, setImportJson] = useState("");
@@ -187,7 +188,7 @@ export function AuthPanel({
         </p>
         <h1 className="landing-title">VaultChat</h1>
         <p className="landing-subtitle max-w-lg">
-          Ende-zu-Ende verschlüsselt. Sealed-Sender. Double-Ratchet v4.
+          Ende-zu-Ende verschluesselt. Sealed Sender. Private Gruppen.
         </p>
         <div className="feature-list max-w-lg">
           <Feature
@@ -210,7 +211,7 @@ export function AuthPanel({
           className="relative z-[1] mt-10 max-w-md text-sm"
           style={{ color: "var(--text-muted)" }}
         >
-          Keine Pflicht-E-Mail. Fuer Recovery kannst du optional eine E-Mail als Server-Hash hinterlegen.
+          Starte ohne Pflicht-E-Mail. Recovery und Plan kannst du optional einstellen.
         </p>
       </div>
 
@@ -243,8 +244,8 @@ export function AuthPanel({
                 style={{ color: "var(--text-secondary)" }}
               >
                 {hasLocal
-                  ? "Lokale Schlüssel mit deinem Passwort nutzen."
-                  : "E2E-verschlüsselter Messenger im Browser."}
+                  ? "Lokale Schluessel mit deinem Passwort entsperren."
+                  : "Privater Messenger mit lokalem Schluessel-Backup."}
               </p>
             </div>
             <ThemeToggle />
@@ -258,7 +259,7 @@ export function AuthPanel({
               VaultChat
             </h3>
             <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Sicher verschlüsselt, minimal Metadaten.
+              Verschluesselt, privat, minimal Metadaten.
             </p>
           </div>
 
@@ -303,7 +304,7 @@ export function AuthPanel({
         {mode === "unlock" && hasLocal && (
           <div className="space-y-4">
             <div className="auth-input-group">
-              <label>Passwort (lokale Schlüssel)</label>
+              <label>Passwort fuer lokale Schluessel</label>
               <input
                 type="password"
                 autoComplete="current-password"
@@ -443,79 +444,90 @@ export function AuthPanel({
                 </p>
               </div>
             )}
-            <div className="auth-choice-panel">
-              <div className="flex items-start justify-between gap-3">
-                <div>
+            <button
+              type="button"
+              className="auth-advanced-toggle"
+              onClick={() => setShowAdvancedAuth((v) => !v)}
+            >
+              {showAdvancedAuth ? "Erweiterte Optionen ausblenden" : "Recovery und Plan optional einstellen"}
+            </button>
+            {showAdvancedAuth && (
+              <div className="auth-advanced-stack">
+                <div className="auth-choice-panel">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                        Authentizitaet & Recovery
+                      </p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                        Optional. Der Server speichert keinen Klartext, sondern nur einen HMAC-Hash.
+                      </p>
+                    </div>
+                    <span className="auth-badge">Privacy-first</span>
+                  </div>
+                  <div className="auth-input-group mt-3">
+                    <label>Recovery-E-Mail optional</label>
+                    <input
+                      type="email"
+                      className="auth-input"
+                      value={recoveryEmail}
+                      onChange={(e) => setRecoveryEmail(e.target.value)}
+                      autoComplete="email"
+                      placeholder="name@example.com"
+                    />
+                    <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                      Hilft spaeter bei Support/Account-Nachweis. Fuer neue Geraete brauchst du trotzdem dein Backup.
+                    </p>
+                  </div>
+                </div>
+                <div className="auth-choice-panel">
                   <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                    Authentizitaet & Recovery
+                    Plan waehlen
                   </p>
-                  <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    Optional. Der Server speichert keinen Klartext, sondern nur einen HMAC-Hash.
+                  <div className="auth-plan-grid mt-3">
+                    {(productConfig?.plans ?? [
+                      {
+                        id: "personal" as const,
+                        name: "Personal",
+                        priceEurMonthly: 0,
+                        audience: "Private Nutzung",
+                        highlights: ["E2E-Chats", "Gruppen", "Backups"],
+                      },
+                      {
+                        id: "pro" as const,
+                        name: "Pro",
+                        priceEurMonthly: 5,
+                        audience: "Power-User",
+                        highlights: ["mehr Geraete", "Priority Support"],
+                      },
+                      {
+                        id: "team" as const,
+                        name: "Team",
+                        priceEurMonthly: 9,
+                        audience: "Teams",
+                        highlights: ["Einladungen", "Admin-Policy"],
+                      },
+                    ]).map((plan) => (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        className={`auth-plan-card ${selectedPlan === plan.id ? "active" : ""}`}
+                        onClick={() => setSelectedPlan(plan.id)}
+                      >
+                        <span className="font-semibold">{plan.name}</span>
+                        <span className="auth-plan-price">
+                          {plan.priceEurMonthly === 0 ? "Free" : `${plan.priceEurMonthly} EUR/Monat`}
+                        </span>
+                        <span className="auth-plan-audience">{plan.audience}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
+                    Payment ist noch nicht aktiv. Diese Auswahl bereitet Pricing, Limits und spaetere Abrechnung vor.
                   </p>
                 </div>
-                <span className="auth-badge">Privacy-first</span>
               </div>
-              <div className="auth-input-group mt-3">
-                <label>Recovery-E-Mail optional</label>
-                <input
-                  type="email"
-                  className="auth-input"
-                  value={recoveryEmail}
-                  onChange={(e) => setRecoveryEmail(e.target.value)}
-                  autoComplete="email"
-                  placeholder="name@example.com"
-                />
-                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  Hilft spaeter bei Support/Account-Nachweis. Fuer neue Geraete brauchst du trotzdem dein Backup.
-                </p>
-              </div>
-            </div>
-            <div className="auth-choice-panel">
-              <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                Plan waehlen
-              </p>
-              <div className="auth-plan-grid mt-3">
-                {(productConfig?.plans ?? [
-                  {
-                    id: "personal" as const,
-                    name: "Personal",
-                    priceEurMonthly: 0,
-                    audience: "Private Nutzung",
-                    highlights: ["E2E-Chats", "Gruppen", "Backups"],
-                  },
-                  {
-                    id: "pro" as const,
-                    name: "Pro",
-                    priceEurMonthly: 5,
-                    audience: "Power-User",
-                    highlights: ["mehr Geraete", "Priority Support"],
-                  },
-                  {
-                    id: "team" as const,
-                    name: "Team",
-                    priceEurMonthly: 9,
-                    audience: "Teams",
-                    highlights: ["Einladungen", "Admin-Policy"],
-                  },
-                ]).map((plan) => (
-                  <button
-                    key={plan.id}
-                    type="button"
-                    className={`auth-plan-card ${selectedPlan === plan.id ? "active" : ""}`}
-                    onClick={() => setSelectedPlan(plan.id)}
-                  >
-                    <span className="font-semibold">{plan.name}</span>
-                    <span className="auth-plan-price">
-                      {plan.priceEurMonthly === 0 ? "Free" : `${plan.priceEurMonthly} EUR/Monat`}
-                    </span>
-                    <span className="auth-plan-audience">{plan.audience}</span>
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
-                Payment ist noch nicht aktiv. Diese Auswahl bereitet Pricing, Limits und spaetere Abrechnung vor.
-              </p>
-            </div>
+            )}
             <button
               type="button"
               onClick={() => void handleRegister()}

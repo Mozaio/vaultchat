@@ -247,6 +247,7 @@ export function ChatShell({
   );
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
+  const [groupVoiceOpen, setGroupVoiceOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -459,7 +460,18 @@ export function ChatShell({
   const loadGroups = useCallback(async () => {
     const { groups: g } = await api.listGroups(session.token);
     setGroups(g);
-  }, [session.token]);
+    const memberIds = Array.from(new Set(g.flatMap((x) => x.memberIds))).filter(
+      (id) => id !== session.user.id
+    );
+    if (memberIds.length > 0) {
+      const { users: members } = await api.listUsers(session.token, memberIds);
+      setUsers((prev) => {
+        const byId = new Map(prev.map((u) => [u.id, u]));
+        for (const member of members) byId.set(member.id, member);
+        return Array.from(byId.values());
+      });
+    }
+  }, [session.token, session.user.id]);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -759,20 +771,34 @@ export function ChatShell({
         return null;
       }
       const p: PlainPayload = { ...payload, senderUserId: session.user.id };
-      let ciphertext: string;
-      try {
-        ciphertext = await encryptGroupPayload(g.id, p);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (message === "no_group_key" || message === "no_group_state" || message === "no_sender_state") {
-          setError(
-            "Gruppenschluessel fehlt auf diesem Geraet. Warte auf die Schluesselverteilung oder lasse dich erneut zur Gruppe hinzufuegen."
-          );
-          void loadGroups().catch(() => {});
+      let ciphertext = "";
+      let repairedKey = false;
+      for (;;) {
+        try {
+          ciphertext = await encryptGroupPayload(g.id, p);
+          break;
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (
+            !repairedKey &&
+            (message === "no_group_key" ||
+              message === "no_group_state" ||
+              message === "no_sender_state")
+          ) {
+            repairedKey = true;
+            await rotateGroupKey(g, g.memberIds);
+            continue;
+          }
+          if (message === "no_group_key" || message === "no_group_state" || message === "no_sender_state") {
+            setError(
+              "Gruppenschluessel fehlt auf diesem Geraet. Oeffne die Gruppe neu oder lasse dich erneut hinzufuegen."
+            );
+            void loadGroups().catch(() => {});
+            return null;
+          }
+          setError("Gruppennachricht konnte nicht verschluesselt werden.");
           return null;
         }
-        setError("Gruppennachricht konnte nicht verschluesselt werden.");
-        return null;
       }
       const at = Date.now();
       const tmpId = `local-g-${newCid()}`;
@@ -1358,9 +1384,20 @@ export function ChatShell({
   }
 
   async function distributeGroupKey(g: api.ApiGroup, memberIds: string[], keyB64: string) {
+    const knownUsers = new Map(usersRef.current.map((u) => [u.id, u]));
+    const missing = memberIds.filter((mid) => mid !== session.user.id && !knownUsers.has(mid));
+    if (missing.length > 0) {
+      const { users: fetched } = await api.listUsers(session.token, missing);
+      for (const u of fetched) knownUsers.set(u.id, u);
+      setUsers((prev) => {
+        const byId = new Map(prev.map((u) => [u.id, u]));
+        for (const u of fetched) byId.set(u.id, u);
+        return Array.from(byId.values());
+      });
+    }
     for (const mid of memberIds) {
       if (mid === session.user.id) continue;
-      const u = usersRef.current.find((x) => x.id === mid);
+      const u = knownUsers.get(mid);
       if (!u) continue;
       const p: PlainPayload = {
         v: 2,
@@ -1448,12 +1485,11 @@ export function ChatShell({
     }
   }
 
-  async function beginCall() {
-    if (!peer) return;
+  async function beginCallWith(target: api.ApiUser) {
     setCallStatus("connecting");
     try {
       const ctrl = await startCall(
-        peer,
+        target,
         tokenRef.current,
         relayOnly,
         sendRtc,
@@ -1468,8 +1504,8 @@ export function ChatShell({
         }
       );
       callRef.current = ctrl;
-      const queued = pendingRtcRef.current.get(peer.id) ?? [];
-      pendingRtcRef.current.delete(peer.id);
+      const queued = pendingRtcRef.current.get(target.id) ?? [];
+      pendingRtcRef.current.delete(target.id);
       for (const payload of queued) {
         await ctrl.handleRemote?.(payload);
       }
@@ -1477,6 +1513,11 @@ export function ChatShell({
       setError(e instanceof Error ? e.message : "call_failed");
       setCallStatus("failed");
     }
+  }
+
+  async function beginCall() {
+    if (!peer) return;
+    await beginCallWith(peer);
   }
 
   async function acceptIncoming() {
@@ -2519,6 +2560,14 @@ export function ChatShell({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setGroupVoiceOpen((v) => !v)}
+                    className={`btn btn-secondary btn-icon !h-9 !w-9 ${groupVoiceOpen ? "!border-[var(--accent)] !bg-[var(--accent-soft)] !text-[var(--accent)]" : ""}`}
+                    title="Voice-Lounge"
+                  >
+                    <IconPhone size={18} />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setGroupPanelOpen((v) => !v)}
                     className="btn btn-secondary btn-icon !h-9 !w-9"
                     title="Mitglieder"
@@ -2560,6 +2609,60 @@ export function ChatShell({
                   </div>
                 </div>
               </div>
+
+              {groupVoiceOpen && (
+                <div className="group-voice-panel">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                        Voice-Lounge
+                      </p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                        Relay-Only schützt IP-Adressen. Mehrpersonen-Voice wird als sichere Mesh/SFU-Stufe vorbereitet.
+                      </p>
+                    </div>
+                    <span className="group-voice-badge">
+                      {relayOnly ? "Relay aktiv" : "Direkt/Relay"}
+                    </span>
+                  </div>
+                  <div className="group-voice-members">
+                    {group.memberIds
+                      .filter((mid) => mid !== session.user.id)
+                      .map((mid) => {
+                        const u = users.find((x) => x.id === mid);
+                        const label = u?.username ?? mid.slice(0, 8);
+                        return (
+                          <div key={mid} className="group-voice-member">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <div
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
+                                style={{ background: userGradient(mid) }}
+                              >
+                                {label.slice(0, 1).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="truncate text-xs font-semibold" style={{ color: "var(--text)" }}>
+                                  {label}
+                                </p>
+                                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                                  {onlinePeers.has(mid) ? "Online" : "Nicht verbunden"}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-primary !px-2 !py-1 !text-[11px]"
+                              disabled={!u || callStatus === "connecting" || callStatus === "connected"}
+                              onClick={() => u && void beginCallWith(u)}
+                            >
+                              Anrufen
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
 
               {groupPanelOpen && (
                 <div className="mt-3 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text)" }}>

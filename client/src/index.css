@@ -1680,6 +1680,31 @@ select:focus-visible {
   padding: 0.875rem;
 }
 
+.auth-advanced-toggle {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.auth-advanced-toggle:hover,
+.auth-advanced-toggle:focus-visible {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.auth-advanced-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .auth-badge {
   flex-shrink: 0;
   border: 1px solid rgba(52, 211, 153, 0.35);
@@ -1732,6 +1757,46 @@ select:focus-visible {
   color: var(--text-muted);
   font-size: 0.7rem;
   line-height: 1.25;
+}
+
+.group-voice-panel {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-elevated);
+  padding: 0.875rem;
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.group-voice-badge {
+  flex-shrink: 0;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0.18rem 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.group-voice-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.group-voice-member {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem;
 }
 
 .auth-header {
