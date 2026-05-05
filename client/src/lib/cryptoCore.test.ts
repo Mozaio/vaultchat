@@ -5,6 +5,7 @@ import { generateBoxKeypair, publicKeyBase64 } from "./crypto";
 import { drDecrypt, drEncrypt, drInit } from "./doubleRatchet";
 import { getSodium, sodiumReady } from "./sodium";
 import { x3dhReceiver, x3dhSender } from "./x3dh";
+import { ml_kem1024 } from "@noble/post-quantum/ml-kem.js";
 
 globalThis.btoa ??= (value: string) => Buffer.from(value, "binary").toString("base64");
 globalThis.atob ??= (value: string) => Buffer.from(value, "base64").toString("binary");
@@ -42,6 +43,37 @@ test("x3dh sender and receiver derive the same shared secret", async () => {
     base64FromUint8(bobSignedPreKey.privateKey),
     base64FromUint8(bobOneTimePreKey.privateKey),
     sender.ephemeralPublicKey
+  );
+
+  assert.deepEqual(Array.from(receiver), Array.from(sender.sharedSecret));
+});
+
+test("pqxdh sender and receiver derive the same hybrid shared secret", async () => {
+  await sodiumReady();
+  const sodium = getSodium();
+  const alice = await generateBoxKeypair();
+  const bob = await generateBoxKeypair();
+  const bobSignedPreKey = sodium.crypto_box_keypair();
+  const bobOneTimePreKey = sodium.crypto_box_keypair();
+  const bobPqKem = ml_kem1024.keygen();
+
+  const sender = await x3dhSender(
+    alice.secretKey,
+    publicKeyBase64(bob.publicKey),
+    base64FromUint8(bobSignedPreKey.publicKey),
+    base64FromUint8(bobOneTimePreKey.publicKey),
+    base64FromUint8(bobPqKem.publicKey)
+  );
+  assert.ok(sender.pqKemCiphertext);
+
+  const receiver = await x3dhReceiver(
+    bob.secretKey,
+    publicKeyBase64(alice.publicKey),
+    base64FromUint8(bobSignedPreKey.privateKey),
+    base64FromUint8(bobOneTimePreKey.privateKey),
+    sender.ephemeralPublicKey,
+    base64FromUint8(bobPqKem.secretKey),
+    sender.pqKemCiphertext
   );
 
   assert.deepEqual(Array.from(receiver), Array.from(sender.sharedSecret));

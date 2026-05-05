@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@noble/post-quantum": "^0.6.1",
     "libsodium-wrappers-sumo": "^0.7.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

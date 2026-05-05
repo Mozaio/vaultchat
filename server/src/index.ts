@@ -544,6 +544,12 @@ const PreKeyUploadBody = z.object({
   oneTimePreKeys: z
     .array(z.object({ keyId: z.number(), publicKey: z.string() }))
     .max(200),
+  pqKem: z
+    .object({
+      alg: z.literal("ML-KEM-1024"),
+      publicKey: z.string().min(1).max(4096),
+    })
+    .optional(),
 });
 
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
@@ -599,7 +605,8 @@ app.post("/api/keys", async (req, res) => {
     parsed.data.signedPreKey.publicKey,
     parsed.data.signedPreKey.signature,
     parsed.data.signedPreKey.signingPublicKey,
-    parsed.data.signedPreKey.keyId
+    parsed.data.signedPreKey.keyId,
+    parsed.data.pqKem
   );
   uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
   res.json({ ok: true, remaining: getRemainingPreKeyCount(jwtUser.userId) });

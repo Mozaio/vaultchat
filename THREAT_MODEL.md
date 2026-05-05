@@ -28,6 +28,7 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
   - **AEAD mit AAD-Bindung**: `crypto_aead_xchacha20poly1305_ietf_encrypt` mit Header-Feldern (Magic, Flags, Ratchet-Pub, Counter) als Associated Data → ein Angreifer kann weder Header noch Counter manipulieren.
   - State wird pro Peer im verschlüsselten IndexedDB-Meta-Store abgelegt.
 - **Sealed-Sender-Envelope**: Jede DM wird vor dem Verlassen des Clients in einen `crypto_box_seal(recipient_identity_pk, HEADER || sender_uuid || len || inner_ciphertext)` gewrappt. Der Relay-Server kennt den Absender nicht. Der Empfänger entpackt den Envelope und prüft den inneren DR-Wire gegen seinen Ratchet-State für `sender_uuid`; ein gefälschtes `sender_uuid` führt zu Decrypt-Fail.
+- **PQXDH-v1 Hybrid-Handshake**: Wenn das PreKey-Bundle des Empfaengers einen `ML-KEM-1024` Public Key enthaelt, mischt der Sender ein ML-KEM Secret mit dem klassischen X3DH Secret (`vaultchat-pqxdh-mlkem1024-v1`) und initialisiert daraus den Double Ratchet. Empfaenger ohne PQ-Bundle bleiben rueckwaertskompatibel bei X3DH.
 - **Gruppen**: Symmetrischer Gruppenschlüssel (32 Byte, `crypto_secretbox`); verteilt per DR-DM (und damit selbst sealed-sender). **Automatische Schlüsselrotation** bei Add/Remove/Leave eines Members; der rotierte Key wird neu verteilt, sodass ehemalige Member zukünftige Nachrichten nicht mehr lesen können.
 - **Längen-Padding**: Payloads werden vor der Verschlüsselung auf Bucket-Größen (64, 256, 1 KiB, 4 KiB, 16 KiB, 64 KiB, 256 KiB, 1 MiB) aufgepolstert.
 - **Zero-Knowledge-Frames**: Reaktionen, Antworten, Bearbeitungen, Löschungen, Lese-/Zustellbestätigungen, Sprachnachrichten, Gruppen-Key-Verteilung sind E2EE-Payloads.
@@ -70,7 +71,7 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 
    **Verbesserung (v2)**: Code-Integrity-Pinning mit **passwortgeschütztem Hash** (`codeIntegrityEnhanced.ts`). Der Hash wird mit einem aus dem `secretKey` abgeleiteten Schlüssel verschlüsselt gespeichert und ein Mismatch blockiert Unlock/Session-Start. Einfaches Auslesen von localStorage reicht nicht aus — der Angreifer müsste den Browser-Prozess kontrollieren.
 
-2. **Kein auditiertes libsignal** *(residual)*: Unser Double Ratchet v4 ist konzeptionell korrekt, nutzt libsodium-Primitive (XChaCha20-Poly1305, X25519, BLAKE2b) und bindet Header per AAD. Er ist dennoch **kein** Drop-in-Ersatz für `libsignal-protocol`. Es gibt kein X3DH mit One-Time-Prekeys, keine Deniable Signatures, kein formales Audit.
+2. **Kein auditiertes libsignal** *(residual)*: Unser Double Ratchet v4 ist konzeptionell korrekt, nutzt libsodium-Primitive (XChaCha20-Poly1305, X25519, BLAKE2b) und bindet Header per AAD. Der Handshake nutzt X3DH/One-Time-PreKeys und optional PQXDH-v1 mit ML-KEM-1024. Er ist dennoch **kein** Drop-in-Ersatz für `libsignal-protocol`; Deniable Signatures und ein formales externes Audit fehlen weiterhin.
 
 3. **Metadaten-Leak am Relay** *(stark reduziert)*: Der Server kennt für DMs nur `toUserId`, nicht den Absender. Dadurch kann er nicht mehr trivial die Kommunikationsgraphen rekonstruieren. Residuell bleiben: Zeitkorrelation (Sende-/Empfangszeitpunkte) sowie Gruppenmitgliedschaften (weil der Server Mitglieder routen muss).
 

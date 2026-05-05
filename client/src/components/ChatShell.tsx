@@ -41,6 +41,7 @@ import {
 import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import {
   generateKeyMaterial,
+  ensurePostQuantumKem,
   loadKeyMaterial,
   replenishOneTimePreKeys,
   saveKeyMaterial,
@@ -532,6 +533,11 @@ export function ChatShell({
         let km = await loadKeyMaterial();
         if (!km) {
           km = await generateKeyMaterial(session.secretKey);
+          await saveKeyMaterial(km);
+        }
+        const withPqKem = await ensurePostQuantumKem(km);
+        if (withPqKem !== km) {
+          km = withPqKem;
           await saveKeyMaterial(km);
         }
         const replenished = await replenishOneTimePreKeys(km);

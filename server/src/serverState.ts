@@ -29,6 +29,10 @@ export type PersistedPreKeyBundle = {
     signingPublicKey?: string;
   };
   oneTimePreKeys: { keyId: number; publicKey: string }[];
+  pqKem?: {
+    alg: "ML-KEM-1024";
+    publicKey: string;
+  };
   nextKeyId: number;
 };
 

@@ -84,6 +84,7 @@ docker compose up --build
 
 - **Identität**: X25519-Keypair, Secret mit Argon2id-abgeleitetem Key + `crypto_secretbox` gewickelt.
 - **Double Ratchet v4**: libsodium-basierte Eigen­implementierung. Symmetrische BLAKE2b-Kette (Forward Secrecy), DH-Ratchet pro neuem Peer-Public-Key (Post-Compromise Security), AEAD über `crypto_aead_xchacha20poly1305_ietf` mit Header-Binding via AAD (Magic, Flags, Ratchet-Pub, Counter). Domain-getrennte KDFs (`vaultchat-dr-v4-*`).
+- **PQXDH-v1 Hybrid-Handshake**: Neue Sessions verwenden, wenn beide Clients es unterstuetzen, X3DH plus ML-KEM-1024 aus `@noble/post-quantum`. Das hybride Secret initialisiert weiterhin den bestehenden Double Ratchet. Alte Bundles ohne PQ-Key fallen automatisch auf X3DH zurueck.
 - **Sealed Sender**: Jede DM wird vor dem Versand in `crypto_box_seal(recipient_pk, HEADER||sender_uuid||len||inner)` gewrappt. Der Relay-Server sieht nur `toUserId` + Envelope.
 - **Sealed Group Sender**: Gruppenframes haben kein `fromUserId` im Transport. Der Absender liegt verschlüsselt in der Payload (`senderUserId`).
 - **TOFU-Pinning**: Client pinnt beim ersten Kontakt den Public-Key. Bei Änderung: Automatisch `mismatch`-Status und Sperre des Send-Flows bis zur Verifizierung.

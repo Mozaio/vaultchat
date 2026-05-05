@@ -5,6 +5,7 @@
 import { base64FromUint8, uint8FromBase64 } from "./b64";
 import { metaGet, metaSet } from "./idb";
 import { getSodium, sodiumReady } from "./sodium";
+import { ml_kem1024 } from "@noble/post-quantum/ml-kem.js";
 
 const enc = new TextEncoder();
 
@@ -19,6 +20,11 @@ export type LocalKeyMaterial = {
     signingPublicKey: string;
   };
   oneTimePreKeys: Array<{ keyId: number; sk: string; pk: string }>;
+  pqKem?: {
+    alg: "ML-KEM-1024";
+    sk: string;
+    pk: string;
+  };
 };
 
 export async function loadKeyMaterial(): Promise<LocalKeyMaterial | null> {
@@ -65,6 +71,7 @@ export async function generateKeyMaterial(
       pk: base64FromUint8(kp.publicKey),
     });
   }
+  const pqKem = ml_kem1024.keygen();
   return {
     signedPreKey: {
       keyId: 1,
@@ -74,6 +81,30 @@ export async function generateKeyMaterial(
       signingPublicKey: base64FromUint8(signKp.publicKey),
     },
     oneTimePreKeys,
+    pqKem: {
+      alg: "ML-KEM-1024",
+      sk: base64FromUint8(pqKem.secretKey),
+      pk: base64FromUint8(pqKem.publicKey),
+    },
+  };
+}
+
+export function hasPostQuantumKem(km: LocalKeyMaterial): boolean {
+  return km.pqKem?.alg === "ML-KEM-1024" && Boolean(km.pqKem.pk && km.pqKem.sk);
+}
+
+export async function ensurePostQuantumKem(
+  km: LocalKeyMaterial
+): Promise<LocalKeyMaterial> {
+  if (hasPostQuantumKem(km)) return km;
+  const pqKem = ml_kem1024.keygen();
+  return {
+    ...km,
+    pqKem: {
+      alg: "ML-KEM-1024",
+      sk: base64FromUint8(pqKem.secretKey),
+      pk: base64FromUint8(pqKem.publicKey),
+    },
   };
 }
 
@@ -111,6 +142,14 @@ export function toUploadBody(km: LocalKeyMaterial) {
       keyId: k.keyId,
       publicKey: k.pk,
     })),
+    ...(hasPostQuantumKem(km)
+      ? {
+          pqKem: {
+            alg: "ML-KEM-1024" as const,
+            publicKey: km.pqKem!.pk,
+          },
+        }
+      : {}),
   };
 }
 

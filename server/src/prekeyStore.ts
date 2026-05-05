@@ -14,6 +14,10 @@ type PreKeyBundle = {
     signingPublicKey?: string;
   };
   oneTimePreKeys: Map<number, string>;
+  pqKem?: {
+    alg: "ML-KEM-1024";
+    publicKey: string;
+  };
   nextKeyId: number;
 };
 
@@ -53,7 +57,8 @@ export function initPreKeyBundle(
   signedPreKeyPublic: string,
   signedPreKeySignature: string,
   signingPublicKey?: string,
-  signedPreKeyId = 1
+  signedPreKeyId = 1,
+  pqKem?: { alg: "ML-KEM-1024"; publicKey: string }
 ): void {
   bundles.set(userId, {
     userId,
@@ -65,6 +70,7 @@ export function initPreKeyBundle(
       ...(signingPublicKey ? { signingPublicKey } : {}),
     },
     oneTimePreKeys: new Map(),
+    ...(pqKem ? { pqKem } : {}),
     nextKeyId: 1,
   });
   persistBundles();
@@ -91,6 +97,10 @@ export function getPreKeyBundle(userId: string): {
   };
   remainingPreKeys: number;
   oneTimePreKey: { keyId: number; publicKey: string } | null;
+  pqKem?: {
+    alg: "ML-KEM-1024";
+    publicKey: string;
+  };
 } | null {
   const b = bundles.get(userId);
   if (!b) return null;
@@ -106,6 +116,7 @@ export function getPreKeyBundle(userId: string): {
     signedPreKey: b.signedPreKey,
     remainingPreKeys: b.oneTimePreKeys.size,
     oneTimePreKey: otp,
+    ...(b.pqKem ? { pqKem: b.pqKem } : {}),
   };
 }
 

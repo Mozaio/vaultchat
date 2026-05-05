@@ -30,7 +30,7 @@ import { x3dhReceiver, x3dhSender } from "./x3dh";
 import * as api from "./api";
 
 type PersistedDRState = DRState & {
-  initMode?: "legacy" | "x3dh";
+  initMode?: "legacy" | "x3dh" | "pqxdh";
 };
 
 function metaKey(peerId: string) {
@@ -45,12 +45,13 @@ type X3dhPreKeyFrame = {
   ephemeralPublicKey: string;
   signedPreKeyId: number;
   oneTimePreKeyId: number | null;
+  pqKemCiphertext?: string;
   wire: string;
 };
 
 export type DmEncryptResult = {
   innerB64: string;
-  mode: "x3dh" | "ratchet" | "legacy";
+  mode: "pqxdh" | "x3dh" | "ratchet" | "legacy";
 };
 
 function x3dhEnabled(): boolean {
@@ -82,6 +83,10 @@ function decodeX3dhFrame(b64: string): X3dhPreKeyFrame {
     typeof frame.ephemeralPublicKey !== "string" ||
     typeof frame.signedPreKeyId !== "number" ||
     !(typeof frame.oneTimePreKeyId === "number" || frame.oneTimePreKeyId === null) ||
+    !(
+      typeof frame.pqKemCiphertext === "undefined" ||
+      typeof frame.pqKemCiphertext === "string"
+    ) ||
     typeof frame.wire !== "string"
   ) {
     throw new Error("invalid_x3dh_frame");
@@ -158,7 +163,8 @@ export async function ensureDrSessionWithX3dh(
       myIdentitySk,
       bundle.identityKey,
       bundle.signedPreKey.publicKey,
-      bundle.oneTimePreKey?.publicKey ?? null
+      bundle.oneTimePreKey?.publicKey ?? null,
+      bundle.pqKem?.publicKey ?? null
     );
 
     // DR-Session mit X3DH initiieren (anderes KDF-Label → kein Kollisionsrisiko)
@@ -169,7 +175,10 @@ export async function ensureDrSessionWithX3dh(
     );
 
     // Merken dass dies eine X3DH-Session ist (Metadata)
-    const stateWithMeta: PersistedDRState = { ...fresh, initMode: "x3dh" };
+    const stateWithMeta: PersistedDRState = {
+      ...fresh,
+      initMode: x3dhResult.pqKemCiphertext ? "pqxdh" : "x3dh",
+    };
 
     await metaSet(metaKey(peerId), JSON.stringify(stateWithMeta));
     return stateWithMeta;
@@ -241,11 +250,12 @@ export async function drEncryptJsonForDm(
       myIdentitySk,
       bundle.identityKey,
       bundle.signedPreKey.publicKey,
-      bundle.oneTimePreKey?.publicKey ?? null
+      bundle.oneTimePreKey?.publicKey ?? null,
+      bundle.pqKem?.publicKey ?? null
     );
     const st: PersistedDRState = {
       ...(await drInitFromX3DH(x3dh.sharedSecret, peerId, peerPublicKeyB64)),
-      initMode: "x3dh",
+      initMode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
     };
     const padded = pad(enc.encode(plainJson));
     const { state, wire } = await drEncrypt(st, padded);
@@ -257,9 +267,12 @@ export async function drEncryptJsonForDm(
         ephemeralPublicKey: x3dh.ephemeralPublicKey,
         signedPreKeyId: bundle.signedPreKey.keyId,
         oneTimePreKeyId: bundle.oneTimePreKey?.keyId ?? null,
+        ...(x3dh.pqKemCiphertext
+          ? { pqKemCiphertext: x3dh.pqKemCiphertext }
+          : {}),
         wire: base64FromUint8(wire),
       }),
-      mode: "x3dh",
+      mode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
     };
   } catch {
     if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
@@ -334,7 +347,9 @@ export async function drDecryptX3dhPreKeyJson(
     peerPublicKeyB64,
     km.signedPreKey.sk,
     otpSk,
-    frame.ephemeralPublicKey
+    frame.ephemeralPublicKey,
+    km.pqKem?.sk ?? null,
+    frame.pqKemCiphertext ?? null
   );
   const st = await drInitFromX3DH(sharedSecret, peerId, peerPublicKeyB64);
   const wire = uint8FromBase64(frame.wire);

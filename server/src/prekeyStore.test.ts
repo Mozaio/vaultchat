@@ -52,3 +52,21 @@ test("signed prekey remains available when one-time prekeys are exhausted", () =
     oneTimePreKey: null,
   });
 });
+
+test("prekey bundle can advertise an optional post-quantum kem key", () => {
+  const userId = "user-prekey-pq";
+  initPreKeyBundle(
+    userId,
+    "identity-pq",
+    "signed-public-pq",
+    "signed-signature-pq",
+    undefined,
+    7,
+    { alg: "ML-KEM-1024", publicKey: "pq-public" }
+  );
+
+  const bundle = getPreKeyBundle(userId);
+
+  assert.equal(bundle?.pqKem?.alg, "ML-KEM-1024");
+  assert.equal(bundle?.pqKem?.publicKey, "pq-public");
+});

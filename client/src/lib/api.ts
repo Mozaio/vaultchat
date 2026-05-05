@@ -264,6 +264,10 @@ export type PreKeyBundle = {
   };
   remainingPreKeys?: number;
   oneTimePreKey: { keyId: number; publicKey: string } | null;
+  pqKem?: {
+    alg: "ML-KEM-1024";
+    publicKey: string;
+  };
 };
 
 export async function getPreKeyBundle(token: string, userId: string) {
@@ -280,6 +284,10 @@ export async function uploadPreKeys(
       signingPublicKey?: string;
     };
     oneTimePreKeys: { keyId: number; publicKey: string }[];
+    pqKem?: {
+      alg: "ML-KEM-1024";
+      publicKey: string;
+    };
   }
 ) {
   return req<{ ok: true; remaining: number }>("/api/keys", {
