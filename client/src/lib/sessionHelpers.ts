@@ -7,6 +7,10 @@ import {
   unwrapSecretKey,
   wrapSecretKey,
 } from "./crypto";
+import {
+  generateKeyMaterial,
+  toUploadBody,
+} from "./keyStore";
 
 export type Session = {
   token: string;
@@ -53,6 +57,12 @@ export async function buildSessionFromRegister(
     ...(options?.requestedPlan ? { requestedPlan: options.requestedPlan } : {}),
     ...(inviteCode ? { inviteCode } : {}),
   });
+  try {
+    const keyMaterial = await generateKeyMaterial(kp.secretKey);
+    await api.uploadPreKeys(token, toUploadBody(keyMaterial));
+  } catch {
+    // ChatShell retries pre-key upload after the local data key is unlocked.
+  }
   const local: LocalIdentity = {
     userId: user.id,
     username: user.username,

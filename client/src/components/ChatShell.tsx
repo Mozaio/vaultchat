@@ -5,6 +5,7 @@ import { decryptIncomingSealedDm } from "../lib/incomingDm";
 import { drEncryptJsonForDm } from "../lib/drSession";
 import { getWsUrl } from "../lib/wsUrl";
 import {
+  directEncryptPayload,
   fingerprintFromPublicKeyB64,
   type PlainPayload,
 } from "../lib/crypto";
@@ -195,6 +196,11 @@ function humanDmSendError(err: unknown): string {
     return "Keine sichere Ratchet-Session gefunden. Starte den Chat neu, sobald der Kontakt PreKeys verfuegbar hat.";
   }
   return msg;
+}
+
+function canUseDirectAuthFallback(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg === "prekey_bundle_unavailable" || msg === "x3dh_required";
 }
 
 function maxE2eFileBytes(): number {
@@ -738,26 +744,42 @@ export function ChatShell({
         setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
         return null;
       }
-      let encrypted: Awaited<ReturnType<typeof drEncryptJsonForDm>>;
+      let innerB64: string;
+      let cryptoMode: Awaited<ReturnType<typeof drEncryptJsonForDm>>["mode"] | "direct-auth-fallback";
       try {
-        encrypted = await drEncryptJsonForDm(
+        const encrypted = await drEncryptJsonForDm(
           session.secretKey,
           toUser.id,
           toUser.publicKey,
           JSON.stringify(payload),
           tokenRef.current
         );
+        innerB64 = encrypted.innerB64;
+        cryptoMode = encrypted.mode;
       } catch (err) {
-        setError(humanDmSendError(err));
-        return null;
+        if (!canUseDirectAuthFallback(err)) {
+          setError(humanDmSendError(err));
+          return null;
+        }
+        innerB64 = await directEncryptPayload(
+          payload,
+          session.secretKey,
+          toUser.publicKey
+        );
+        cryptoMode = "direct-auth-fallback";
       }
       const envelope = await sealSender(
         session.user.id,
-        encrypted.innerB64,
+        innerB64,
         toUser.publicKey
       );
-      if (encrypted.mode === "legacy") {
+      if (cryptoMode === "legacy") {
         setError("Legacy-DH-Fallback genutzt: Prekey-Bundle des Kontakts nicht verfügbar.");
+      }
+      if (cryptoMode === "direct-auth-fallback" && !suppressLocal) {
+        setError(
+          "Nachricht per kompatiblem E2E-Fallback gesendet. Der Kontakt sollte die App oeffnen, damit X3DH/Double-Ratchet wieder aktiv wird."
+        );
       }
       const cid = newCid();
 
