@@ -266,7 +266,7 @@ async function createX3dhPreKeyEnvelope(
   peerPublicKeyB64: string,
   plainJson: string,
   token: string,
-  options: { forceSignedPreKeyOnly?: boolean } = {}
+  options: { forceSignedPreKeyOnly?: boolean; forceClassicalOnly?: boolean } = {}
 ): Promise<{ innerB64: string; state: PersistedDRState; mode: "pqxdh" | "x3dh" }> {
   const bundle = await api.getPreKeyBundle(token, peerId);
   return createX3dhPreKeyEnvelopeFromBundle(
@@ -285,7 +285,7 @@ async function createX3dhPreKeyEnvelopeFromBundle(
   peerPublicKeyB64: string,
   plainJson: string,
   bundle: api.PreKeyBundle,
-  options: { forceSignedPreKeyOnly?: boolean } = {}
+  options: { forceSignedPreKeyOnly?: boolean; forceClassicalOnly?: boolean } = {}
 ): Promise<{ innerB64: string; state: PersistedDRState; mode: "pqxdh" | "x3dh" }> {
   const oneTimePreKey = options.forceSignedPreKeyOnly
     ? null
@@ -295,7 +295,7 @@ async function createX3dhPreKeyEnvelopeFromBundle(
     bundle.identityKey,
     bundle.signedPreKey.publicKey,
     oneTimePreKey?.publicKey ?? null,
-    bundle.pqKem?.publicKey ?? null
+    options.forceClassicalOnly ? null : bundle.pqKem?.publicKey ?? null
   );
   const st: PersistedDRState = {
     ...(await drInitFromX3DH(x3dh.sharedSecret, peerId, peerPublicKeyB64)),
@@ -360,7 +360,8 @@ export async function drEncryptJsonForDm(
           peerId,
           peerPublicKeyB64,
           plainJson,
-          token
+          token,
+          { forceSignedPreKeyOnly: true, forceClassicalOnly: true }
         );
         return {
           innerB64: encodeDmBundleFrame({
@@ -397,7 +398,7 @@ export async function drEncryptJsonForDm(
       bundle
     );
     await saveState(x3dh.state);
-    if (bundle.oneTimePreKey) {
+    if (bundle.oneTimePreKey || bundle.pqKem) {
       try {
         const recovery = await createX3dhPreKeyEnvelopeFromBundle(
           myIdentitySk,
@@ -405,7 +406,7 @@ export async function drEncryptJsonForDm(
           peerPublicKeyB64,
           plainJson,
           bundle,
-          { forceSignedPreKeyOnly: true }
+          { forceSignedPreKeyOnly: true, forceClassicalOnly: true }
         );
         return {
           innerB64: encodeDmBundleFrame({
