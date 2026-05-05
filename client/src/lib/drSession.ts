@@ -316,8 +316,6 @@ export async function drDecryptX3dhPreKeyJson(
   peerPublicKeyB64: string,
   frameB64: string
 ): Promise<string> {
-  const existing = await loadState(peerId, peerPublicKeyB64);
-  if (existing) throw new Error("x3dh_replay_existing_session");
   const frame = decodeX3dhFrame(frameB64);
   const km = await loadKeyMaterial();
   if (!km) throw new Error("key_material_missing");
@@ -342,6 +340,9 @@ export async function drDecryptX3dhPreKeyJson(
   const wire = uint8FromBase64(frame.wire);
   const { state, plaintext } = await drDecrypt(st, myIdentitySk, wire);
   const result = dec.decode(unpad(plaintext));
+  // A peer may legitimately restart its local ratchet state after a browser
+  // reset or device restore. Accepting a fresh X3DH pre-key message here keeps
+  // delivery working while still requiring a valid signed pre-key handshake.
   await saveState(state);
   if (frame.oneTimePreKeyId !== null) {
     await consumeOneTimePreKey(km, frame.oneTimePreKeyId);

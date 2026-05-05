@@ -14,7 +14,6 @@ export type WrappedSecret = {
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const DIRECT_AUTH_HEADER = new Uint8Array([0x56, 0x44, 0x48, 0x31]); // "VDH1"
 
 function pwhashAlg(sodium: {
   crypto_pwhash_ALG_ARGON2ID?: number;
@@ -173,55 +172,6 @@ export async function openPayload(
   const opened = sodium.crypto_box_seal_open(sealed, pk, recipientSk);
   const json = dec.decode(opened);
   return JSON.parse(json) as PlainPayload;
-}
-
-export async function directEncryptPayload(
-  payload: PlainPayload,
-  senderSk: Uint8Array,
-  recipientPkB64: string
-): Promise<string> {
-  await sodiumReady();
-  const sodium = getSodium();
-  const recipientPk = publicKeyFromBase64(recipientPkB64);
-  const nonce = sodium.randombytes_buf(sodium.crypto_box_NONCEBYTES);
-  const plain = enc.encode(JSON.stringify(payload));
-  const cipher = sodium.crypto_box_easy(plain, nonce, recipientPk, senderSk);
-  const out = new Uint8Array(DIRECT_AUTH_HEADER.length + nonce.length + cipher.length);
-  let offset = 0;
-  out.set(DIRECT_AUTH_HEADER, offset);
-  offset += DIRECT_AUTH_HEADER.length;
-  out.set(nonce, offset);
-  offset += nonce.length;
-  out.set(cipher, offset);
-  return base64FromUint8(out);
-}
-
-export function isDirectPayload(ciphertextB64: string): boolean {
-  try {
-    const bytes = uint8FromBase64(ciphertextB64);
-    if (bytes.length <= DIRECT_AUTH_HEADER.length) return false;
-    return DIRECT_AUTH_HEADER.every((value, index) => bytes[index] === value);
-  } catch {
-    return false;
-  }
-}
-
-export async function directOpenPayload(
-  ciphertextB64: string,
-  senderPkB64: string,
-  recipientSk: Uint8Array
-): Promise<PlainPayload> {
-  await sodiumReady();
-  const sodium = getSodium();
-  const bytes = uint8FromBase64(ciphertextB64);
-  if (!isDirectPayload(ciphertextB64)) throw new Error("bad_direct_payload");
-  const senderPk = publicKeyFromBase64(senderPkB64);
-  const nonceStart = DIRECT_AUTH_HEADER.length;
-  const nonceEnd = nonceStart + sodium.crypto_box_NONCEBYTES;
-  const nonce = bytes.subarray(nonceStart, nonceEnd);
-  const cipher = bytes.subarray(nonceEnd);
-  const opened = sodium.crypto_box_open_easy(cipher, nonce, senderPk, recipientSk);
-  return JSON.parse(dec.decode(opened)) as PlainPayload;
 }
 
 export async function fingerprintFromPublicKeyB64(

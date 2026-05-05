@@ -1,10 +1,5 @@
 import type { ApiUser } from "./api";
-import {
-  directOpenPayload,
-  isDirectPayload,
-  openPayload,
-  type PlainPayload,
-} from "./crypto";
+import { openPayload, type PlainPayload } from "./crypto";
 import {
   drDecryptJson,
   drDecryptX3dhPreKeyJson,
@@ -70,12 +65,6 @@ export async function decryptIncomingSealedDm(
         innerB64
       );
       plain = JSON.parse(json) as PlainPayload;
-    } else if (isDirectPayload(innerB64)) {
-      plain = await directOpenPayload(
-        innerB64,
-        peer.publicKey,
-        session.secretKey
-      );
     } else {
       plain = await openPayload(
         innerB64,
