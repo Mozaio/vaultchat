@@ -100,6 +100,12 @@ type PendingGroupFrame = {
   createdAt: number;
 };
 
+type PendingDmFrame = {
+  id: string;
+  envelope: string;
+  createdAt: number;
+};
+
 type SharedMediaItem = {
   id: string;
   kind: "file" | "voice";
@@ -336,6 +342,7 @@ export function ChatShell({
   const groupsRef = useRef<api.ApiGroup[]>([]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seen = useRef(new Set<string>());
+  const pendingDmFramesRef = useRef<PendingDmFrame[]>([]);
   const pendingGroupFramesRef = useRef<PendingGroupFrame[]>([]);
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
@@ -936,6 +943,139 @@ export function ChatShell({
     [handleIncomingGroupFrame]
   );
 
+  const handleIncomingDmFrame = useCallback(
+    async (frame: PendingDmFrame, allowQueue = true) => {
+      if (seen.current.has(frame.id)) return true;
+      const dec = await decryptIncomingSealedDm(
+        frame.envelope,
+        session,
+        resolveUser
+      );
+      if (!dec) {
+        if (allowQueue) {
+          pendingDmFramesRef.current = [
+            ...pendingDmFramesRef.current.filter((x) => x.id !== frame.id),
+            frame,
+          ].slice(-100);
+        }
+        return false;
+      }
+      if (blockedPeers.has(dec.senderUserId)) {
+        seen.current.add(frame.id);
+        return true;
+      }
+      const peerUser =
+        usersRef.current.find((u) => u.id === dec.senderUserId) ??
+        (await resolveUser(dec.senderUserId));
+      if (!peerUser) {
+        if (allowQueue) {
+          pendingDmFramesRef.current = [
+            ...pendingDmFramesRef.current.filter((x) => x.id !== frame.id),
+            frame,
+          ].slice(-100);
+        }
+        return false;
+      }
+      seen.current.add(frame.id);
+
+      const plain = dec.plain;
+      if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
+        const keyBytes = uint8FromBase64(plain.keyB64);
+        await setGroupKey(plain.groupId, keyBytes);
+        const existingState = await getGroupKeyState(plain.groupId);
+        if (!existingState || existingState.rootKey !== plain.keyB64) {
+          const groupMembers =
+            groupsRef.current.find((x) => x.id === plain.groupId)?.memberIds ??
+            usersRef.current.map((u) => u.id);
+          await initGroupKeyState(
+            plain.groupId,
+            groupMembers,
+            session.user.id,
+            session.secretKey,
+            keyBytes
+          );
+        }
+        await loadGroups();
+        await retryPendingGroupFrames(plain.groupId);
+        return true;
+      }
+
+      const ttl = plain.ttlMs ?? 0;
+      await idbPutDm({
+        id: frame.id,
+        peerId: peerUser.id,
+        fromMe: false,
+        plainJson: JSON.stringify(plain),
+        at: frame.createdAt,
+        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
+      });
+      const arr = rawDmRef.current.get(peerUser.id) ?? [];
+      arr.push({
+        id: frame.id,
+        fromMe: false,
+        plainJson: JSON.stringify(plain),
+        at: frame.createdAt,
+        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
+      });
+      rawDmRef.current.set(peerUser.id, arr);
+      if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
+
+      if (peerRef.current?.id !== peerUser.id) {
+        if (!mutedPeers.has(peerUser.id)) {
+          maybeNotify(peerUser.username, previewForPayload(plain));
+        }
+        void (async () => {
+          const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
+            () => null
+          );
+          const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
+          if (frame.createdAt > seenAt) {
+            setUnreadByPeer((m) => ({
+              ...m,
+              [peerUser.id]: (m[peerUser.id] ?? 0) + 1,
+            }));
+          }
+        })();
+      }
+
+      if (sendReadReceipts && plain.kind !== "receipt" && plain.cid) {
+        const receipt: PlainPayload = {
+          v: 2,
+          cid: newCid(),
+          kind: "receipt",
+          receiptKind:
+            peerRef.current?.id === peerUser.id ? "read" : "delivered",
+          refCid: plain.cid,
+        };
+        void sendDmWire(peerUser, receipt, true);
+      }
+      return true;
+    },
+    [
+      session,
+      resolveUser,
+      blockedPeers,
+      loadGroups,
+      retryPendingGroupFrames,
+      rebuildDm,
+      mutedPeers,
+      maybeNotify,
+      sendReadReceipts,
+      sendDmWire,
+    ]
+  );
+
+  const retryPendingDmFrames = useCallback(async () => {
+    const pending = pendingDmFramesRef.current;
+    if (pending.length === 0) return;
+    const stillPending: PendingDmFrame[] = [];
+    for (const frame of pending) {
+      const handled = await handleIncomingDmFrame(frame, false);
+      if (!handled && !seen.current.has(frame.id)) stillPending.push(frame);
+    }
+    pendingDmFramesRef.current = stillPending;
+  }, [handleIncomingDmFrame]);
+
   /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
   const flushOutbox = useCallback(async () => {
     const ws = wsRef.current;
@@ -1013,6 +1153,7 @@ export function ChatShell({
             reconnectAttempts.current = 0;
             setConnected(true);
             void flushOutbox();
+            void retryPendingDmFrames();
             if (coverRef.current) {
               coverRef.current.stop();
               coverRef.current = null;
@@ -1085,93 +1226,11 @@ export function ChatShell({
             typeof data.id === "string" &&
             typeof data.envelope === "string"
           ) {
-            const id = data.id;
-            if (seen.current.has(id)) return;
-            const createdAt = Number(data.createdAt ?? Date.now());
-            const dec = await decryptIncomingSealedDm(
-              data.envelope,
-              session,
-              resolveUser
-            );
-            if (!dec) return;
-            if (blockedPeers.has(dec.senderUserId)) return;
-            seen.current.add(id);
-            const peerUser =
-              usersRef.current.find((u) => u.id === dec.senderUserId) ??
-              (await resolveUser(dec.senderUserId));
-            if (!peerUser) return;
-
-            const plain = dec.plain;
-            if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
-              const keyBytes = uint8FromBase64(plain.keyB64);
-              await setGroupKey(plain.groupId, keyBytes);
-              const existingState = await getGroupKeyState(plain.groupId);
-              if (!existingState || existingState.rootKey !== plain.keyB64) {
-                const groupMembers =
-                  groupsRef.current.find((x) => x.id === plain.groupId)?.memberIds ??
-                  usersRef.current.map((u) => u.id);
-                await initGroupKeyState(
-                  plain.groupId,
-                  groupMembers,
-                  session.user.id,
-                  session.secretKey,
-                  keyBytes
-                );
-              }
-              await loadGroups();
-              await retryPendingGroupFrames(plain.groupId);
-              return;
-            }
-
-            const ttl = plain.ttlMs ?? 0;
-            await idbPutDm({
-              id,
-              peerId: peerUser.id,
-              fromMe: false,
-              plainJson: JSON.stringify(plain),
-              at: createdAt,
-              ...(ttl ? { expiresAt: createdAt + ttl } : {}),
+            await handleIncomingDmFrame({
+              id: String(data.id),
+              envelope: String(data.envelope),
+              createdAt: Number(data.createdAt ?? Date.now()),
             });
-            const arr = rawDmRef.current.get(peerUser.id) ?? [];
-            arr.push({
-              id,
-              fromMe: false,
-              plainJson: JSON.stringify(plain),
-              at: createdAt,
-              ...(ttl ? { expiresAt: createdAt + ttl } : {}),
-            });
-            rawDmRef.current.set(peerUser.id, arr);
-            if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
-            // Update unread (if chat not currently open).
-            if (peerRef.current?.id !== peerUser.id) {
-              if (!mutedPeers.has(peerUser.id)) {
-                maybeNotify(peerUser.username, previewForPayload(plain));
-              }
-              void (async () => {
-                const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
-                  () => null
-                );
-                const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
-                if (createdAt > seenAt) {
-                  setUnreadByPeer((m) => ({
-                    ...m,
-                    [peerUser.id]: (m[peerUser.id] ?? 0) + 1,
-                  }));
-                }
-              })();
-            }
-
-            if (sendReadReceipts && plain.kind !== "receipt" && plain.cid) {
-              const receipt: PlainPayload = {
-                v: 2,
-                cid: newCid(),
-                kind: "receipt",
-                receiptKind:
-                  peerRef.current?.id === peerUser.id ? "read" : "delivered",
-                refCid: plain.cid,
-              };
-              void sendDmWire(peerUser, receipt, true);
-            }
           }
           if (data.type === "group" && typeof data.id === "string") {
             await handleIncomingGroupFrame({
@@ -1188,6 +1247,7 @@ export function ChatShell({
     };
     const interval = setInterval(() => {
       void flushOutbox();
+      void retryPendingDmFrames();
     }, 15_000);
     return () => {
       stopped = true;
@@ -1209,6 +1269,8 @@ export function ChatShell({
     sendDmWire,
     handleIncomingGroupFrame,
     retryPendingGroupFrames,
+    handleIncomingDmFrame,
+    retryPendingDmFrames,
     rebuildDm,
     rebuildGroup,
     resolveUser,

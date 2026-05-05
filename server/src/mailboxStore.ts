@@ -26,11 +26,12 @@ const MAX_PER_RECIPIENT = Number(process.env.VAULTCHAT_MAILBOX_MAX_PER_USER ?? 5
 export function enqueueMailboxDm(input: {
   toUserId: string;
   envelope: string;
+  id?: string;
   createdAt?: number;
 }): MailboxDm {
   const createdAt = input.createdAt ?? Date.now();
   const item: MailboxDm = {
-    id: randomUUID(),
+    id: input.id ?? randomUUID(),
     toUserId: input.toUserId,
     envelope: input.envelope,
     createdAt,

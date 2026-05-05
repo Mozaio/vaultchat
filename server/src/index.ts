@@ -925,7 +925,7 @@ wss.on("connection", (ws, req) => {
       createdAt,
     });
     if (delivered === 0) {
-      enqueueMailboxDm({ toUserId, envelope, createdAt });
+      enqueueMailboxDm({ id, toUserId, envelope, createdAt });
     }
 
     ws.send(
