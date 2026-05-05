@@ -772,7 +772,7 @@ export function ChatShell({
       if (encrypted.mode === "legacy") {
         setError("Legacy-DH-Fallback genutzt: Prekey-Bundle des Kontakts nicht verfügbar.");
       }
-      const cid = newCid();
+      const cid = payload.cid || newCid();
 
       const at = Date.now();
       const tmpId = `local-${newCid()}`;
@@ -1177,7 +1177,38 @@ export function ChatShell({
             if (id) seen.current.add(id);
             if (cid) {
               if (delivered > 0) {
+                const pending = await outboxList().catch(() => []);
+                const row = pending.find((item) => item.cid === cid);
                 await outboxRemove(cid);
+                if (row) {
+                  const receipt: PlainPayload = {
+                    v: 2,
+                    cid: `delivery-${cid}`,
+                    kind: "receipt",
+                    receiptKind: "delivered",
+                    refCid: cid,
+                  };
+                  const at = Number(data.createdAt ?? Date.now());
+                  const receiptRow = {
+                    id: `local-delivered-${cid}`,
+                    peerId: row.toUserId,
+                    fromMe: false,
+                    plainJson: JSON.stringify(receipt),
+                    at,
+                  };
+                  await idbPutDm(receiptRow);
+                  const arr = rawDmRef.current.get(row.toUserId) ?? [];
+                  if (!arr.some((item) => item.id === receiptRow.id)) {
+                    arr.push({
+                      id: receiptRow.id,
+                      fromMe: false,
+                      plainJson: receiptRow.plainJson,
+                      at,
+                    });
+                    rawDmRef.current.set(row.toUserId, arr);
+                    if (peerRef.current?.id === row.toUserId) rebuildDm(row.toUserId);
+                  }
+                }
               }
               await refreshPendingCount();
             }

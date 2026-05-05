@@ -265,14 +265,36 @@ async function createX3dhPreKeyEnvelope(
   peerId: string,
   peerPublicKeyB64: string,
   plainJson: string,
-  token: string
+  token: string,
+  options: { forceSignedPreKeyOnly?: boolean } = {}
 ): Promise<{ innerB64: string; state: PersistedDRState; mode: "pqxdh" | "x3dh" }> {
   const bundle = await api.getPreKeyBundle(token, peerId);
+  return createX3dhPreKeyEnvelopeFromBundle(
+    myIdentitySk,
+    peerId,
+    peerPublicKeyB64,
+    plainJson,
+    bundle,
+    options
+  );
+}
+
+async function createX3dhPreKeyEnvelopeFromBundle(
+  myIdentitySk: Uint8Array,
+  peerId: string,
+  peerPublicKeyB64: string,
+  plainJson: string,
+  bundle: api.PreKeyBundle,
+  options: { forceSignedPreKeyOnly?: boolean } = {}
+): Promise<{ innerB64: string; state: PersistedDRState; mode: "pqxdh" | "x3dh" }> {
+  const oneTimePreKey = options.forceSignedPreKeyOnly
+    ? null
+    : bundle.oneTimePreKey;
   const x3dh = await x3dhSender(
     myIdentitySk,
     bundle.identityKey,
     bundle.signedPreKey.publicKey,
-    bundle.oneTimePreKey?.publicKey ?? null,
+    oneTimePreKey?.publicKey ?? null,
     bundle.pqKem?.publicKey ?? null
   );
   const st: PersistedDRState = {
@@ -287,7 +309,7 @@ async function createX3dhPreKeyEnvelope(
       type: "x3dh_prekey",
       ephemeralPublicKey: x3dh.ephemeralPublicKey,
       signedPreKeyId: bundle.signedPreKey.keyId,
-      oneTimePreKeyId: bundle.oneTimePreKey?.keyId ?? null,
+      oneTimePreKeyId: oneTimePreKey?.keyId ?? null,
       ...(x3dh.pqKemCiphertext
         ? { pqKemCiphertext: x3dh.pqKemCiphertext }
         : {}),
@@ -299,6 +321,21 @@ async function createX3dhPreKeyEnvelope(
     },
     mode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
   };
+}
+
+async function decryptInnerFrameJson(
+  myIdentitySk: Uint8Array,
+  peerId: string,
+  peerPublicKeyB64: string,
+  innerB64: string
+): Promise<string> {
+  if (isDrCiphertext(innerB64)) {
+    return drDecryptJson(myIdentitySk, peerId, peerPublicKeyB64, innerB64);
+  }
+  if (isX3dhPreKeyFrame(innerB64)) {
+    return drDecryptX3dhPreKeyJson(myIdentitySk, peerId, peerPublicKeyB64, innerB64);
+  }
+  throw new Error("unsupported_dm_inner_frame");
 }
 
 export async function drEncryptJsonForDm(
@@ -351,14 +388,38 @@ export async function drEncryptJsonForDm(
   }
 
   try {
-    const x3dh = await createX3dhPreKeyEnvelope(
+    const bundle = await api.getPreKeyBundle(token, peerId);
+    const x3dh = await createX3dhPreKeyEnvelopeFromBundle(
       myIdentitySk,
       peerId,
       peerPublicKeyB64,
       plainJson,
-      token
+      bundle
     );
     await saveState(x3dh.state);
+    if (bundle.oneTimePreKey) {
+      try {
+        const recovery = await createX3dhPreKeyEnvelopeFromBundle(
+          myIdentitySk,
+          peerId,
+          peerPublicKeyB64,
+          plainJson,
+          bundle,
+          { forceSignedPreKeyOnly: true }
+        );
+        return {
+          innerB64: encodeDmBundleFrame({
+            v: 1,
+            type: "dm_bundle",
+            primary: x3dh.innerB64,
+            recovery: recovery.innerB64,
+          }),
+          mode: x3dh.mode,
+        };
+      } catch {
+        /* The primary X3DH frame is still valid when signed-prekey recovery cannot be built. */
+      }
+    }
     return { innerB64: x3dh.innerB64, mode: x3dh.mode };
   } catch {
     if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
@@ -459,19 +520,9 @@ export async function drDecryptDmBundleJson(
 ): Promise<string> {
   const frame = decodeDmBundleFrame(frameB64);
   try {
-    return await drDecryptJson(
-      myIdentitySk,
-      peerId,
-      peerPublicKeyB64,
-      frame.primary
-    );
+    return await decryptInnerFrameJson(myIdentitySk, peerId, peerPublicKeyB64, frame.primary);
   } catch {
-    return drDecryptX3dhPreKeyJson(
-      myIdentitySk,
-      peerId,
-      peerPublicKeyB64,
-      frame.recovery
-    );
+    return decryptInnerFrameJson(myIdentitySk, peerId, peerPublicKeyB64, frame.recovery);
   }
 }
 
