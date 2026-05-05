@@ -38,6 +38,7 @@ function metaKey(peerId: string) {
 }
 
 const X3DH_FRAME = new Uint8Array([0x56, 0x58, 0x33, 0x31]); // "VX31"
+const DM_BUNDLE_FRAME = new Uint8Array([0x56, 0x44, 0x42, 0x31]); // "VDB1"
 
 type X3dhPreKeyFrame = {
   v: 1;
@@ -49,9 +50,16 @@ type X3dhPreKeyFrame = {
   wire: string;
 };
 
+type DmBundleFrame = {
+  v: 1;
+  type: "dm_bundle";
+  primary: string;
+  recovery: string;
+};
+
 export type DmEncryptResult = {
   innerB64: string;
-  mode: "pqxdh" | "x3dh" | "ratchet" | "legacy";
+  mode: "pqxdh" | "x3dh" | "ratchet" | "ratchet_recovery" | "legacy";
 };
 
 function x3dhEnabled(): boolean {
@@ -94,9 +102,44 @@ function decodeX3dhFrame(b64: string): X3dhPreKeyFrame {
   return frame;
 }
 
+function encodeDmBundleFrame(frame: DmBundleFrame): string {
+  const body = enc.encode(JSON.stringify(frame));
+  const out = new Uint8Array(DM_BUNDLE_FRAME.length + body.length);
+  out.set(DM_BUNDLE_FRAME, 0);
+  out.set(body, DM_BUNDLE_FRAME.length);
+  return base64FromUint8(out);
+}
+
+function decodeDmBundleFrame(b64: string): DmBundleFrame {
+  const data = uint8FromBase64(b64);
+  if (data.length <= DM_BUNDLE_FRAME.length) throw new Error("short_dm_bundle_frame");
+  for (let i = 0; i < DM_BUNDLE_FRAME.length; i++) {
+    if (data[i] !== DM_BUNDLE_FRAME[i]) throw new Error("bad_dm_bundle_frame");
+  }
+  const frame = JSON.parse(dec.decode(data.subarray(DM_BUNDLE_FRAME.length))) as DmBundleFrame;
+  if (
+    frame.v !== 1 ||
+    frame.type !== "dm_bundle" ||
+    typeof frame.primary !== "string" ||
+    typeof frame.recovery !== "string"
+  ) {
+    throw new Error("invalid_dm_bundle_frame");
+  }
+  return frame;
+}
+
 export function isX3dhPreKeyFrame(b64: string): boolean {
   try {
     decodeX3dhFrame(b64);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function isDmBundleFrame(b64: string): boolean {
+  try {
+    decodeDmBundleFrame(b64);
     return true;
   } catch {
     return false;
@@ -217,6 +260,47 @@ async function loadState(
   return null;
 }
 
+async function createX3dhPreKeyEnvelope(
+  myIdentitySk: Uint8Array,
+  peerId: string,
+  peerPublicKeyB64: string,
+  plainJson: string,
+  token: string
+): Promise<{ innerB64: string; state: PersistedDRState; mode: "pqxdh" | "x3dh" }> {
+  const bundle = await api.getPreKeyBundle(token, peerId);
+  const x3dh = await x3dhSender(
+    myIdentitySk,
+    bundle.identityKey,
+    bundle.signedPreKey.publicKey,
+    bundle.oneTimePreKey?.publicKey ?? null,
+    bundle.pqKem?.publicKey ?? null
+  );
+  const st: PersistedDRState = {
+    ...(await drInitFromX3DH(x3dh.sharedSecret, peerId, peerPublicKeyB64)),
+    initMode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
+  };
+  const padded = pad(enc.encode(plainJson));
+  const { state, wire } = await drEncrypt(st, padded);
+  return {
+    innerB64: encodeX3dhFrame({
+      v: 1,
+      type: "x3dh_prekey",
+      ephemeralPublicKey: x3dh.ephemeralPublicKey,
+      signedPreKeyId: bundle.signedPreKey.keyId,
+      oneTimePreKeyId: bundle.oneTimePreKey?.keyId ?? null,
+      ...(x3dh.pqKemCiphertext
+        ? { pqKemCiphertext: x3dh.pqKemCiphertext }
+        : {}),
+      wire: base64FromUint8(wire),
+    }),
+    state: {
+      ...state,
+      initMode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
+    },
+    mode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
+  };
+}
+
 export async function drEncryptJsonForDm(
   myIdentitySk: Uint8Array,
   peerId: string,
@@ -232,6 +316,28 @@ export async function drEncryptJsonForDm(
     const padded = pad(enc.encode(plainJson));
     const { state, wire } = await drEncrypt(existing, padded);
     await saveState(state);
+    if (useX3dh) {
+      try {
+        const recovery = await createX3dhPreKeyEnvelope(
+          myIdentitySk,
+          peerId,
+          peerPublicKeyB64,
+          plainJson,
+          token
+        );
+        return {
+          innerB64: encodeDmBundleFrame({
+            v: 1,
+            type: "dm_bundle",
+            primary: base64FromUint8(wire),
+            recovery: recovery.innerB64,
+          }),
+          mode: "ratchet_recovery",
+        };
+      } catch {
+        /* Normal ratchet delivery still works when recovery prekeys are temporarily unavailable. */
+      }
+    }
     return { innerB64: base64FromUint8(wire), mode: "ratchet" };
   }
 
@@ -245,35 +351,15 @@ export async function drEncryptJsonForDm(
   }
 
   try {
-    const bundle = await api.getPreKeyBundle(token, peerId);
-    const x3dh = await x3dhSender(
+    const x3dh = await createX3dhPreKeyEnvelope(
       myIdentitySk,
-      bundle.identityKey,
-      bundle.signedPreKey.publicKey,
-      bundle.oneTimePreKey?.publicKey ?? null,
-      bundle.pqKem?.publicKey ?? null
+      peerId,
+      peerPublicKeyB64,
+      plainJson,
+      token
     );
-    const st: PersistedDRState = {
-      ...(await drInitFromX3DH(x3dh.sharedSecret, peerId, peerPublicKeyB64)),
-      initMode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
-    };
-    const padded = pad(enc.encode(plainJson));
-    const { state, wire } = await drEncrypt(st, padded);
-    await saveState(state);
-    return {
-      innerB64: encodeX3dhFrame({
-        v: 1,
-        type: "x3dh_prekey",
-        ephemeralPublicKey: x3dh.ephemeralPublicKey,
-        signedPreKeyId: bundle.signedPreKey.keyId,
-        oneTimePreKeyId: bundle.oneTimePreKey?.keyId ?? null,
-        ...(x3dh.pqKemCiphertext
-          ? { pqKemCiphertext: x3dh.pqKemCiphertext }
-          : {}),
-        wire: base64FromUint8(wire),
-      }),
-      mode: x3dh.pqKemCiphertext ? "pqxdh" : "x3dh",
-    };
+    await saveState(x3dh.state);
+    return { innerB64: x3dh.innerB64, mode: x3dh.mode };
   } catch {
     if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
     const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
@@ -363,6 +449,30 @@ export async function drDecryptX3dhPreKeyJson(
     await consumeOneTimePreKey(km, frame.oneTimePreKeyId);
   }
   return result;
+}
+
+export async function drDecryptDmBundleJson(
+  myIdentitySk: Uint8Array,
+  peerId: string,
+  peerPublicKeyB64: string,
+  frameB64: string
+): Promise<string> {
+  const frame = decodeDmBundleFrame(frameB64);
+  try {
+    return await drDecryptJson(
+      myIdentitySk,
+      peerId,
+      peerPublicKeyB64,
+      frame.primary
+    );
+  } catch {
+    return drDecryptX3dhPreKeyJson(
+      myIdentitySk,
+      peerId,
+      peerPublicKeyB64,
+      frame.recovery
+    );
+  }
 }
 
 export function isDrCiphertext(b64: string): boolean {
