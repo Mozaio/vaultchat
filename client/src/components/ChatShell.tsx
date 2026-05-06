@@ -293,6 +293,7 @@ export function ChatShell({
   const [groupEditName, setGroupEditName] = useState("");
   const [groupEditDescription, setGroupEditDescription] = useState("");
   const [groupEditBusy, setGroupEditBusy] = useState(false);
+  const [notifyPromptOpen, setNotifyPromptOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -462,12 +463,44 @@ export function ChatShell({
       return;
     }
     if (Notification.permission === "default") {
-      void Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          new Notification(title, { body: displayBody, tag: "vaultchat-message" });
-        }
-      });
+      // Don't pop the native browser prompt unannounced — show a friendly
+      // in-app banner instead and let the user opt in deliberately.
+      let dismissed = false;
+      try {
+        dismissed =
+          localStorage.getItem("vaultchat.notify.promptDismissed") === "1";
+      } catch {
+        /* ignore */
+      }
+      if (!dismissed) setNotifyPromptOpen(true);
     }
+  }, []);
+
+  const handleEnableNotifications = useCallback(async () => {
+    if (!("Notification" in window)) {
+      setNotifyPromptOpen(false);
+      return;
+    }
+    try {
+      await Notification.requestPermission();
+    } catch {
+      /* ignore */
+    }
+    try {
+      localStorage.setItem("vaultchat.notify.promptDismissed", "1");
+    } catch {
+      /* ignore */
+    }
+    setNotifyPromptOpen(false);
+  }, []);
+
+  const handleDismissNotifyPrompt = useCallback(() => {
+    try {
+      localStorage.setItem("vaultchat.notify.promptDismissed", "1");
+    } catch {
+      /* ignore */
+    }
+    setNotifyPromptOpen(false);
   }, []);
 
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
@@ -2252,6 +2285,33 @@ export function ChatShell({
 
   return (
     <div className="flex h-full w-full flex-col bg-[var(--bg)] p-0 md:p-4">
+      {notifyPromptOpen && (
+        <div className="notify-prompt-banner" role="status">
+          <span className="notify-prompt-icon" aria-hidden>
+            <IconBell size={16} />
+          </span>
+          <div className="notify-prompt-text">
+            <strong>Benachrichtigungen aktivieren?</strong>
+            <span>VaultChat zeigt dir neue Nachrichten an, wenn das Fenster im Hintergrund ist.</span>
+          </div>
+          <div className="notify-prompt-actions">
+            <button
+              type="button"
+              className="btn btn-secondary !px-3 !py-1 !text-xs"
+              onClick={handleDismissNotifyPrompt}
+            >
+              Nicht jetzt
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary !px-3 !py-1 !text-xs"
+              onClick={() => void handleEnableNotifications()}
+            >
+              Erlauben
+            </button>
+          </div>
+        </div>
+      )}
       {searchOpen && (
         <SearchPanel
           users={users.map((u) => ({ id: u.id, username: u.username }))}

@@ -783,6 +783,50 @@ select:focus-visible {
   }
 }
 
+/* Notification permission opt-in banner — friendlier than the native
+   browser permission prompt fired without context. */
+.notify-prompt-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  margin: 0.5rem 0.75rem 0;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+.notify-prompt-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-on-accent, #fff);
+  flex-shrink: 0;
+}
+.notify-prompt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex: 1;
+  min-width: 0;
+}
+.notify-prompt-text strong { font-size: 0.85rem; }
+.notify-prompt-text span { font-size: 0.78rem; color: var(--text-secondary); }
+.notify-prompt-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .notify-prompt-banner { flex-wrap: wrap; }
+  .notify-prompt-actions { width: 100%; justify-content: flex-end; }
+}
+
 /* System message (centered neutral pill: "X hat Y hinzugefügt") */
 .system-message {
   display: flex;
