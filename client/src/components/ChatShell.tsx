@@ -258,6 +258,7 @@ export function ChatShell({
   const [peerFp, setPeerFp] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
+  const [newGroupDescription, setNewGroupDescription] = useState("");
   const [incomingOffer, setIncomingOffer] = useState<{
     from: api.ApiUser;
     sdp: string;
@@ -288,6 +289,10 @@ export function ChatShell({
   const [relayOnly, setRelayOnly] = useState(false);
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
+  const [groupEditMode, setGroupEditMode] = useState(false);
+  const [groupEditName, setGroupEditName] = useState("");
+  const [groupEditDescription, setGroupEditDescription] = useState("");
+  const [groupEditBusy, setGroupEditBusy] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -380,6 +385,11 @@ export function ChatShell({
   useEffect(() => {
     if (forwardTarget) setForwardPick(new Set());
   }, [forwardTarget]);
+
+  // Reset group edit form when switching groups or closing the panel.
+  useEffect(() => {
+    setGroupEditMode(false);
+  }, [group?.id, groupPanelOpen]);
 
   useShortcuts({
     onSearch: () => setSearchOpen(true),
@@ -1561,9 +1571,11 @@ export function ChatShell({
     }
     setError(null);
     const memberIds = [...new Set([...newGroupMembers, session.user.id])];
+    const description = newGroupDescription.trim();
     const { group: g } = await api.createGroup(session.token, {
       name: newGroupName.trim(),
       memberIds,
+      ...(description ? { description } : {}),
     });
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
@@ -1571,6 +1583,7 @@ export function ChatShell({
     await distributeGroupKey(g, memberIds, base64FromUint8(key));
     setNewGroupName("");
     setNewGroupMembers([]);
+    setNewGroupDescription("");
     setGroup(g);
     setTab("group");
     // Refresh group list immediately
@@ -1581,6 +1594,41 @@ export function ChatShell({
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
     await distributeGroupKey(g, newMembers, base64FromUint8(key));
+  }
+
+  async function saveGroupProfile() {
+    if (!group) return;
+    const trimmedName = groupEditName.trim();
+    const trimmedDesc = groupEditDescription.trim();
+    if (!trimmedName) {
+      pushToast("Gruppenname darf nicht leer sein.", "danger");
+      return;
+    }
+    setGroupEditBusy(true);
+    try {
+      const { group: updated } = await api.updateGroupProfile(
+        session.token,
+        group.id,
+        {
+          name: trimmedName,
+          description: trimmedDesc,
+        }
+      );
+      setGroup((prev) => (prev && prev.id === updated.id ? updated : prev));
+      await loadGroups();
+      setGroupEditMode(false);
+      pushToast("Gruppe aktualisiert.", "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "unknown_error";
+      pushToast(
+        msg === "cannot_update"
+          ? "Nur der Ersteller darf die Gruppe bearbeiten."
+          : `Aktualisierung fehlgeschlagen: ${msg}`,
+        "danger"
+      );
+    } finally {
+      setGroupEditBusy(false);
+    }
   }
 
   async function addMember() {
@@ -2532,6 +2580,17 @@ export function ChatShell({
                 onChange={(e) => setNewGroupName(e.target.value)}
                 aria-label="Gruppenname"
               />
+              <textarea
+                className="app-input w-full !py-2 text-xs"
+                placeholder="Beschreibung (optional, max. 280 Zeichen)"
+                value={newGroupDescription}
+                onChange={(e) =>
+                  setNewGroupDescription(e.target.value.slice(0, 280))
+                }
+                rows={2}
+                aria-label="Gruppenbeschreibung"
+                style={{ resize: "none" }}
+              />
               <div
                 className="max-h-40 space-y-0.5 overflow-y-auto rounded-lg border p-1"
                 style={{ borderColor: "var(--border)" }}
@@ -3354,6 +3413,86 @@ export function ChatShell({
 
               {groupPanelOpen && (
                 <div className="mt-3 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text)" }}>
+                  {/* Profile (description + edit) */}
+                  {(group.description || group.createdByUserId === session.user.id) && (
+                    <div
+                      className="mb-2 border-b pb-2"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      {groupEditMode ? (
+                        <div className="space-y-2">
+                          <input
+                            className="app-input w-full !py-1 !text-xs"
+                            value={groupEditName}
+                            onChange={(e) => setGroupEditName(e.target.value)}
+                            placeholder="Gruppenname"
+                            maxLength={64}
+                            aria-label="Gruppenname bearbeiten"
+                          />
+                          <textarea
+                            className="app-input w-full !py-1 !text-xs"
+                            value={groupEditDescription}
+                            onChange={(e) =>
+                              setGroupEditDescription(e.target.value.slice(0, 280))
+                            }
+                            placeholder="Beschreibung (optional, max. 280 Zeichen)"
+                            rows={2}
+                            style={{ resize: "none" }}
+                            aria-label="Gruppenbeschreibung bearbeiten"
+                          />
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setGroupEditMode(false)}
+                              className="btn btn-secondary !px-2 !py-1 !text-[10px]"
+                              disabled={groupEditBusy}
+                            >
+                              Abbrechen
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void saveGroupProfile()}
+                              className="btn btn-primary !px-2 !py-1 !text-[10px]"
+                              disabled={groupEditBusy || !groupEditName.trim()}
+                            >
+                              {groupEditBusy ? "…" : "Speichern"}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {group.description ? (
+                            <p
+                              className="whitespace-pre-wrap leading-snug"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {group.description}
+                            </p>
+                          ) : (
+                            <p
+                              className="italic"
+                              style={{ color: "var(--text-muted)" }}
+                            >
+                              Keine Beschreibung gesetzt.
+                            </p>
+                          )}
+                          {group.createdByUserId === session.user.id && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setGroupEditName(group.name);
+                                setGroupEditDescription(group.description ?? "");
+                                setGroupEditMode(true);
+                              }}
+                              className="btn btn-secondary !px-2 !py-1 !text-[10px]"
+                            >
+                              Profil bearbeiten
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <ul className="mb-2 space-y-1">
                     {group.memberIds.map((mid) => {
                       const u = users.find((x) => x.id === mid);
