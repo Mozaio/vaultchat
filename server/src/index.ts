@@ -639,6 +639,7 @@ function flushMailboxToSocket(userId: string, ws: WebSocket) {
         type: "dm",
         id: item.id,
         toUserId: userId,
+        ...(item.cid ? { cid: item.cid } : {}),
         envelope: item.envelope,
         createdAt: item.createdAt,
         mailbox: true,
@@ -934,11 +935,12 @@ wss.on("connection", (ws, req) => {
       type: "dm",
       id,
       toUserId,
+      cid,
       envelope,
       createdAt,
     });
     if (delivered === 0) {
-      enqueueMailboxDm({ id, toUserId, envelope, createdAt });
+      enqueueMailboxDm({ id, toUserId, envelope, cid, createdAt });
     }
 
     ws.send(

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 type MailboxDm = {
   id: string;
   toUserId: string;
+  cid?: string;
   envelope: string;
   createdAt: number;
   expiresAt: number;
@@ -27,19 +28,22 @@ export function enqueueMailboxDm(input: {
   toUserId: string;
   envelope: string;
   id?: string;
+  cid?: string;
   createdAt?: number;
 }): MailboxDm {
   const createdAt = input.createdAt ?? Date.now();
   const item: MailboxDm = {
     id: input.id ?? randomUUID(),
     toUserId: input.toUserId,
+    ...(input.cid ? { cid: input.cid } : {}),
     envelope: input.envelope,
     createdAt,
     expiresAt: createdAt + DEFAULT_TTL_MS,
   };
-  const list = (dmByRecipient.get(input.toUserId) ?? []).filter(
-    (x) => x.expiresAt > Date.now()
-  );
+  const list = (dmByRecipient.get(input.toUserId) ?? []).filter((x) => {
+    if (x.expiresAt <= Date.now()) return false;
+    return !input.cid || x.cid !== input.cid;
+  });
   list.push(item);
   while (list.length > MAX_PER_RECIPIENT) list.shift();
   dmByRecipient.set(input.toUserId, list);

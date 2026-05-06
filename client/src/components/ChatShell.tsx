@@ -12,6 +12,7 @@ import { base64FromUint8, uint8FromBase64 } from "../lib/b64";
 import {
   idbDeleteDm,
   idbDeleteGroupMsg,
+  idbListAllDm,
   idbListDm,
   idbListGroup,
   idbPutDm,
@@ -23,7 +24,6 @@ import {
 import {
   decryptGroupPayload,
   encryptGroupPayload,
-  getGroupKeyState,
   initGroupKeyState,
   randomGroupKey,
   setGroupKey,
@@ -104,6 +104,7 @@ type PendingGroupFrame = {
 
 type PendingDmFrame = {
   id: string;
+  cid?: string;
   envelope: string;
   createdAt: number;
   mailbox?: boolean;
@@ -492,8 +493,24 @@ export function ChatShell({
 
   // Load only contacts from local messages (not from server)
   const loadContacts = useCallback(async () => {
-    // Only show contacts we've exchanged messages with (from local storage)
-    const contactIds = Array.from(rawDmRef.current.keys());
+    const allRows = await idbListAllDm();
+    const byPeer = new Map<string, ReturnType<typeof authoredFromDm>>();
+    for (const row of allRows) {
+      const arr = byPeer.get(row.peerId) ?? [];
+      arr.push({
+        id: row.id,
+        fromMe: row.fromMe,
+        plainJson: row.plainJson,
+        at: row.at,
+        ...(row.expiresAt ? { expiresAt: row.expiresAt } : {}),
+      });
+      byPeer.set(row.peerId, arr);
+    }
+    for (const [peerId, rows] of byPeer) {
+      rawDmRef.current.set(peerId, rows.sort((a, b) => a.at - b.at));
+    }
+    const contactIds = Array.from(byPeer.keys());
+    if (contactIds.length === 0) return;
     const { users: list } = await api.listUsers(session.token, contactIds);
     const contacts = list.filter((u) => contactIds.includes(u.id));
     setUsers((prev) => {
@@ -841,7 +858,8 @@ export function ChatShell({
         if (peerRef.current?.id === toUser.id) rebuildDm(toUser.id);
       }
 
-      await outboxAdd(cid, toUser.id, envelope);
+      const ackMode = payload.kind === "receipt" ? "transport" : "e2e";
+      await outboxAdd(cid, toUser.id, envelope, { ackMode });
       await refreshPendingCount();
 
       const ws = wsRef.current;
@@ -890,12 +908,6 @@ export function ChatShell({
           }
           setError("Gruppennachricht konnte nicht verschluesselt werden.");
           return null;
-        }
-      }
-      if (!suppressLocal) {
-        const currentState = await getGroupKeyState(g.id).catch(() => null);
-        if (currentState?.rootKey) {
-          await distributeGroupKey(g, g.memberIds, currentState.rootKey);
         }
       }
       const at = Date.now();
@@ -1005,8 +1017,34 @@ export function ChatShell({
   const handleIncomingDmFrame = useCallback(
     async (frame: PendingDmFrame, allowQueue = true) => {
       const seenKey = `seen:frame:${frame.id}`;
+      const cidSeenKey = frame.cid ? `seen:dmcid:${frame.cid}` : null;
       const wasPersisted = await metaGet(seenKey).catch(() => null);
+      const cidWasPersisted = cidSeenKey
+        ? await metaGet(cidSeenKey).catch(() => null)
+        : null;
       if (seen.current.has(frame.id) || wasPersisted) {
+        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
+        return true;
+      }
+      if (cidSeenKey && (seen.current.has(cidSeenKey) || cidWasPersisted)) {
+        if (
+          typeof cidWasPersisted === "string" &&
+          cidWasPersisted !== "1" &&
+          frame.cid &&
+          !blockedPeers.has(cidWasPersisted)
+        ) {
+          const sender = await resolveUser(cidWasPersisted);
+          if (sender) {
+            const receipt: PlainPayload = {
+              v: 2,
+              cid: newCid(),
+              kind: "receipt",
+              receiptKind: "delivered",
+              refCid: frame.cid,
+            };
+            void sendDmWire(sender, receipt, true);
+          }
+        }
         if (frame.mailbox) ackMailboxFrame("dm", frame.id);
         return true;
       }
@@ -1026,7 +1064,9 @@ export function ChatShell({
       }
       if (blockedPeers.has(dec.senderUserId)) {
         seen.current.add(frame.id);
+        if (cidSeenKey) seen.current.add(cidSeenKey);
         await metaSet(seenKey, "1").catch(() => {});
+        if (cidSeenKey) await metaSet(cidSeenKey, dec.senderUserId).catch(() => {});
         if (frame.mailbox) ackMailboxFrame("dm", frame.id);
         return true;
       }
@@ -1059,7 +1099,19 @@ export function ChatShell({
         );
         await retryPendingGroupFrames(plain.groupId);
         seen.current.add(frame.id);
+        if (cidSeenKey) seen.current.add(cidSeenKey);
         await metaSet(seenKey, "1").catch(() => {});
+        if (cidSeenKey) await metaSet(cidSeenKey, dec.senderUserId).catch(() => {});
+        if (plain.cid) {
+          const receipt: PlainPayload = {
+            v: 2,
+            cid: newCid(),
+            kind: "receipt",
+            receiptKind: "delivered",
+            refCid: plain.cid,
+          };
+          void sendDmWire(peerUser, receipt, true);
+        }
         if (frame.mailbox) ackMailboxFrame("dm", frame.id);
         return true;
       }
@@ -1074,7 +1126,9 @@ export function ChatShell({
         ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
       });
       seen.current.add(frame.id);
+      if (cidSeenKey) seen.current.add(cidSeenKey);
       await metaSet(seenKey, "1").catch(() => {});
+      if (cidSeenKey) await metaSet(cidSeenKey, dec.senderUserId).catch(() => {});
       const arr = rawDmRef.current.get(peerUser.id) ?? [];
       arr.push({
         id: frame.id,
@@ -1104,13 +1158,20 @@ export function ChatShell({
         })();
       }
 
-      if (sendReadReceipts && plain.kind !== "receipt" && plain.cid) {
+      if (plain.kind === "receipt" && plain.refCid) {
+        await outboxRemove(plain.refCid).catch(() => {});
+        await refreshPendingCount();
+      }
+
+      if (plain.kind !== "receipt" && plain.cid) {
         const receipt: PlainPayload = {
           v: 2,
           cid: newCid(),
           kind: "receipt",
           receiptKind:
-            peerRef.current?.id === peerUser.id ? "read" : "delivered",
+            sendReadReceipts && peerRef.current?.id === peerUser.id
+              ? "read"
+              : "delivered",
           refCid: plain.cid,
         };
         void sendDmWire(peerUser, receipt, true);
@@ -1130,6 +1191,7 @@ export function ChatShell({
       maybeNotify,
       sendReadReceipts,
       sendDmWire,
+      refreshPendingCount,
     ]
   );
 
@@ -1251,36 +1313,7 @@ export function ChatShell({
               if (delivered > 0) {
                 const pending = await outboxList().catch(() => []);
                 const row = pending.find((item) => item.cid === cid);
-                await outboxRemove(cid);
-                if (row) {
-                  const receipt: PlainPayload = {
-                    v: 2,
-                    cid: `delivery-${cid}`,
-                    kind: "receipt",
-                    receiptKind: "delivered",
-                    refCid: cid,
-                  };
-                  const at = Number(data.createdAt ?? Date.now());
-                  const receiptRow = {
-                    id: `local-delivered-${cid}`,
-                    peerId: row.toUserId,
-                    fromMe: false,
-                    plainJson: JSON.stringify(receipt),
-                    at,
-                  };
-                  await idbPutDm(receiptRow);
-                  const arr = rawDmRef.current.get(row.toUserId) ?? [];
-                  if (!arr.some((item) => item.id === receiptRow.id)) {
-                    arr.push({
-                      id: receiptRow.id,
-                      fromMe: false,
-                      plainJson: receiptRow.plainJson,
-                      at,
-                    });
-                    rawDmRef.current.set(row.toUserId, arr);
-                    if (peerRef.current?.id === row.toUserId) rebuildDm(row.toUserId);
-                  }
-                }
+                if (row?.ackMode !== "e2e") await outboxRemove(cid);
               }
               await refreshPendingCount();
             }
@@ -1331,6 +1364,7 @@ export function ChatShell({
           ) {
             await handleIncomingDmFrame({
               id: String(data.id),
+              ...(typeof data.cid === "string" ? { cid: String(data.cid) } : {}),
               envelope: String(data.envelope),
               createdAt: Number(data.createdAt ?? Date.now()),
               mailbox: data.mailbox === true,

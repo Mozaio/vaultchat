@@ -25,6 +25,7 @@ type OutboxRecord = {
   attempts: number;
   lastAttempt: number;
   nextAttemptAt?: number;
+  ackMode?: "transport" | "e2e";
 };
 
 function openDb(): Promise<IDBDatabase> {
@@ -42,7 +43,8 @@ function assertKey() {
 export async function outboxAdd(
   cid: string,
   toUserId: string,
-  envelopeB64: string
+  envelopeB64: string,
+  options: { ackMode?: "transport" | "e2e" } = {}
 ): Promise<void> {
   assertKey();
   const envelopeCipher = await encryptString(envelopeB64);
@@ -53,6 +55,7 @@ export async function outboxAdd(
     createdAt: Date.now(),
     attempts: 0,
     lastAttempt: 0,
+    ackMode: options.ackMode ?? "transport",
   };
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
@@ -74,7 +77,13 @@ export async function outboxRemove(cid: string): Promise<void> {
 }
 
 export async function outboxList(): Promise<
-  { cid: string; toUserId: string; envelopeB64: string; attempts: number }[]
+  {
+    cid: string;
+    toUserId: string;
+    envelopeB64: string;
+    attempts: number;
+    ackMode: "transport" | "e2e";
+  }[]
 > {
   assertKey();
   const db = await openDb();
@@ -98,6 +107,7 @@ export async function outboxList(): Promise<
     toUserId: string;
     envelopeB64: string;
     attempts: number;
+    ackMode: "transport" | "e2e";
   }[] = [];
   for (const r of records) {
     try {
@@ -106,6 +116,7 @@ export async function outboxList(): Promise<
         toUserId: r.toUserId,
         envelopeB64: await decryptToString(r.envelopeCipher),
         attempts: r.attempts,
+        ackMode: r.ackMode ?? "transport",
       });
     } catch {
       /* ignore */
