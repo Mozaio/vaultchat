@@ -53,6 +53,23 @@ export function popMailboxDms(userId: string): MailboxDm[] {
   return list.filter((x) => x.expiresAt > now);
 }
 
+export function listMailboxDms(userId: string): MailboxDm[] {
+  const now = Date.now();
+  const live = (dmByRecipient.get(userId) ?? []).filter((x) => x.expiresAt > now);
+  if (live.length > 0) dmByRecipient.set(userId, live);
+  else dmByRecipient.delete(userId);
+  return [...live];
+}
+
+export function removeMailboxDm(userId: string, id: string): void {
+  const now = Date.now();
+  const live = (dmByRecipient.get(userId) ?? []).filter(
+    (x) => x.id !== id && x.expiresAt > now
+  );
+  if (live.length > 0) dmByRecipient.set(userId, live);
+  else dmByRecipient.delete(userId);
+}
+
 export function enqueueMailboxGroup(input: {
   toUserId: string;
   groupId: string;
@@ -83,6 +100,23 @@ export function popMailboxGroups(userId: string): MailboxGroup[] {
   const list = groupByRecipient.get(userId) ?? [];
   groupByRecipient.delete(userId);
   return list.filter((x) => x.expiresAt > now);
+}
+
+export function listMailboxGroups(userId: string): MailboxGroup[] {
+  const now = Date.now();
+  const live = (groupByRecipient.get(userId) ?? []).filter((x) => x.expiresAt > now);
+  if (live.length > 0) groupByRecipient.set(userId, live);
+  else groupByRecipient.delete(userId);
+  return [...live];
+}
+
+export function removeMailboxGroup(userId: string, id: string): void {
+  const now = Date.now();
+  const live = (groupByRecipient.get(userId) ?? []).filter(
+    (x) => x.id !== id && x.expiresAt > now
+  );
+  if (live.length > 0) groupByRecipient.set(userId, live);
+  else groupByRecipient.delete(userId);
 }
 
 export function getMailboxStats() {

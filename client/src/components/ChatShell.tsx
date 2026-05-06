@@ -99,12 +99,14 @@ type PendingGroupFrame = {
   groupId: string;
   ciphertext: string;
   createdAt: number;
+  mailbox?: boolean;
 };
 
 type PendingDmFrame = {
   id: string;
   envelope: string;
   createdAt: number;
+  mailbox?: boolean;
 };
 
 type SharedMediaItem = {
@@ -494,7 +496,11 @@ export function ChatShell({
     const contactIds = Array.from(rawDmRef.current.keys());
     const { users: list } = await api.listUsers(session.token, contactIds);
     const contacts = list.filter((u) => contactIds.includes(u.id));
-    setUsers(contacts);
+    setUsers((prev) => {
+      const byId = new Map(prev.map((u) => [u.id, u]));
+      for (const u of contacts) byId.set(u.id, u);
+      return Array.from(byId.values());
+    });
     
     // Also observe peer keys for contacts
     for (const u of contacts) {
@@ -748,6 +754,12 @@ export function ChatShell({
     wsRef.current?.send(JSON.stringify({ type: "rtc", toUserId, payload }));
   }, []);
 
+  const ackMailboxFrame = useCallback((kind: "dm" | "group", id: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthenticatedRef.current) return;
+    ws.send(JSON.stringify({ type: "mailbox_ack", kind, id }));
+  }, []);
+
   /**
    * Kernroutine fürs Senden: DR-Verschlüsselung → Sealed-Sender-Envelope →
    * WebSocket. Wenn kein Socket oder `delivered=0`, wird die Nachricht in der
@@ -757,7 +769,8 @@ export function ChatShell({
     async (
       toUser: api.ApiUser,
       payload: PlainPayload,
-      suppressLocal = false
+      suppressLocal = false,
+      options: { forceRecovery?: boolean } = {}
     ): Promise<string | null> => {
       if (!preKeyReadyRef.current) {
         setError("Sichere Schluessel werden vorbereitet. Bitte in ein paar Sekunden erneut senden.");
@@ -778,8 +791,8 @@ export function ChatShell({
         }
       });
       const requireRecovery =
-        !suppressLocal &&
-        !hasPeerContent;
+        Boolean(options.forceRecovery) ||
+        (!suppressLocal && !hasPeerContent);
       let encrypted: Awaited<ReturnType<typeof drEncryptJsonForDm>>;
       try {
         encrypted = await drEncryptJsonForDm(
@@ -879,6 +892,12 @@ export function ChatShell({
           return null;
         }
       }
+      if (!suppressLocal) {
+        const currentState = await getGroupKeyState(g.id).catch(() => null);
+        if (currentState?.rootKey) {
+          await distributeGroupKey(g, g.memberIds, currentState.rootKey);
+        }
+      }
       const at = Date.now();
       const tmpId = `local-g-${newCid()}`;
       const ttl = p.ttlMs ?? 0;
@@ -911,7 +930,12 @@ export function ChatShell({
 
   const handleIncomingGroupFrame = useCallback(
     async (frame: PendingGroupFrame, allowQueue = true) => {
-      if (seen.current.has(frame.id)) return true;
+      const seenKey = `seen:frame:${frame.id}`;
+      const wasPersisted = await metaGet(seenKey).catch(() => null);
+      if (seen.current.has(frame.id) || wasPersisted) {
+        if (frame.mailbox) ackMailboxFrame("group", frame.id);
+        return true;
+      }
       let plain: PlainPayload;
       try {
         plain = await decryptGroupPayload(frame.groupId, frame.ciphertext);
@@ -924,7 +948,6 @@ export function ChatShell({
         }
         return false;
       }
-      seen.current.add(frame.id);
       const fromUserId = plain.senderUserId ?? "";
       const ttl = plain.ttlMs ?? 0;
       await idbPutGroupMsg({
@@ -935,6 +958,8 @@ export function ChatShell({
         at: frame.createdAt,
         ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
       });
+      seen.current.add(frame.id);
+      await metaSet(seenKey, "1").catch(() => {});
       const arr = rawGroupRef.current.get(frame.groupId) ?? [];
       arr.push({
         id: frame.id,
@@ -945,14 +970,18 @@ export function ChatShell({
         ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
       });
       rawGroupRef.current.set(frame.groupId, arr);
+      if (!groupsRef.current.some((x) => x.id === frame.groupId)) {
+        void loadGroups().catch(() => {});
+      }
       if (groupRef.current?.id === frame.groupId) rebuildGroup(frame.groupId);
       if (groupRef.current?.id !== frame.groupId && !mutedGroups.has(frame.groupId)) {
         const groupName = groupsRef.current.find((x) => x.id === frame.groupId)?.name ?? "Gruppe";
         maybeNotify(groupName, previewForPayload(plain));
       }
+      if (frame.mailbox) ackMailboxFrame("group", frame.id);
       return true;
     },
-    [maybeNotify, mutedGroups, rebuildGroup, session.user.id]
+    [ackMailboxFrame, loadGroups, maybeNotify, mutedGroups, rebuildGroup, session.user.id]
   );
 
   const retryPendingGroupFrames = useCallback(
@@ -975,7 +1004,12 @@ export function ChatShell({
 
   const handleIncomingDmFrame = useCallback(
     async (frame: PendingDmFrame, allowQueue = true) => {
-      if (seen.current.has(frame.id)) return true;
+      const seenKey = `seen:frame:${frame.id}`;
+      const wasPersisted = await metaGet(seenKey).catch(() => null);
+      if (seen.current.has(frame.id) || wasPersisted) {
+        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
+        return true;
+      }
       const dec = await decryptIncomingSealedDm(
         frame.envelope,
         session,
@@ -992,6 +1026,8 @@ export function ChatShell({
       }
       if (blockedPeers.has(dec.senderUserId)) {
         seen.current.add(frame.id);
+        await metaSet(seenKey, "1").catch(() => {});
+        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
         return true;
       }
       const peerUser =
@@ -1006,27 +1042,25 @@ export function ChatShell({
         }
         return false;
       }
-      seen.current.add(frame.id);
-
       const plain = dec.plain;
       if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
         const keyBytes = uint8FromBase64(plain.keyB64);
         await setGroupKey(plain.groupId, keyBytes);
-        const existingState = await getGroupKeyState(plain.groupId);
-        if (!existingState || existingState.rootKey !== plain.keyB64) {
-          const groupMembers =
-            groupsRef.current.find((x) => x.id === plain.groupId)?.memberIds ??
-            usersRef.current.map((u) => u.id);
-          await initGroupKeyState(
-            plain.groupId,
-            groupMembers,
-            session.user.id,
-            session.secretKey,
-            keyBytes
-          );
-        }
         await loadGroups();
+        const groupMembers =
+          groupsRef.current.find((x) => x.id === plain.groupId)?.memberIds ??
+          usersRef.current.map((u) => u.id);
+        await initGroupKeyState(
+          plain.groupId,
+          groupMembers,
+          session.user.id,
+          session.secretKey,
+          keyBytes
+        );
         await retryPendingGroupFrames(plain.groupId);
+        seen.current.add(frame.id);
+        await metaSet(seenKey, "1").catch(() => {});
+        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
         return true;
       }
 
@@ -1039,6 +1073,8 @@ export function ChatShell({
         at: frame.createdAt,
         ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
       });
+      seen.current.add(frame.id);
+      await metaSet(seenKey, "1").catch(() => {});
       const arr = rawDmRef.current.get(peerUser.id) ?? [];
       arr.push({
         id: frame.id,
@@ -1079,9 +1115,11 @@ export function ChatShell({
         };
         void sendDmWire(peerUser, receipt, true);
       }
+      if (frame.mailbox) ackMailboxFrame("dm", frame.id);
       return true;
     },
     [
+      ackMailboxFrame,
       session,
       resolveUser,
       blockedPeers,
@@ -1295,6 +1333,7 @@ export function ChatShell({
               id: String(data.id),
               envelope: String(data.envelope),
               createdAt: Number(data.createdAt ?? Date.now()),
+              mailbox: data.mailbox === true,
             });
           }
           if (data.type === "group" && typeof data.id === "string") {
@@ -1303,6 +1342,7 @@ export function ChatShell({
               groupId: String(data.groupId),
               ciphertext: String(data.ciphertext),
               createdAt: Number(data.createdAt ?? Date.now()),
+              mailbox: data.mailbox === true,
             });
           }
         } catch {
@@ -1615,7 +1655,7 @@ export function ChatShell({
         groupId: g.id,
         keyB64,
       };
-      await sendDmWire(u, p, true);
+      await sendDmWire(u, p, true, { forceRecovery: true });
     }
   }
 

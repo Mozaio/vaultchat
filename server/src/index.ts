@@ -25,8 +25,10 @@ import {
   enqueueMailboxDm,
   enqueueMailboxGroup,
   getMailboxStats,
-  popMailboxDms,
-  popMailboxGroups,
+  listMailboxDms,
+  listMailboxGroups,
+  removeMailboxDm,
+  removeMailboxGroup,
 } from "./mailboxStore.js";
 import {
   getPreKeyBundle,
@@ -629,7 +631,7 @@ const wss = new WebSocketServer({
 });
 
 function flushMailboxToSocket(userId: string, ws: WebSocket) {
-  const pending = popMailboxDms(userId);
+  const pending = listMailboxDms(userId);
   for (const item of pending) {
     if (ws.readyState !== ws.OPEN) break;
     ws.send(
@@ -643,7 +645,7 @@ function flushMailboxToSocket(userId: string, ws: WebSocket) {
       })
     );
   }
-  const pendingGroups = popMailboxGroups(userId);
+  const pendingGroups = listMailboxGroups(userId);
   for (const item of pendingGroups) {
     if (ws.readyState !== ws.OPEN) break;
     ws.send(
@@ -827,12 +829,23 @@ wss.on("connection", (ws, req) => {
     });
 
     const Ping = z.object({ type: z.literal("ping") });
+    const MailboxAck = z.object({
+      type: z.literal("mailbox_ack"),
+      kind: z.enum(["dm", "group"]),
+      id: z.string().uuid(),
+    });
 
-    const parsed = z.union([Dm, Typing, Group, Rtc, Ping]).safeParse(msg);
+    const parsed = z.union([Dm, Typing, Group, Rtc, Ping, MailboxAck]).safeParse(msg);
     if (!parsed.success) return;
 
     if (parsed.data.type === "ping") {
       ws.send(JSON.stringify({ type: "pong", at: Date.now() }));
+      return;
+    }
+
+    if (parsed.data.type === "mailbox_ack") {
+      if (parsed.data.kind === "dm") removeMailboxDm(jwtUser!.userId, parsed.data.id);
+      else removeMailboxGroup(jwtUser!.userId, parsed.data.id);
       return;
     }
 
