@@ -351,6 +351,19 @@ export async function drEncryptJsonForDm(
   options: DmEncryptOptions = {}
 ): Promise<DmEncryptResult> {
   const useX3dh = x3dhEnabled();
+  if (useX3dh && options.requireRecovery) {
+    const bundle = await api.getPreKeyBundle(token, peerId);
+    const fresh = await createX3dhPreKeyEnvelopeFromBundle(
+      myIdentitySk,
+      peerId,
+      peerPublicKeyB64,
+      plainJson,
+      bundle,
+      { forceSignedPreKeyOnly: true, forceClassicalOnly: true }
+    );
+    await saveState(fresh.state);
+    return { innerB64: fresh.innerB64, mode: fresh.mode };
+  }
   const existing = await loadState(peerId, peerPublicKeyB64, {
     requireLegacy: !useX3dh,
   });
