@@ -26,6 +26,10 @@ export type StoredGroup = {
   /** User, der die Gruppe angelegt hat (für Rollen/UI). */
   createdByUserId: string;
   createdAt: number;
+  /** Optional, klartext beim Server. Soll lediglich UX, nicht Sicherheit, leisten. */
+  description?: string;
+  /** Wann zuletzt Name/Beschreibung geändert (für UI-Cache). */
+  updatedAt?: number;
 };
 
 const users = new Map<string, StoredUser>(
@@ -48,6 +52,8 @@ function persistedGroupToStored(group: PersistedGroup): StoredGroup {
     memberIds: [...group.memberIds],
     createdAt: group.createdAt,
     createdByUserId: group.createdByUserId ?? group.memberIds[0] ?? "",
+    ...(group.description ? { description: group.description } : {}),
+    ...(group.updatedAt ? { updatedAt: group.updatedAt } : {}),
   };
 }
 
@@ -113,15 +119,44 @@ export function createGroup(input: {
   name: string;
   memberIds: string[];
   createdByUserId: string;
+  description?: string;
 }): StoredGroup {
+  const now = Date.now();
   const g: StoredGroup = {
     id: randomUUID(),
     name: input.name,
     memberIds: [...new Set(input.memberIds)],
     createdByUserId: input.createdByUserId,
-    createdAt: Date.now(),
+    createdAt: now,
+    ...(input.description ? { description: input.description, updatedAt: now } : {}),
   };
   groups.set(g.id, g);
+  persistDirectory();
+  return g;
+}
+
+/**
+ * Aktualisiert Name oder Beschreibung. Nur der creator darf das aktuell;
+ * spätere Erweiterungen (admin role list) bleiben kompatibel.
+ */
+export function updateGroupProfile(
+  groupId: string,
+  actorId: string,
+  updates: { name?: string; description?: string }
+): StoredGroup | null {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (g.createdByUserId !== actorId) return null;
+  if (typeof updates.name === "string") {
+    const trimmed = updates.name.trim();
+    if (trimmed) g.name = trimmed;
+  }
+  if (typeof updates.description === "string") {
+    const trimmed = updates.description.trim();
+    if (trimmed) g.description = trimmed;
+    else delete g.description;
+  }
+  g.updatedAt = Date.now();
   persistDirectory();
   return g;
 }

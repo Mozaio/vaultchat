@@ -41,6 +41,10 @@ export type ApiGroup = {
   /** Fehlt bei älteren Servern bis Neustart. */
   createdByUserId?: string;
   createdAt: number;
+  /** Optional, vom Creator gesetzt. Server speichert klartext (nicht E2EE). */
+  description?: string;
+  /** Letzte Änderung an Profil (Name/Beschreibung). */
+  updatedAt?: number;
 };
 
 async function req<T>(
@@ -193,10 +197,25 @@ export async function searchUsers(token: string, query: string) {
   return req<{ users: ApiUser[] }>(`/api/users/search?q=${encodeURIComponent(q)}`, { token });
 }
 
-export async function createGroup(token: string, body: { name: string; memberIds: string[] }) {
+export async function createGroup(
+  token: string,
+  body: { name: string; memberIds: string[]; description?: string }
+) {
   return req<{ group: ApiGroup }>("/api/groups", {
     method: "POST",
     body: JSON.stringify(body),
+    token,
+  });
+}
+
+export async function updateGroupProfile(
+  token: string,
+  groupId: string,
+  updates: { name?: string; description?: string }
+) {
+  return req<{ group: ApiGroup }>(`/api/groups/${groupId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
     token,
   });
 }

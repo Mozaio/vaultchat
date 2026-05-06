@@ -18,6 +18,7 @@ import {
   listGroupsForUser,
   listUsersSafe,
   removeGroupMember,
+  updateGroupProfile,
 } from "./memoryStore.js";
 import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
 import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
@@ -196,7 +197,44 @@ const LoginBody = z.object({
 const CreateGroupBody = z.object({
   name: z.string().min(1).max(64),
   memberIds: z.array(z.string().uuid()).min(1),
+  description: z.string().max(280).optional(),
 });
+
+const UpdateGroupBody = z.object({
+  name: z.string().min(1).max(64).optional(),
+  description: z.string().max(280).optional(),
+});
+
+type GroupResponse = {
+  id: string;
+  name: string;
+  memberIds: string[];
+  createdByUserId: string;
+  createdAt: number;
+  description?: string;
+  updatedAt?: number;
+};
+
+function shapeGroup(g: {
+  id: string;
+  name: string;
+  memberIds: string[];
+  createdByUserId: string;
+  createdAt: number;
+  description?: string;
+  updatedAt?: number;
+}): GroupResponse {
+  const out: GroupResponse = {
+    id: g.id,
+    name: g.name,
+    memberIds: g.memberIds,
+    createdByUserId: g.createdByUserId,
+    createdAt: g.createdAt,
+  };
+  if (g.description) out.description = g.description;
+  if (g.updatedAt) out.updatedAt = g.updatedAt;
+  return out;
+}
 
 function bearer(req: express.Request): string | null {
   const h = req.headers.authorization;
@@ -404,16 +442,9 @@ app.post("/api/groups", groupLimiter, async (req, res) => {
     name: parsed.data.name,
     memberIds,
     createdByUserId: jwtUser.userId,
+    ...(parsed.data.description ? { description: parsed.data.description } : {}),
   });
-  res.json({
-    group: {
-      id: g.id,
-      name: g.name,
-      memberIds: g.memberIds,
-      createdByUserId: g.createdByUserId,
-      createdAt: g.createdAt,
-    },
-  });
+  res.json({ group: shapeGroup(g) });
 });
 
 app.get("/api/groups", async (req, res) => {
@@ -423,14 +454,29 @@ app.get("/api/groups", async (req, res) => {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  const list = listGroupsForUser(jwtUser.userId).map((g) => ({
-    id: g.id,
-    name: g.name,
-    memberIds: g.memberIds,
-    createdByUserId: g.createdByUserId,
-    createdAt: g.createdAt,
-  }));
+  const list = listGroupsForUser(jwtUser.userId).map(shapeGroup);
   res.json({ groups: list });
+});
+
+app.patch("/api/groups/:id", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = UpdateGroupBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const groupId = String(req.params.id);
+  const g = updateGroupProfile(groupId, jwtUser.userId, parsed.data);
+  if (!g) {
+    res.status(403).json({ error: "cannot_update" });
+    return;
+  }
+  res.json({ group: shapeGroup(g) });
 });
 
 const MemberBody = z.object({ memberId: z.string().uuid() });
@@ -453,15 +499,7 @@ app.post("/api/groups/:id/members", groupLimiter, async (req, res) => {
     res.status(400).json({ error: "cannot_add" });
     return;
   }
-  res.json({
-    group: {
-      id: g.id,
-      name: g.name,
-      memberIds: g.memberIds,
-      createdByUserId: g.createdByUserId,
-      createdAt: g.createdAt,
-    },
-  });
+  res.json({ group: shapeGroup(g) });
 });
 
 app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) => {
@@ -478,15 +516,7 @@ app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) =
     res.status(400).json({ error: "cannot_remove" });
     return;
   }
-  res.json({
-    group: {
-      id: g.id,
-      name: g.name,
-      memberIds: g.memberIds,
-      createdByUserId: g.createdByUserId,
-      createdAt: g.createdAt,
-    },
-  });
+  res.json({ group: shapeGroup(g) });
 });
 
 app.post("/api/groups/:id/leave", async (req, res) => {

@@ -19,6 +19,10 @@ export type PersistedGroup = {
   createdAt: number;
   /** Neuere Clients schreiben das Feld; alte State-Dateien können es weglassen. */
   createdByUserId?: string;
+  /** Optional, frei vom Creator gesetzt. Server speichert Klartext (nicht E2EE). */
+  description?: string;
+  /** Letzte Änderung an Profil (Name/Beschreibung). Erleichtert Cache-Validation. */
+  updatedAt?: number;
 };
 
 export type PersistedPreKeyBundle = {
