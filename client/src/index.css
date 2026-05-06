@@ -783,6 +783,23 @@ select:focus-visible {
   }
 }
 
+/* System message (centered neutral pill: "X hat Y hinzugefügt") */
+.system-message {
+  display: flex;
+  justify-content: center;
+  margin: 0.75rem 0;
+}
+.system-message > span {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.72rem;
+  max-width: min(85%, 30rem);
+  text-align: center;
+}
+
 /* Date separator (WhatsApp/Telegram style) */
 .date-separator {
   display: flex;

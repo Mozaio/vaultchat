@@ -196,6 +196,17 @@ export function MessageBubble({
   const reacts = msg.reactions ?? {};
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
   const isImage = isImagePayload(msg.plain);
+  const isSystem = msg.plain.kind === "system";
+
+  // System messages render as a centered, neutral notice — no avatar,
+  // no reactions, no actions.
+  if (isSystem) {
+    return (
+      <div className="system-message" data-cid={msg.plain.cid}>
+        <span>{body}</span>
+      </div>
+    );
+  }
 
   useEffect(() => {
     if (!menuOpen && !reactOpen) return;

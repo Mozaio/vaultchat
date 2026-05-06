@@ -1596,6 +1596,20 @@ export function ChatShell({
     await distributeGroupKey(g, newMembers, base64FromUint8(key));
   }
 
+  async function sendGroupSystemMessage(g: api.ApiGroup, body: string) {
+    try {
+      const payload: PlainPayload = {
+        v: 2,
+        cid: newCid(),
+        kind: "system",
+        body,
+      };
+      await sendGroupWire(g, payload);
+    } catch {
+      /* system messages are best-effort; never block the underlying action */
+    }
+  }
+
   async function saveGroupProfile() {
     if (!group) return;
     const trimmedName = groupEditName.trim();
@@ -1606,6 +1620,8 @@ export function ChatShell({
     }
     setGroupEditBusy(true);
     try {
+      const previousName = group.name;
+      const previousDesc = group.description ?? "";
       const { group: updated } = await api.updateGroupProfile(
         session.token,
         group.id,
@@ -1618,6 +1634,19 @@ export function ChatShell({
       await loadGroups();
       setGroupEditMode(false);
       pushToast("Gruppe aktualisiert.", "success");
+      const changes: string[] = [];
+      if (previousName !== trimmedName) {
+        changes.push(`Name auf „${trimmedName}"`);
+      }
+      if (previousDesc !== trimmedDesc) {
+        changes.push(trimmedDesc ? "Beschreibung" : "Beschreibung entfernt");
+      }
+      if (changes.length > 0) {
+        await sendGroupSystemMessage(
+          updated,
+          `${session.user.username} hat ${changes.join(" und ")} geändert`
+        );
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "unknown_error";
       pushToast(
@@ -1633,6 +1662,8 @@ export function ChatShell({
 
   async function addMember() {
     if (!group || !addMemberId) return;
+    const memberLabel =
+      users.find((u) => u.id === addMemberId)?.username ?? "Mitglied";
     try {
       const { group: g2 } = await api.addGroupMember(
         session.token,
@@ -1643,6 +1674,10 @@ export function ChatShell({
       await loadGroups();
       await rotateGroupKey(g2, g2.memberIds);
       setAddMemberId("");
+      await sendGroupSystemMessage(
+        g2,
+        `${session.user.username} hat ${memberLabel} hinzugefügt`
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "add_failed");
     }
@@ -1650,6 +1685,8 @@ export function ChatShell({
 
   async function removeMember(memberId: string) {
     if (!group) return;
+    const memberLabel =
+      users.find((u) => u.id === memberId)?.username ?? "Mitglied";
     try {
       const { group: g2 } = await api.removeGroupMember(
         session.token,
@@ -1659,6 +1696,10 @@ export function ChatShell({
       setGroup(g2);
       await loadGroups();
       await rotateGroupKey(g2, g2.memberIds);
+      await sendGroupSystemMessage(
+        g2,
+        `${session.user.username} hat ${memberLabel} entfernt`
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "remove_failed");
     }
@@ -1667,6 +1708,12 @@ export function ChatShell({
   async function leaveCurrentGroup() {
     if (!group) return;
     try {
+      // Send the system message BEFORE leaving so the rest of the group
+      // sees it; once we leave we can't send into that group any more.
+      await sendGroupSystemMessage(
+        group,
+        `${session.user.username} hat die Gruppe verlassen`
+      );
       await api.leaveGroup(session.token, group.id);
       setGroup(null);
       await loadGroups();
