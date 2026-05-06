@@ -264,19 +264,32 @@ export function MessageBubble({
             </span>
           ) : editing ? (
             <div className="bubble-edit">
-              <input
+              <textarea
                 className="bubble-edit-input"
                 value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
+                rows={1}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto";
+                    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+                  }
+                }}
+                onChange={(e) => {
+                  setEditValue(e.target.value);
+                  const el = e.currentTarget;
+                  el.style.height = "auto";
+                  el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+                }}
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
                     e.preventDefault();
                     if (editValue.trim() && editValue.trim() !== body) {
                       onEdit(msg, editValue.trim());
                     }
                     setEditing(false);
                   } else if (e.key === "Escape") {
+                    e.preventDefault();
                     setEditing(false);
                     setEditValue(body);
                   }
