@@ -2551,6 +2551,9 @@ select:focus-visible {
 }
 
 .btn-verify {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   background: var(--accent);
   color: var(--text-on-accent);
   border: none;

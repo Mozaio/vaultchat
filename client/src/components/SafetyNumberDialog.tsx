@@ -7,6 +7,7 @@ import {
   trustLabel,
   type PeerPin,
 } from "../lib/trust";
+import { IconCheck, IconX } from "./Icons";
 
 export function SafetyNumberDialog({
   peerId,
@@ -55,20 +56,27 @@ export function SafetyNumberDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="safety-number-dialog">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="safety-number-title"
+    >
+      <div className="safety-number-dialog" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="header">
           <div>
-            <h2 className="title">🔐 Sicherheitsnummer</h2>
+            <h2 id="safety-number-title" className="title">Sicherheitsnummer</h2>
             <p className="subtitle">mit {peerLabel}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="close-btn"
+            aria-label="Sicherheitsnummer-Dialog schließen"
           >
-            ✕
+            <IconX size={18} />
           </button>
         </div>
 
@@ -145,7 +153,8 @@ export function SafetyNumberDialog({
             onClick={() => void onVerify()}
             className="btn-verify"
           >
-            ✓ Als verifiziert markieren
+            <IconCheck size={16} />
+            <span>Als verifiziert markieren</span>
           </button>
           <button
             type="button"
