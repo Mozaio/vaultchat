@@ -2893,15 +2893,19 @@ export function ChatShell({
               onDrop={(e) => {
                 e.preventDefault();
                 setDragOver(false);
-                const file = e.dataTransfer.files?.[0];
-                if (file && peer) void sendDmFile(file);
+                if (!peer) return;
+                const files = Array.from(e.dataTransfer.files ?? []);
+                if (files.length === 0) return;
+                void (async () => {
+                  for (const f of files) await sendDmFile(f);
+                })();
               }}
             >
               {dragOver && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-emerald-500/20 backdrop-blur-sm border-2 border-dashed border-emerald-400 m-2">
                   <div className="text-center">
                     <p className="text-2xl mb-2">📎</p>
-                    <p className="text-sm font-medium text-emerald-700">Datei hier ablegen</p>
+                    <p className="text-sm font-medium text-emerald-100">Dateien hier ablegen</p>
                   </div>
                 </div>
               )}
@@ -3069,10 +3073,14 @@ export function ChatShell({
                   <input
                     type="file"
                     className="hidden"
+                    multiple
                     onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void sendDmFile(f);
+                      const files = Array.from(e.target.files ?? []);
                       e.target.value = "";
+                      if (files.length === 0) return;
+                      void (async () => {
+                        for (const f of files) await sendDmFile(f);
+                      })();
                     }}
                   />
                 </label>
@@ -3107,23 +3115,27 @@ export function ChatShell({
                   onPaste={(e) => {
                     const items = e.clipboardData?.items;
                     if (!items) return;
+                    const pastedFiles: File[] = [];
                     for (const it of Array.from(items)) {
                       if (it.kind === "file" && it.type.startsWith("image/")) {
                         const f = it.getAsFile();
                         if (f) {
-                          e.preventDefault();
                           const named = new File(
                             [f],
                             f.name && f.name !== "image.png"
                               ? f.name
-                              : `image-${Date.now()}.${(f.type.split("/")[1] || "png")}`,
+                              : `image-${Date.now()}-${pastedFiles.length}.${(f.type.split("/")[1] || "png")}`,
                             { type: f.type }
                           );
-                          void sendDmFile(named);
-                          break;
+                          pastedFiles.push(named);
                         }
                       }
                     }
+                    if (pastedFiles.length === 0) return;
+                    e.preventDefault();
+                    void (async () => {
+                      for (const f of pastedFiles) await sendDmFile(f);
+                    })();
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
@@ -3362,15 +3374,19 @@ export function ChatShell({
               onDrop={(e) => {
                 e.preventDefault();
                 setGroupDragOver(false);
-                const file = e.dataTransfer.files?.[0];
-                if (file && group) void sendGroupFile(file);
+                if (!group) return;
+                const files = Array.from(e.dataTransfer.files ?? []);
+                if (files.length === 0) return;
+                void (async () => {
+                  for (const f of files) await sendGroupFile(f);
+                })();
               }}
             >
               {groupDragOver && (
                 <div className="absolute inset-0 z-50 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-emerald-400 bg-emerald-500/20 backdrop-blur-sm">
                   <div className="text-center">
                     <p className="mb-2 text-2xl">📎</p>
-                    <p className="text-sm font-medium text-emerald-700">Datei in die Gruppe legen</p>
+                    <p className="text-sm font-medium text-emerald-100">Dateien in die Gruppe legen</p>
                   </div>
                 </div>
               )}
@@ -3520,10 +3536,14 @@ export function ChatShell({
                   <input
                     type="file"
                     className="hidden"
+                    multiple
                     onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void sendGroupFile(f);
+                      const files = Array.from(e.target.files ?? []);
                       e.target.value = "";
+                      if (files.length === 0) return;
+                      void (async () => {
+                        for (const f of files) await sendGroupFile(f);
+                      })();
                     }}
                   />
                 </label>
@@ -3575,23 +3595,27 @@ export function ChatShell({
                   onPaste={(e) => {
                     const items = e.clipboardData?.items;
                     if (!items) return;
+                    const pastedFiles: File[] = [];
                     for (const it of Array.from(items)) {
                       if (it.kind === "file" && it.type.startsWith("image/")) {
                         const f = it.getAsFile();
                         if (f) {
-                          e.preventDefault();
                           const named = new File(
                             [f],
                             f.name && f.name !== "image.png"
                               ? f.name
-                              : `image-${Date.now()}.${(f.type.split("/")[1] || "png")}`,
+                              : `image-${Date.now()}-${pastedFiles.length}.${(f.type.split("/")[1] || "png")}`,
                             { type: f.type }
                           );
-                          void sendGroupFile(named);
-                          break;
+                          pastedFiles.push(named);
                         }
                       }
                     }
+                    if (pastedFiles.length === 0) return;
+                    e.preventDefault();
+                    void (async () => {
+                      for (const f of pastedFiles) await sendGroupFile(f);
+                    })();
                   }}
                   onKeyDown={(e) => {
                     if (mentionOpen) {
