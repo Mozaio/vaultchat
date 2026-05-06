@@ -3,6 +3,7 @@ import {
   loadPersistedGroups,
   loadPersistedUsers,
   persistUsersAndGroups,
+  type PersistedGroup,
 } from "./serverState.js";
 
 /** User/group directory. RAM-only unless VAULTCHAT_STATE_FILE is configured. */
@@ -40,8 +41,18 @@ const users = new Map<string, StoredUser>(
 const usersByName = new Map<string, string>(
   [...users.values()].map((user) => [user.username.toLowerCase(), user.id])
 );
+function persistedGroupToStored(group: PersistedGroup): StoredGroup {
+  return {
+    id: group.id,
+    name: group.name,
+    memberIds: [...group.memberIds],
+    createdAt: group.createdAt,
+    createdByUserId: group.createdByUserId ?? group.memberIds[0] ?? "",
+  };
+}
+
 const groups = new Map<string, StoredGroup>(
-  loadPersistedGroups().map((group) => [group.id, group])
+  loadPersistedGroups().map((group) => [group.id, persistedGroupToStored(group)])
 );
 
 function persistDirectory() {

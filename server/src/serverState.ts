@@ -17,6 +17,8 @@ export type PersistedGroup = {
   name: string;
   memberIds: string[];
   createdAt: number;
+  /** Neuere Clients schreiben das Feld; alte State-Dateien können es weglassen. */
+  createdByUserId?: string;
 };
 
 export type PersistedPreKeyBundle = {
