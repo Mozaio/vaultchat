@@ -70,6 +70,7 @@ import { ChatEmptyState } from "./ChatEmptyState";
 import {
   IconAlertTriangle,
   IconBell,
+  IconCheck,
   IconFileText,
   IconInfo,
   IconLock,
@@ -282,8 +283,6 @@ export function ChatShell({
   const [blockedPeers, setBlockedPeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.blocked.peers")
   );
-  // Online status tracking
-  const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
   const [ttlGroup, setTtlGroup] = useState<number>(0);
@@ -2152,10 +2151,16 @@ export function ChatShell({
         </div>
 
         <div className="sidebar-security-strip mx-3 mt-3">
-          <span className={connected ? "online" : "offline"} />
+          <span className={connected && preKeyReady ? "online" : "offline"} />
           <div className="min-w-0">
-            <p>{connected ? "Realtime verbunden" : "Verbindung wird aufgebaut"}</p>
-            <small>{relayOnly ? "Relay-only aktiv" : "E2E aktiv, Relay optional"}</small>
+            <p>
+              {preKeyReady
+                ? connected
+                  ? "Sicher verbunden"
+                  : "Warte auf Verbindung"
+                : "Schluessel werden vorbereitet"}
+            </p>
+            <small>{relayOnly ? "Relay-only fuer Anrufe" : "E2E bereit, minimale Metadaten"}</small>
           </div>
         </div>
 
@@ -2275,23 +2280,38 @@ export function ChatShell({
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
               />
-              <select
-                multiple
-                className="app-input h-24 !py-1 text-xs"
-                value={newGroupMembers}
-                disabled={!hasContacts}
-                aria-label="Gruppenmitglieder aus Kontakten auswaehlen"
-                onChange={(e) => {
-                  const o = [...e.target.selectedOptions].map((x) => x.value);
-                  setNewGroupMembers(o);
-                }}
-              >
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.username}
-                  </option>
-                ))}
-              </select>
+              {hasContacts && (
+                <div className="group-member-picker" aria-label="Gruppenmitglieder aus Kontakten auswaehlen">
+                  {users.map((u) => {
+                    const selected = newGroupMembers.includes(u.id);
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        className={`group-member-option ${selected ? "selected" : ""}`}
+                        onClick={() =>
+                          setNewGroupMembers((prev) =>
+                            prev.includes(u.id)
+                              ? prev.filter((id) => id !== u.id)
+                              : [...prev, u.id]
+                          )
+                        }
+                      >
+                        <span
+                          className="group-member-avatar"
+                          style={{ background: userGradient(u.id) }}
+                        >
+                          {u.username.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="truncate">{u.username}</span>
+                        <span className="group-member-check" aria-hidden>
+                          {selected ? <IconCheck size={13} /> : null}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               {!hasContacts && (
                 <p className="sidebar-form-hint">
                   Fuege zuerst Kontakte hinzu. Gruppen koennen nur mit verifizierten Kontakten erstellt werden.
@@ -2466,7 +2486,7 @@ export function ChatShell({
           <>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
               <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
-                <div className={`h-full transition-all duration-500 ${connected ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
+                <div className={`h-full transition-all duration-500 ${connected && preKeyReady ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
               </div>
               <div className="flex w-full items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-3">
@@ -2491,8 +2511,10 @@ export function ChatShell({
                     >
                       {peer.username.slice(0, 1).toUpperCase()}
                     </div>
-                    {/* Online indicator dot */}
-                    <div className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)] ${onlinePeers.has(peer.id) ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
+                    <div
+                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)] ${connected && preKeyReady ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                      title={connected && preKeyReady ? "Sicherer Kanal bereit" : "Kanal wird vorbereitet"}
+                    />
                   </div>
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
@@ -2508,9 +2530,13 @@ export function ChatShell({
                         schreibt...
                       </p>
                     ) : (
-                      <p className="flex items-center gap-1.5 text-xs" style={{ color: connected ? "var(--success)" : "var(--text-muted)" }}>
-                        <span className="h-2 w-2 rounded-full" style={{ background: connected ? "var(--success)" : "var(--text-muted)" }} />
-                        {connected ? "Online" : "Zuletzt gesehen vor kurzem"}
+                      <p className="flex items-center gap-1.5 text-xs" style={{ color: connected && preKeyReady ? "var(--success)" : "var(--text-muted)" }}>
+                        <span className="h-2 w-2 rounded-full" style={{ background: connected && preKeyReady ? "var(--success)" : "var(--warning)" }} />
+                        {connected && preKeyReady
+                          ? "Sicherer Kanal bereit"
+                          : preKeyReady
+                            ? "Warte auf Realtime"
+                            : "Schluessel werden vorbereitet"}
                       </p>
                     )}
                   </div>
@@ -2656,8 +2682,8 @@ export function ChatShell({
               {messages.length === 0 && (
                 <div className="chat-inline-empty">
                   <IconShieldCheck size={24} />
-                  <p>Schreibe die erste verschluesselte Nachricht.</p>
-                  <span>Nur deine Geraete und dieser Kontakt koennen den Inhalt lesen.</span>
+                  <p>Noch keine Nachrichten</p>
+                  <span>Bereit fuer die erste private Nachricht.</span>
                 </div>
               )}
               {messages.flatMap((m, i) => {
@@ -2967,7 +2993,7 @@ export function ChatShell({
                                   {label}
                                 </p>
                                 <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                                  {onlinePeers.has(mid) ? "Online" : "Nicht verbunden"}
+                                  {u ? "Kontakt bereit" : "Nicht in Kontakten"}
                                 </p>
                               </div>
                             </div>
@@ -3065,8 +3091,8 @@ export function ChatShell({
               {groupMessages.length === 0 && (
                 <div className="chat-inline-empty">
                   <IconUsers size={24} />
-                  <p>Diese Gruppe ist bereit.</p>
-                  <span>Nachrichten, Dateien und Sprachnachrichten werden Ende-zu-Ende verschluesselt.</span>
+                  <p>Gruppe bereit</p>
+                  <span>Starte die Unterhaltung oder fuege spaeter weitere Mitglieder hinzu.</span>
                 </div>
               )}
               {groupMessages.flatMap((m, i) => {
@@ -3493,15 +3519,17 @@ function ComposerNotice({
   onDismiss,
 }: {
   message: string;
-  onDismiss: () => void;
+  onDismiss?: () => void;
 }) {
   return (
     <div className="composer-notice" role="status">
       <IconAlertTriangle size={16} />
       <span>{message}</span>
-      <button type="button" onClick={onDismiss} title="Hinweis schliessen">
-        ×
-      </button>
+      {onDismiss ? (
+        <button type="button" onClick={onDismiss} title="Hinweis schliessen">
+          ×
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -3539,7 +3567,7 @@ function InfoPanel({
 }) {
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
-  const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
+  const status = mode === "dm" ? "Privater Chat" : `${group?.memberIds.length ?? 0} Mitglieder`;
   const isMuted = peer ? mutedPeers.has(peer.id) : false;
   const groupedSafetyNumber = peerFp
     ? peerFp.replace(/\s+/g, "").match(/.{1,4}/g)?.join(" ") ?? peerFp
@@ -3566,7 +3594,7 @@ function InfoPanel({
           <div className="info-avatar-large">
             {initials}
           </div>
-          {mode === "dm" && <span className="online-dot" />}
+          {mode === "dm" && <span className="secure-dot" title="Sicherer Chat" />}
         </div>
         <p className="text-center text-lg font-bold" style={{ color: "var(--text)" }}>
           {title}

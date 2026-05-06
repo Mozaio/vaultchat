@@ -496,12 +496,12 @@ select:focus-visible {
 
 .chat-empty-state-card {
   width: min(100%, 34rem);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--bg-glass);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   display: grid;
   justify-items: center;
   gap: 0.75rem;
@@ -509,6 +509,13 @@ select:focus-visible {
 }
 
 .chat-empty-state-icon {
+  width: 4rem;
+  height: 4rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
   color: var(--accent);
   margin-bottom: 0.25rem;
 }
@@ -811,7 +818,7 @@ select:focus-visible {
 .message-bubble {
   width: fit-content;
   max-width: 100%;
-  min-width: 6rem;
+  min-width: 3.4rem;
   padding: 0.65rem 0.8rem 0.48rem;
   border-radius: 14px;
   font-size: 0.9375rem;
@@ -1312,6 +1319,69 @@ select:focus-visible {
   font-size: 0.7rem;
 }
 
+.group-member-picker {
+  max-height: 10.5rem;
+  display: grid;
+  gap: 0.4rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sidebar);
+  padding: 0.4rem;
+}
+
+.group-member-option {
+  min-height: 2.65rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.4rem 0.5rem;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.group-member-option:hover,
+.group-member-option:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.group-member-option.selected {
+  border-color: rgba(52, 211, 153, 0.4);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.group-member-avatar,
+.group-member-check {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.group-member-avatar {
+  width: 1.85rem;
+  height: 1.85rem;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.group-member-check {
+  width: 1.35rem;
+  height: 1.35rem;
+  border: 1px solid var(--border);
+  color: var(--accent);
+  background: var(--bg-elevated);
+}
+
 .sidebar-form-hint {
   margin: 0;
   color: var(--text-muted);
@@ -1575,7 +1645,7 @@ select:focus-visible {
 }
 
 .info-panel-shell.open {
-  width: 320px;
+  width: 360px;
   border-left-color: var(--border);
   opacity: 1;
   transform: translateX(0);
@@ -1596,7 +1666,7 @@ select:focus-visible {
   box-shadow: var(--shadow-md);
 }
 
-.online-dot {
+.secure-dot {
   position: absolute;
   right: 0.125rem;
   bottom: 0.75rem;
@@ -1644,19 +1714,26 @@ select:focus-visible {
 }
 
 .info-action-button:hover,
+.info-action-button.active,
 .info-action-button.active-warning {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent);
 }
 
+.info-action-button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
 .info-action-button span {
   font-size: 11px;
   line-height: 1.1;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-align: center;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .info-item {
@@ -2225,6 +2302,13 @@ select:focus-visible {
 
 .auth-button:active {
   transform: translateY(0);
+}
+
+.auth-button:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .auth-footer {

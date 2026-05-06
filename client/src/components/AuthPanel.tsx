@@ -378,18 +378,18 @@ export function AuthPanel({
             </div>
             <button
               type="button"
-              onClick={() => setMode("import")}
-              className="btn btn-secondary w-full"
-            >
-              Neues Gerät? Backup importieren
-            </button>
-            <button
-              type="button"
               onClick={() => void handleLogin()}
               disabled={busy}
               className="auth-button"
             >
               {busy ? "…" : "Anmelden"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("import")}
+              className="btn btn-secondary w-full"
+            >
+              Neues Gerät? Backup importieren
             </button>
           </div>
         )}
@@ -400,7 +400,7 @@ export function AuthPanel({
               <label className="auth-label-row">
                 <span>Benutzername</span>
                 <span>
-                  Discord-like Format
+                  2-32 Zeichen
                 </span>
               </label>
               <input
@@ -636,9 +636,8 @@ export function AuthPanel({
         )}
 
         <p className="auth-footer">
-          Browser und externer Server: Ohne vollständige Software-Audit ist das
-          Bedrohungsmodell schwächer als bei nativen Apps. Siehe THREAT_MODEL.md
-          im Repository.
+          Transparenz: Browser-Clients brauchen Code-Integrität, Backups und ein klares
+          Bedrohungsmodell. Details stehen in THREAT_MODEL.md.
         </p>
         </div>
       </div>

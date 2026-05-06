@@ -319,7 +319,7 @@ export function MessageBubble({
                   setMenuOpen(false);
                 }}
               >
-                <IconSmile size={14} /> Antworten
+                <IconMessageSquare size={14} /> Antworten
               </button>
               <button
                 type="button"
@@ -329,7 +329,7 @@ export function MessageBubble({
                   setMenuOpen(false);
                 }}
               >
-                😊 Reagieren
+                <IconSmile size={14} /> Reagieren
               </button>
               {canCopy && (
                 <button
