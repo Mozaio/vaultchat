@@ -46,8 +46,7 @@ async function getCallStream(): Promise<MediaStream> {
       },
       video: false,
     });
-  } catch (err) {
-    console.error("Failed to get audio device:", err);
+  } catch {
     throw new Error("Mikrofon nicht verfügbar oder Berechtigung verweigert");
   }
 }
@@ -69,8 +68,8 @@ async function addIceCandidateSafely(
   }
   try {
     await pc.addIceCandidate(candidate);
-  } catch (err) {
-    console.error("Error adding ICE candidate:", err);
+  } catch {
+    /* ignore single bad candidate */
   }
 }
 
@@ -84,8 +83,8 @@ async function flushPendingCandidates(
     if (relayOnly && !isRelayCandidate(candidate)) continue;
     try {
       await pc.addIceCandidate(candidate);
-    } catch (err) {
-      console.error("Error flushing ICE candidate:", err);
+    } catch {
+      /* ignore single bad candidate */
     }
   }
 }
@@ -112,8 +111,9 @@ export async function startCall(
 
   pc.onicecandidate = (ev) => {
     if (!ev.candidate) return;
-    // In relay-only mode, only send relay candidates
-    if (effectiveRelayOnly && ev.candidate.type && ev.candidate.type !== "relay") return;
+    // In relay-only mode, only send relay candidates.
+    // Treat candidates without a known type as non-relay (fail closed).
+    if (effectiveRelayOnly && ev.candidate.type !== "relay") return;
     sendRtc(peer.id, {
       type: "candidate",
       candidate: ev.candidate.toJSON(),
@@ -121,9 +121,7 @@ export async function startCall(
   };
 
   pc.oniceconnectionstatechange = () => {
-    console.log("ICE connection state:", pc.iceConnectionState);
     if (pc.iceConnectionState === "failed") {
-      // Try to restart ICE
       pc.restartIce();
     }
     if (pc.iceConnectionState === "closed" || pc.iceConnectionState === "disconnected") {
@@ -151,8 +149,8 @@ export async function startCall(
             effectiveRelayOnly
           );
         }
-      } catch (err) {
-        console.error("Error handling remote payload:", err);
+      } catch {
+        /* ignore — single bad remote payload should not abort the call */
       }
     },
     close: () => {
@@ -186,7 +184,8 @@ export async function acceptCall(
 
   pc.onicecandidate = (ev) => {
     if (!ev.candidate) return;
-    if (effectiveRelayOnly && ev.candidate.type && ev.candidate.type !== "relay") return;
+    // Treat candidates without a known type as non-relay (fail closed).
+    if (effectiveRelayOnly && ev.candidate.type !== "relay") return;
     sendRtc(peer.id, {
       type: "candidate",
       candidate: ev.candidate.toJSON(),
@@ -194,7 +193,6 @@ export async function acceptCall(
   };
 
   pc.oniceconnectionstatechange = () => {
-    console.log("ICE connection state:", pc.iceConnectionState);
     if (pc.iceConnectionState === "failed") {
       pc.restartIce();
     }
@@ -223,8 +221,8 @@ export async function acceptCall(
             effectiveRelayOnly
           );
         }
-      } catch (err) {
-        console.error("Error adding ICE candidate:", err);
+      } catch {
+        /* ignore — single bad remote payload should not abort the call */
       }
     },
     addIce: async (c: RTCIceCandidateInit) => {

@@ -40,8 +40,8 @@ function validateUsername(username: string): { valid: boolean; error?: string } 
   if (/^[_-]|[_-]$/.test(username)) {
     return { valid: false, error: "Darf nicht mit _ oder - beginnen/enden" };
   }
-  // No double underscore/hyphen
-  if (/__|--|-_|_-|__/.test(username)) {
+  // No double or adjacent separator characters
+  if (/__|--|-_|_-/.test(username)) {
     return { valid: false, error: "Keine doppelte Zeichen wie __ oder -- erlaubt" };
   }
   if (["admin", "support", "vaultchat", "system", "signal", "telegram", "discord"].includes(username.toLowerCase())) {

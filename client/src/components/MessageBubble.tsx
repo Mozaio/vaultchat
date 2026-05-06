@@ -182,7 +182,6 @@ export function MessageBubble({
   );
   const [imageOpen, setImageOpen] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const lastClickRef = useRef<number>(0);
 
   useEffect(() => {
     if (!msg.expiresAt) return;
@@ -214,16 +213,6 @@ export function MessageBubble({
     setReactOpen(false);
     setMenuOpen(false);
   }
-
-  const handleBubbleClick = () => {
-    const now = Date.now();
-    if (now - lastClickRef.current < 320) {
-      onReact(msg, msg.myReaction === "👍" ? "" : "👍");
-      lastClickRef.current = 0;
-    } else {
-      lastClickRef.current = now;
-    }
-  };
 
   return (
     <div
@@ -268,7 +257,6 @@ export function MessageBubble({
               onReact(msg, msg.myReaction === "👍" ? "" : "👍");
             }
           }}
-          onClick={handleBubbleClick}
         >
           {msg.deleted ? (
             <span className="bubble-deleted">
