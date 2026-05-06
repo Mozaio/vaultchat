@@ -3160,19 +3160,32 @@ export function ChatShell({
                     <IconSend size={16} />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void sendDmVoice()}
-                    className={`btn-send${voice.recording ? " recording" : " mic"}`}
-                    aria-label={voice.recording ? "Aufnahme stoppen" : "Sprachnachricht aufnehmen"}
-                    title={voice.recording ? "Aufnahme stoppen" : "Sprachnachricht aufnehmen"}
-                  >
-                    {voice.recording ? (
-                      <span className="rec-dot" aria-hidden />
-                    ) : (
-                      <IconMic size={18} />
+                  <>
+                    {voice.recording && (
+                      <button
+                        type="button"
+                        onClick={() => voice.cancel()}
+                        className="btn-send cancel"
+                        aria-label="Aufnahme verwerfen"
+                        title="Aufnahme verwerfen"
+                      >
+                        <IconX size={16} />
+                      </button>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => void sendDmVoice()}
+                      className={`btn-send${voice.recording ? " recording" : " mic"}`}
+                      aria-label={voice.recording ? "Aufnahme senden" : "Sprachnachricht aufnehmen"}
+                      title={voice.recording ? "Aufnahme senden" : "Sprachnachricht aufnehmen"}
+                    >
+                      {voice.recording ? (
+                        <span className="rec-dot" aria-hidden />
+                      ) : (
+                        <IconMic size={18} />
+                      )}
+                    </button>
+                  </>
                 )}
               </div>
             </footer>
@@ -3729,27 +3742,40 @@ export function ChatShell({
                     <IconSend size={16} />
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => void sendGroupVoice()}
-                    className={`btn-send${groupVoice.recording ? " recording" : " mic"}`}
-                    aria-label={
-                      groupVoice.recording
-                        ? "Aufnahme stoppen"
-                        : "Sprachnachricht aufnehmen"
-                    }
-                    title={
-                      groupVoice.recording
-                        ? "Aufnahme stoppen"
-                        : "Sprachnachricht aufnehmen"
-                    }
-                  >
-                    {groupVoice.recording ? (
-                      <span className="rec-dot" aria-hidden />
-                    ) : (
-                      <IconMic size={18} />
+                  <>
+                    {groupVoice.recording && (
+                      <button
+                        type="button"
+                        onClick={() => groupVoice.cancel()}
+                        className="btn-send cancel"
+                        aria-label="Aufnahme verwerfen"
+                        title="Aufnahme verwerfen"
+                      >
+                        <IconX size={16} />
+                      </button>
                     )}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => void sendGroupVoice()}
+                      className={`btn-send${groupVoice.recording ? " recording" : " mic"}`}
+                      aria-label={
+                        groupVoice.recording
+                          ? "Aufnahme senden"
+                          : "Sprachnachricht aufnehmen"
+                      }
+                      title={
+                        groupVoice.recording
+                          ? "Aufnahme senden"
+                          : "Sprachnachricht aufnehmen"
+                      }
+                    >
+                      {groupVoice.recording ? (
+                        <span className="rec-dot" aria-hidden />
+                      ) : (
+                        <IconMic size={18} />
+                      )}
+                    </button>
+                  </>
                 )}
               </div>
             </footer>
