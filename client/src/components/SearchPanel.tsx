@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { idbListAllDm, idbListAllGroupMsgs } from "../lib/idb";
 import type { PlainPayload } from "../lib/crypto";
+import { IconSearch, IconX } from "./Icons";
 
 type SearchHit = {
   key: string;
@@ -98,9 +99,17 @@ export function SearchPanel({
   }, [query, userById, groupById]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") performSearch();
+    if (e.key === "Enter") void performSearch();
     if (e.key === "Escape") onClose();
   };
+
+  // Live search with 250ms debounce — local IDB lookup, fast enough.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void performSearch();
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query, performSearch]);
 
   return (
     <div className="search-panel-overlay" onClick={onClose}>
@@ -118,20 +127,22 @@ export function SearchPanel({
           />
           <button
             type="button"
-            onClick={performSearch}
+            onClick={() => void performSearch()}
             disabled={searching}
             className="theme-toggle"
             title="Suchen"
+            aria-label="Suchen"
           >
-            {searching ? "…" : "🔍"}
+            {searching ? <span aria-hidden>…</span> : <IconSearch size={18} />}
           </button>
           <button
             type="button"
             onClick={onClose}
             className="theme-toggle"
             title="Schließen"
+            aria-label="Suche schließen"
           >
-            ✕
+            <IconX size={18} />
           </button>
         </div>
 

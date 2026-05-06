@@ -395,6 +395,7 @@ export function ChatShell({
       setForwardTarget(null);
       setForwardPick(new Set());
       setMentionOpen(false);
+      setShowAddContact(false);
     },
     onLock: () => onLock(),
     onSend: () => {

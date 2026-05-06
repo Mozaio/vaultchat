@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { searchUsers, type ApiUser } from "../lib/api";
+import { IconX } from "./Icons";
 
 const MIN_SEARCH_CHARS = 3;
 
@@ -72,12 +73,21 @@ export function AddContactModal({
     setResults([]);
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     onClose();
     setQuery("");
     setResults([]);
     setError(null);
-  };
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen, handleClose]);
 
   if (!isOpen) return null;
 
@@ -106,8 +116,9 @@ export function AddContactModal({
             onClick={handleClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             aria-label="Kontakt-Dialog schliessen"
+            style={{ color: "var(--text-muted)" }}
           >
-            x
+            <IconX size={18} />
           </button>
         </div>
 
@@ -177,9 +188,6 @@ export function AddContactModal({
                       Kontakt hinzufuegen und Chat starten
                     </p>
                   </div>
-                  <span className="text-lg" style={{ color: "var(--accent)" }}>
-                    -&gt;
-                  </span>
                 </button>
               ))}
             </div>
