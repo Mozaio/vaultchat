@@ -10,7 +10,7 @@ import { clearLocalKey, setLocalKeyFromSecret } from "./lib/localKey";
 import type { Session } from "./lib/sessionHelpers";
 import { AuthPanel } from "./components/AuthPanel";
 import { ChatShell } from "./components/ChatShell";
-import { idbPurgeExpired } from "./lib/idb";
+import { idbPurgeExpired, setIdbAccountScope } from "./lib/idb";
 import { useAutoLock } from "./lib/useAutoLock";
 import {
   checkCodeIntegrity,
@@ -90,6 +90,7 @@ export function App() {
       }
     }
     clearLocalKey();
+    setIdbAccountScope(null);
     unregisterKeyForProtection();
     stopPeriodicWipe();
     resetAllReplayProtection();
@@ -180,7 +181,8 @@ export function App() {
                 saveToken(s.token);
                 saveLocalIdentity(local);
                 await setLocalKeyFromSecret(s.secretKey);
-                
+                setIdbAccountScope(s.user.id);
+
                 // Neue Sicherheits-Features initialisieren
                 await setVerificationKey(s.secretKey);
                 const postUnlockCheck = await checkCodeIntegrityEnhanced();

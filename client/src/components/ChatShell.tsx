@@ -1051,7 +1051,8 @@ export function ChatShell({
       const dec = await decryptIncomingSealedDm(
         frame.envelope,
         session,
-        resolveUser
+        resolveUser,
+        { receivedAt: frame.createdAt }
       );
       if (!dec) {
         if (allowQueue) {

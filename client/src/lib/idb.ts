@@ -13,6 +13,15 @@ import {
 
 const DB = "vaultchat";
 const VER = 4;
+let accountScope: string | null = null;
+
+export function setIdbAccountScope(userId: string | null) {
+  accountScope = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, "") : null;
+}
+
+function scopedMetaKey(key: string) {
+  return accountScope ? `acct:${accountScope}:${key}` : key;
+}
 
 type DmRecord = {
   id: string;
@@ -378,6 +387,21 @@ export async function idbListAllGroupMsgs(): Promise<StoredGroupMessage[]> {
 export async function metaGet(key: string): Promise<string | null> {
   assertKey();
   const db = await openDb();
+  const scoped = scopedMetaKey(key);
+  const scopedValue = await readMetaValue(db, scoped);
+  if (scopedValue !== null || scoped === key) return scopedValue;
+
+  const legacyValue = await readMetaValue(db, key);
+  if (legacyValue !== null) {
+    await metaSet(key, legacyValue).catch(() => {});
+  }
+  return legacyValue;
+}
+
+async function readMetaValue(
+  db: IDBDatabase,
+  key: string
+): Promise<string | null> {
   const rec = await new Promise<MetaRecord | null>((resolve, reject) => {
     const tx = db.transaction("meta", "readonly");
     const req = tx.objectStore("meta").get(key);
@@ -399,7 +423,7 @@ export async function metaSet(key: string, value: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction("meta", "readwrite");
-    tx.objectStore("meta").put({ key, valueCipher });
+    tx.objectStore("meta").put({ key: scopedMetaKey(key), valueCipher });
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });

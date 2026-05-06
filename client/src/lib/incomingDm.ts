@@ -31,7 +31,8 @@ export type DecryptedDm = {
 export async function decryptIncomingSealedDm(
   envelopeB64: string,
   session: Session,
-  resolvePeer: (userId: string) => Promise<ApiUser | null>
+  resolvePeer: (userId: string) => Promise<ApiUser | null>,
+  options: { receivedAt?: number } = {}
 ): Promise<DecryptedDm | null> {
   let senderUserId: string;
   let innerB64: string;
@@ -56,7 +57,8 @@ export async function decryptIncomingSealedDm(
         session.secretKey,
         peer.id,
         peer.publicKey,
-        innerB64
+        innerB64,
+        options.receivedAt
       );
       plain = JSON.parse(json) as PlainPayload;
     } else if (isDrCiphertext(innerB64)) {
@@ -72,7 +74,8 @@ export async function decryptIncomingSealedDm(
         session.secretKey,
         peer.id,
         peer.publicKey,
-        innerB64
+        innerB64,
+        options.receivedAt
       );
       plain = JSON.parse(json) as PlainPayload;
     } else {
