@@ -2530,25 +2530,63 @@ export function ChatShell({
                 placeholder="Gruppenname"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
+                aria-label="Gruppenname"
               />
-              <select
-                multiple
-                className="app-input h-24 !py-1 text-xs"
-                value={newGroupMembers}
-                onChange={(e) => {
-                  const o = [...e.target.selectedOptions].map((x) => x.value);
-                  setNewGroupMembers(o);
-                }}
+              <div
+                className="max-h-40 space-y-0.5 overflow-y-auto rounded-lg border p-1"
+                style={{ borderColor: "var(--border)" }}
+                role="group"
+                aria-label="Mitglieder auswählen"
               >
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.username}
-                  </option>
-                ))}
-              </select>
+                {users.length === 0 ? (
+                  <p
+                    className="py-3 text-center text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Noch keine Kontakte. Füge zuerst Kontakte hinzu.
+                  </p>
+                ) : (
+                  users.map((u) => {
+                    const checked = newGroupMembers.includes(u.id);
+                    return (
+                      <label
+                        key={u.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition hover:bg-[var(--bg-hover)]"
+                        style={{ color: "var(--text)" }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => {
+                            setNewGroupMembers((prev) =>
+                              prev.includes(u.id)
+                                ? prev.filter((id) => id !== u.id)
+                                : [...prev, u.id]
+                            );
+                          }}
+                        />
+                        <span
+                          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
+                          style={{ background: userGradient(u.id) }}
+                          aria-hidden
+                        >
+                          {u.username.charAt(0).toUpperCase()}
+                        </span>
+                        <span className="truncate">{u.username}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              {newGroupMembers.length > 0 && (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {newGroupMembers.length} ausgewählt
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => void createGroup()}
+                disabled={!newGroupName.trim() || newGroupMembers.length === 0}
                 className="btn btn-primary w-full"
               >
                 Gruppe erstellen
