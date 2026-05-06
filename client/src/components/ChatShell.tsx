@@ -99,6 +99,7 @@ import {
   IconShieldCheck,
   IconSmile,
   IconStar,
+  IconUserPlus,
   IconUsers,
   IconVolumeMute,
   IconWifiOff,
@@ -2399,7 +2400,8 @@ export function ChatShell({
               type="button"
               onClick={onLock}
               className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-              title="Sofort sperren (LDK aus dem Speicher entfernen)"
+              title="Konto sperren — Schlüssel aus dem Speicher entfernen"
+              aria-label="Konto sperren"
             >
               <IconLock size={14} />
               Sperren
@@ -2418,7 +2420,20 @@ export function ChatShell({
               placeholder="Suchen…"
               className="w-full border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text)" }}
+              aria-label="Kontakte und Gruppen filtern"
             />
+            {query && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                className="shrink-0 rounded-full p-0.5 transition hover:bg-[var(--bg-hover)]"
+                style={{ color: "var(--text-muted)" }}
+                aria-label="Suche löschen"
+                title="Löschen (Esc)"
+              >
+                <IconX size={14} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -2464,10 +2479,11 @@ export function ChatShell({
               <button
                 type="button"
                 onClick={() => setShowAddContact(true)}
-                className="btn btn-primary btn-icon !h-8 !w-8 !text-base"
+                className="btn btn-primary btn-icon !h-8 !w-8"
                 title="Kontakt hinzufügen"
+                aria-label="Kontakt hinzufügen"
               >
-                +
+                <IconUserPlus size={16} />
               </button>
             </div>
             <div

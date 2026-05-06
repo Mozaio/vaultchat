@@ -720,3 +720,31 @@ export function IconVolumeMute(props: P) {
   );
 }
 
+export function IconPlus(props: P) {
+  return (
+    <Svg {...props}>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function IconUserPlus(props: P) {
+  return (
+    <Svg {...props}>
+      <path
+        d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M19 8v6M22 11h-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
