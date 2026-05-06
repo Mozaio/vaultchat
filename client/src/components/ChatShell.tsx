@@ -198,6 +198,9 @@ function humanDmSendError(err: unknown): string {
   if (msg === "prekey_bundle_unavailable" || msg === "x3dh_required") {
     return "Sicherer X3DH-Schluesselaustausch fehlgeschlagen. Der Kontakt muss einmal online sein oder seine PreKeys neu hochladen.";
   }
+  if (msg === "prekey_recovery_unavailable") {
+    return "Erste Nachricht noch nicht gesendet: sicherer PreKey-Recovery-Pfad des Kontakts ist noch nicht bereit. Bitte in ein paar Sekunden erneut senden.";
+  }
   if (msg === "missing_ratchet_session") {
     return "Keine sichere Ratchet-Session gefunden. Starte den Chat neu, sobald der Kontakt PreKeys verfuegbar hat.";
   }
@@ -255,6 +258,7 @@ export function ChatShell({
   const [groupMessages, setGroupMessages] = useState<ChatMsg[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  const [preKeyReady, setPreKeyReady] = useState(false);
   const [typing, setTyping] = useState(false);
   const [myFp, setMyFp] = useState<string | null>(null);
   const [peerFp, setPeerFp] = useState<string | null>(null);
@@ -334,6 +338,7 @@ export function ChatShell({
 
   const wsRef = useRef<WebSocket | null>(null);
   const wsAuthenticatedRef = useRef(false);
+  const preKeyReadyRef = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
   const peerRef = useRef<api.ApiUser | null>(null);
@@ -363,6 +368,7 @@ export function ChatShell({
   usersRef.current = users;
   groupsRef.current = groups;
   tokenRef.current = session.token;
+  preKeyReadyRef.current = preKeyReady;
 
   useShortcuts({
     onSearch: () => setSearchOpen(true),
@@ -535,6 +541,8 @@ export function ChatShell({
 
   /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
   useEffect(() => {
+    let cancelled = false;
+    setPreKeyReady(false);
     void (async () => {
       try {
         let km = await loadKeyMaterial();
@@ -553,11 +561,16 @@ export function ChatShell({
           await saveKeyMaterial(km);
         }
         await api.uploadPreKeys(session.token, toUploadBody(km));
+        if (!cancelled) setPreKeyReady(true);
       } catch (e) {
+        if (!cancelled) setPreKeyReady(false);
         // eslint-disable-next-line no-console
         console.error("[vaultchat] prekey upload", e);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [session.token, session.secretKey]);
 
   useEffect(() => {
@@ -747,10 +760,27 @@ export function ChatShell({
       payload: PlainPayload,
       suppressLocal = false
     ): Promise<string | null> => {
+      if (!preKeyReadyRef.current) {
+        setError("Sichere Schluessel werden vorbereitet. Bitte in ein paar Sekunden erneut senden.");
+        return null;
+      }
       if (blockedPeers.has(toUser.id)) {
         setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
         return null;
       }
+      const existingLocalFrames = rawDmRef.current.get(toUser.id) ?? [];
+      const hasPeerContent = existingLocalFrames.some((row) => {
+        if (row.fromMe) return false;
+        try {
+          const plain = JSON.parse(row.plainJson) as PlainPayload;
+          return plain.kind !== "receipt";
+        } catch {
+          return false;
+        }
+      });
+      const requireRecovery =
+        !suppressLocal &&
+        !hasPeerContent;
       let encrypted: Awaited<ReturnType<typeof drEncryptJsonForDm>>;
       try {
         encrypted = await drEncryptJsonForDm(
@@ -758,7 +788,8 @@ export function ChatShell({
           toUser.id,
           toUser.publicKey,
           JSON.stringify(payload),
-          tokenRef.current
+          tokenRef.current,
+          { requireRecovery }
         );
       } catch (err) {
         setError(humanDmSendError(err));
@@ -1105,6 +1136,10 @@ export function ChatShell({
   }, [refreshPendingCount]);
 
   useEffect(() => {
+    if (!preKeyReady) {
+      setConnected(false);
+      return;
+    }
     let stopped = false;
     const url = getWsUrl();
     const ws = new WebSocket(url);
@@ -1296,6 +1331,7 @@ export function ChatShell({
     };
   }, [
     session,
+    preKeyReady,
     loadGroups,
     sendDmWire,
     handleIncomingGroupFrame,
@@ -2676,6 +2712,9 @@ export function ChatShell({
             </div>
 
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
+              {!preKeyReady && (
+                <ComposerNotice message="Sichere Schluessel werden vorbereitet. Nachrichten sind gleich bereit." />
+              )}
               {error && <ComposerNotice message={error} onDismiss={() => setError(null)} />}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
@@ -2765,7 +2804,7 @@ export function ChatShell({
                     voice.recording ? "Aufnahme läuft…" : "Nachricht…"
                   }
                   value={text}
-                  disabled={voice.recording || peerPin?.state === "mismatch"}
+                  disabled={!preKeyReady || voice.recording || peerPin?.state === "mismatch"}
                   rows={1}
                   onChange={(e) => {
                     setText(e.target.value);
@@ -2796,7 +2835,7 @@ export function ChatShell({
                 <button
                   type="button"
                   onClick={() => void sendDmText()}
-                  disabled={voice.recording || !text.trim()}
+                  disabled={!preKeyReady || voice.recording || !text.trim()}
                   className="btn-send"
                 >
                   <IconSend size={16} />

@@ -62,6 +62,10 @@ export type DmEncryptResult = {
   mode: "pqxdh" | "x3dh" | "ratchet" | "ratchet_recovery" | "legacy";
 };
 
+export type DmEncryptOptions = {
+  requireRecovery?: boolean;
+};
+
 function x3dhEnabled(): boolean {
   return import.meta.env.VITE_VAULTCHAT_ENABLE_X3DH !== "0";
 }
@@ -343,7 +347,8 @@ export async function drEncryptJsonForDm(
   peerId: string,
   peerPublicKeyB64: string,
   plainJson: string,
-  token: string
+  token: string,
+  options: DmEncryptOptions = {}
 ): Promise<DmEncryptResult> {
   const useX3dh = x3dhEnabled();
   const existing = await loadState(peerId, peerPublicKeyB64, {
@@ -373,9 +378,11 @@ export async function drEncryptJsonForDm(
           mode: "ratchet_recovery",
         };
       } catch {
+        if (options.requireRecovery) throw new Error("prekey_recovery_unavailable");
         /* Normal ratchet delivery still works when recovery prekeys are temporarily unavailable. */
       }
     }
+    if (options.requireRecovery) throw new Error("prekey_recovery_unavailable");
     return { innerB64: base64FromUint8(wire), mode: "ratchet" };
   }
 
