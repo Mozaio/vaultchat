@@ -1,69 +1,139 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlainPayload } from "../lib/crypto";
 import {
-  IconFileText,
-  IconDownload,
-  IconTimer,
-  IconSmile,
-  IconMoreVertical,
-  IconMessageSquare,
+  formatFileSize,
+  fmtDuration,
+  isImagePayload,
+  truncate,
+} from "../lib/messagePreview";
+import {
+  IconBookmark,
   IconCheck,
   IconCheckCheck,
+  IconCopy,
+  IconDownload,
+  IconEdit,
+  IconFileText,
+  IconForward,
+  IconImage,
+  IconPause,
+  IconPin,
+  IconPlay,
+  IconReply,
+  IconSmile,
+  IconStar,
+  IconTimer,
+  IconTrash,
+  IconX,
 } from "./Icons";
 
 export type ChatMsg = {
   id: string;
   fromMe: boolean;
+  /** Server-Sender-ID für Gruppen (für Avatar/Username-Auflösung). */
+  fromUserId?: string;
   plain: PlainPayload;
   at: number;
   expiresAt?: number;
-  /** Aggregierte Reaktionen: Emoji -> Anzahl. */
   reactions?: Record<string, number>;
-  /** Enthält "mein Reaktions-Emoji" für Toggle-Anzeige. */
   myReaction?: string;
-  /** True, wenn ein "delete"-Frame empfangen wurde. */
   deleted?: boolean;
-  /** True, wenn ein "edit"-Frame den Body aktualisiert hat. */
   edited?: boolean;
-  /** Lesebestätigung empfangen? */
   readByPeer?: boolean;
-  /** Zustellung bestätigt? */
   deliveredToPeer?: boolean;
 };
 
-const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "🙏", "✅"];
+export const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
-function fmtDuration(ms?: number): string {
-  if (!ms) return "";
-  const s = Math.max(1, Math.round(ms / 1000));
-  const mm = Math.floor(s / 60);
-  const ss = s % 60;
-  return `${mm}:${ss.toString().padStart(2, "0")}`;
+export { previewForPayload } from "../lib/messagePreview";
+
+/** Deterministische, harmlos zufällige Wellenform aus dem Cid-String. */
+function useWaveform(seed: string, bars = 28): number[] {
+  return useMemo(() => {
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) {
+      h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+    }
+    const out: number[] = [];
+    for (let i = 0; i < bars; i++) {
+      h = (Math.imul(1103515245, h) + 12345) | 0;
+      const v = ((h >>> 8) & 0xff) / 255;
+      out.push(0.25 + v * 0.75);
+    }
+    return out;
+  }, [seed, bars]);
 }
 
-function truncate(text: string, n = 64): string {
-  if (!text) return "";
-  return text.length > n ? text.slice(0, n - 1) + "…" : text;
-}
+function VoiceCard({
+  src,
+  durationMs,
+  cid,
+}: {
+  src: string;
+  durationMs?: number;
+  cid: string;
+}) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const bars = useWaveform(cid, 28);
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onTime = () => {
+      if (audio.duration > 0) setProgress(audio.currentTime / audio.duration);
+    };
+    const onEnd = () => {
+      setPlaying(false);
+      setProgress(0);
+    };
+    audio.addEventListener("timeupdate", onTime);
+    audio.addEventListener("ended", onEnd);
+    return () => {
+      audio.removeEventListener("timeupdate", onTime);
+      audio.removeEventListener("ended", onEnd);
+    };
+  }, []);
 
-export function previewForPayload(p: PlainPayload): string {
-  switch (p.kind) {
-    case "text":
-      return truncate(p.body ?? "");
-    case "file":
-      return `📎 ${p.fileName ?? "Datei"}`;
-    case "voice":
-      return `🎤 Sprachnachricht ${fmtDuration(p.durationMs)}`;
-    default:
-      return "";
-  }
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      void audio.play();
+      setPlaying(true);
+    } else {
+      audio.pause();
+      setPlaying(false);
+    }
+  };
+
+  return (
+    <div className="voice-card">
+      <button
+        type="button"
+        className="voice-play"
+        onClick={toggle}
+        aria-label={playing ? "Pausieren" : "Abspielen"}
+      >
+        {playing ? <IconPause size={14} /> : <IconPlay size={14} />}
+      </button>
+      <div className="voice-wave">
+        {bars.map((h, i) => {
+          const filled = i / bars.length <= progress;
+          return (
+            <span
+              key={i}
+              className={`voice-bar${filled ? " played" : ""}`}
+              style={{ height: `${Math.round(h * 100)}%` }}
+            />
+          );
+        })}
+      </div>
+      <span className="voice-duration">{fmtDuration(durationMs)}</span>
+      <audio ref={audioRef} src={src} preload="metadata" hidden />
+    </div>
+  );
 }
 
 export function MessageBubble({
@@ -72,22 +142,36 @@ export function MessageBubble({
   replyToPreview,
   isGrouped,
   isLastInGroup,
+  isStarred,
+  isHighlighted,
+  isPinned,
   onReply,
   onReact,
   onEdit,
   onDelete,
   onCopy,
+  onForward,
+  onJumpToCid,
+  onToggleStar,
+  onTogglePin,
 }: {
   msg: ChatMsg;
   peerLabel: string;
-  replyToPreview?: { author: string; text: string } | null;
+  replyToPreview?: { author: string; text: string; cid?: string } | null;
   isGrouped?: boolean;
   isLastInGroup?: boolean;
+  isStarred?: boolean;
+  isHighlighted?: boolean;
+  isPinned?: boolean;
   onReply: (m: ChatMsg) => void;
   onReact: (m: ChatMsg, emoji: string) => void;
   onEdit: (m: ChatMsg, newBody: string) => void;
   onDelete: (m: ChatMsg) => void;
   onCopy: (text: string) => void;
+  onForward?: (m: ChatMsg) => void;
+  onJumpToCid?: (cid: string) => void;
+  onToggleStar?: (m: ChatMsg) => void;
+  onTogglePin?: (m: ChatMsg) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
@@ -96,7 +180,9 @@ export function MessageBubble({
   const [ttlLeft, setTtlLeft] = useState<string | null>(() =>
     computeTtlLeft(msg.expiresAt)
   );
+  const [imageOpen, setImageOpen] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
+  const lastClickRef = useRef<number>(0);
 
   useEffect(() => {
     if (!msg.expiresAt) return;
@@ -110,7 +196,7 @@ export function MessageBubble({
   const body = msg.plain.body ?? "";
   const reacts = msg.reactions ?? {};
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
-  const canCopy = msg.plain.kind === "text" && Boolean(body);
+  const isImage = isImagePayload(msg.plain);
 
   useEffect(() => {
     if (!menuOpen && !reactOpen) return;
@@ -129,11 +215,22 @@ export function MessageBubble({
     setMenuOpen(false);
   }
 
+  const handleBubbleClick = () => {
+    const now = Date.now();
+    if (now - lastClickRef.current < 320) {
+      onReact(msg, msg.myReaction === "👍" ? "" : "👍");
+      lastClickRef.current = 0;
+    } else {
+      lastClickRef.current = now;
+    }
+  };
+
   return (
     <div
       ref={bubbleRef}
-      className={`message-wrapper group ${
-        msg.fromMe ? "sent" : "received"
+      data-cid={msg.plain.cid}
+      className={`message-wrapper group ${msg.fromMe ? "sent" : "received"}${
+        isHighlighted ? " highlighted" : ""
       }`}
     >
       <div
@@ -142,35 +239,45 @@ export function MessageBubble({
         }`}
       >
         {replyToPreview && (
-          <div
-            className="mb-1.5 max-w-full rounded-t-xl border-l-2 px-3 py-1.5 text-xs"
-            style={{
-              borderColor: "var(--accent)",
-              background: "var(--bg-elevated)",
-              color: "var(--text-secondary)",
+          <button
+            type="button"
+            className="reply-stripe"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (replyToPreview.cid) onJumpToCid?.(replyToPreview.cid);
             }}
+            disabled={!replyToPreview.cid}
+            title={replyToPreview.cid ? "Zur Nachricht springen" : undefined}
           >
-            <span style={{ color: "var(--accent)" }}>
-              {replyToPreview.author}:{" "}
+            <span className="reply-stripe-author">{replyToPreview.author}</span>
+            <span className="reply-stripe-text">
+              {truncate(replyToPreview.text, 120)}
             </span>
-            {truncate(replyToPreview.text, 120)}
-          </div>
+          </button>
         )}
 
         <div
           className={`message-bubble relative ${
             msg.fromMe ? "sent" : "received"
-          } max-w-full ${msg.deleted ? "italic opacity-60" : ""} ${
+          } max-w-full ${msg.deleted ? "is-deleted" : ""} ${
             isGrouped ? "grouped" : ""
-          } ${isLastInGroup ? "last-in-group" : ""
-          }`}
+          } ${isLastInGroup ? "tail" : ""} ${isImage ? "is-image" : ""}`}
+          onDoubleClick={(e) => {
+            if (!msg.deleted && msg.plain.kind === "text") {
+              e.stopPropagation();
+              onReact(msg, msg.myReaction === "👍" ? "" : "👍");
+            }
+          }}
+          onClick={handleBubbleClick}
         >
           {msg.deleted ? (
-            <span className="italic">Nachricht gelöscht</span>
+            <span className="bubble-deleted">
+              <IconTrash size={12} aria-hidden /> Nachricht gelöscht
+            </span>
           ) : editing ? (
-            <div className="flex items-center gap-2">
+            <div className="bubble-edit">
               <input
-                className="app-input w-full rounded-md border border-[color:var(--border)] px-2 py-1"
+                className="bubble-edit-input"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 autoFocus
@@ -189,8 +296,9 @@ export function MessageBubble({
               />
               <button
                 type="button"
-                className="text-xs app-muted hover:app-fg"
-                onClick={() => {
+                className="bubble-edit-cancel"
+                onClick={(e) => {
+                  e.stopPropagation();
                   setEditing(false);
                   setEditValue(body);
                 }}
@@ -198,51 +306,95 @@ export function MessageBubble({
                 Esc
               </button>
             </div>
+          ) : isImage ? (
+            <button
+              type="button"
+              className="image-attachment"
+              onClick={(e) => {
+                e.stopPropagation();
+                setImageOpen(true);
+              }}
+              aria-label="Bild öffnen"
+            >
+              <img
+                src={body}
+                alt={msg.plain.fileName ?? "Bild"}
+                className="image-attachment-img"
+                loading="lazy"
+                draggable={false}
+              />
+              {msg.plain.fileName && (
+                <span className="image-attachment-meta">
+                  <IconImage size={12} aria-hidden />
+                  {msg.plain.fileName}
+                </span>
+              )}
+            </button>
           ) : msg.plain.kind === "file" ? (
             <div className="file-attachment-card">
               <div className="file-icon-wrapper">
                 <IconFileText size={18} />
               </div>
               <div className="file-info">
-                <div className="file-name">{msg.plain.fileName ?? "Datei"}</div>
-                <div className="file-size">{formatFileSize(msg.plain.fileSize)}</div>
+                <div className="file-name">
+                  {msg.plain.fileName ?? "Datei"}
+                </div>
+                <div className="file-size">
+                  {formatFileSize(msg.plain.fileSize) || msg.plain.mime || ""}
+                </div>
               </div>
               <a
                 href={body}
                 download={msg.plain.fileName}
                 className="download-btn"
                 onClick={(e) => e.stopPropagation()}
+                aria-label="Herunterladen"
               >
                 <IconDownload size={14} />
               </a>
             </div>
           ) : msg.plain.kind === "voice" ? (
-            <div className="voice-message">
-              <div className="play-btn">▶</div>
-              <audio controls src={body} className="h-8 flex-1 max-w-[180px]" />
-              <span className="text-xs opacity-70">{fmtDuration(msg.plain.durationMs)}</span>
-            </div>
+            <VoiceCard
+              src={body}
+              durationMs={msg.plain.durationMs}
+              cid={msg.plain.cid}
+            />
           ) : (
-            <p className="whitespace-pre-wrap break-words">{body}</p>
+            <p className="bubble-text">{body}</p>
           )}
 
-          {/* Timestamp and status */}
           <div className="bubble-meta">
+            {isStarred && !msg.deleted && (
+              <span className="meta-star" title="Markiert">
+                <IconBookmark size={11} />
+              </span>
+            )}
             {ttlLeft && (
-              <span className="disappearing-timer">
+              <span className="disappearing-timer" title="Verschwindet bald">
                 <IconTimer size={10} />
                 {ttlLeft}
               </span>
             )}
-            <span>
+            {msg.edited && !msg.deleted && (
+              <span className="meta-edited">bearbeitet</span>
+            )}
+            <span className="meta-time">
               {new Date(msg.at).toLocaleTimeString(undefined, {
                 hour: "2-digit",
                 minute: "2-digit",
               })}
             </span>
-            {msg.edited && !msg.deleted && <span>(bearbeitet)</span>}
             {msg.fromMe && !msg.deleted && (
-              <span className="status-icon" title={msg.readByPeer ? "Gelesen" : msg.deliveredToPeer ? "Zugestellt" : "Gesendet"}>
+              <span
+                className="status-icon"
+                title={
+                  msg.readByPeer
+                    ? "Gelesen"
+                    : msg.deliveredToPeer
+                      ? "Zugestellt"
+                      : "Gesendet"
+                }
+              >
                 {msg.readByPeer ? (
                   <IconCheckCheck size={13} className="read" />
                 ) : msg.deliveredToPeer ? (
@@ -254,117 +406,140 @@ export function MessageBubble({
             )}
           </div>
 
-          {/* Menu button */}
           {!msg.deleted && (
             <div
-              className={`message-action-bar ${
+              className={`message-actions ${
                 msg.fromMe ? "from-me" : "from-peer"
               }`}
             >
               <button
                 type="button"
-                aria-label="Reagieren"
-                title="Reagieren"
+                className="message-action-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   setReactOpen((v) => !v);
                   setMenuOpen(false);
                 }}
-                className="message-action-button"
+                aria-label="Reagieren"
+                title="Reagieren"
               >
-                <IconSmile size={15} />
+                <IconSmile size={14} />
               </button>
               <button
                 type="button"
-                aria-label="Antworten"
-                title="Antworten"
+                className="message-action-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   onReply(msg);
-                  setMenuOpen(false);
-                  setReactOpen(false);
                 }}
-                className="message-action-button"
+                aria-label="Antworten"
+                title="Antworten"
               >
-                <IconMessageSquare size={15} />
+                <IconReply size={14} />
               </button>
               <button
                 type="button"
-                aria-label="Mehr"
-                title="Mehr"
+                className="message-action-btn"
                 onClick={(e) => {
                   e.stopPropagation();
                   setMenuOpen((v) => !v);
                   setReactOpen(false);
                 }}
-                className="message-action-button"
+                aria-label="Mehr"
+                title="Mehr"
               >
-                <IconMoreVertical size={15} />
+                ⋯
               </button>
             </div>
           )}
 
           {menuOpen && !msg.deleted && (
             <div
-              className={`message-context-menu ${
-                msg.fromMe ? "-right-2" : "-left-2"
-              }`}
+              className={`bubble-menu ${msg.fromMe ? "right" : "left"}`}
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
-                className="message-context-item"
+                className="bubble-menu-item"
                 onClick={() => {
                   onReply(msg);
                   setMenuOpen(false);
                 }}
               >
-                <IconMessageSquare size={14} /> Antworten
+                <IconReply size={14} /> Antworten
               </button>
-              <button
-                type="button"
-                className="message-context-item"
-                onClick={() => {
-                  setReactOpen(true);
-                  setMenuOpen(false);
-                }}
-              >
-                <IconSmile size={14} /> Reagieren
-              </button>
-              {canCopy && (
+              {onForward && msg.plain.kind !== "voice" && (
                 <button
                   type="button"
-                  className="message-context-item"
+                  className="bubble-menu-item"
+                  onClick={() => {
+                    onForward(msg);
+                    setMenuOpen(false);
+                  }}
+                >
+                  <IconForward size={14} /> Weiterleiten
+                </button>
+              )}
+              {onToggleStar && msg.plain.kind === "text" && (
+                <button
+                  type="button"
+                  className="bubble-menu-item"
+                  onClick={() => {
+                    onToggleStar(msg);
+                    setMenuOpen(false);
+                  }}
+                >
+                  {isStarred ? <IconBookmark size={14} /> : <IconStar size={14} />}
+                  {isStarred ? "Markierung entfernen" : "Markieren"}
+                </button>
+              )}
+              {onTogglePin && (
+                <button
+                  type="button"
+                  className="bubble-menu-item"
+                  onClick={() => {
+                    onTogglePin(msg);
+                    setMenuOpen(false);
+                  }}
+                >
+                  <IconPin size={14} />
+                  {isPinned ? "Pin entfernen" : "Anpinnen"}
+                </button>
+              )}
+              {msg.plain.kind === "text" && body && (
+                <button
+                  type="button"
+                  className="bubble-menu-item"
                   onClick={() => {
                     onCopy(body);
                     setMenuOpen(false);
                   }}
                 >
-                  Kopieren
+                  <IconCopy size={14} /> Kopieren
                 </button>
               )}
               {msg.fromMe && msg.plain.kind === "text" && (
                 <button
                   type="button"
-                  className="message-context-item"
+                  className="bubble-menu-item"
                   onClick={() => {
                     setEditing(true);
                     setMenuOpen(false);
                   }}
                 >
-                  Bearbeiten
+                  <IconEdit size={14} /> Bearbeiten
                 </button>
               )}
               {msg.fromMe && (
                 <button
                   type="button"
-                  className="message-context-item danger"
+                  className="bubble-menu-item danger"
                   onClick={() => {
                     onDelete(msg);
                     setMenuOpen(false);
                   }}
                 >
-                  Für alle löschen
+                  <IconTrash size={14} /> Für alle löschen
                 </button>
               )}
             </div>
@@ -372,19 +547,19 @@ export function MessageBubble({
 
           {reactOpen && !msg.deleted && (
             <div
-              className={`reaction-popover ${
-                msg.fromMe ? "right-0" : "left-0"
-              }`}
+              className={`reaction-popover ${msg.fromMe ? "right" : "left"}`}
               onClick={(e) => e.stopPropagation()}
             >
               {QUICK_EMOJIS.map((e) => (
                 <button
                   key={e}
                   type="button"
-                  className={`reaction-button ${msg.myReaction === e ? "active" : ""}`}
-                  aria-pressed={msg.myReaction === e}
-                  title={msg.myReaction === e ? "Reaktion entfernen" : `Mit ${e} reagieren`}
+                  className={`reaction-popover-btn${
+                    msg.myReaction === e ? " active" : ""
+                  }`}
                   onClick={() => toggleReaction(e)}
+                  aria-label={`Mit ${e} reagieren`}
+                  aria-pressed={msg.myReaction === e}
                 >
                   {e}
                 </button>
@@ -394,22 +569,60 @@ export function MessageBubble({
         </div>
 
         {reactEntries.length > 0 && (
-          <div className={`mt-1 flex gap-1 ${msg.fromMe ? "justify-end" : "justify-start"}`}>
+          <div className={`reactions-row ${msg.fromMe ? "end" : "start"}`}>
             {reactEntries.map(([e, n]) => (
               <button
                 key={e}
                 type="button"
                 onClick={() => toggleReaction(e)}
-                className={`reaction-chip ${msg.myReaction === e ? "active" : ""}`}
-                aria-pressed={msg.myReaction === e}
+                className={`reaction-chip${
+                  msg.myReaction === e ? " mine" : ""
+                }`}
                 title={peerLabel}
+                aria-pressed={msg.myReaction === e}
               >
-                {e} {n}
+                {e} <span>{n}</span>
               </button>
             ))}
           </div>
         )}
       </div>
+
+      {imageOpen && isImage && (
+        <div
+          className="image-lightbox"
+          onClick={() => setImageOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <button
+            type="button"
+            className="image-lightbox-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              setImageOpen(false);
+            }}
+            aria-label="Schließen"
+          >
+            <IconX size={20} />
+          </button>
+          <img
+            src={body}
+            alt={msg.plain.fileName ?? "Bild"}
+            onClick={(e) => e.stopPropagation()}
+          />
+          {msg.plain.fileName && (
+            <a
+              href={body}
+              download={msg.plain.fileName}
+              className="image-lightbox-download"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IconDownload size={14} /> {msg.plain.fileName}
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -84,7 +84,9 @@ export async function parseIdentityBackup(
   passphraseProvider: () => string | null
 ): Promise<LocalIdentity> {
   const parsed = JSON.parse(raw) as unknown;
-  if (!isEncryptedIdentityBackup(parsed)) return parsed as LocalIdentity;
+  if (!isEncryptedIdentityBackup(parsed)) {
+    throw new Error("backup_must_be_encrypted_v2");
+  }
 
   const passphrase = passphraseProvider();
   if (!passphrase) throw new Error("backup_passphrase_required");

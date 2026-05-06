@@ -22,6 +22,8 @@ export type StoredGroup = {
   id: string;
   name: string;
   memberIds: string[];
+  /** User, der die Gruppe angelegt hat (für Rollen/UI). */
+  createdByUserId: string;
   createdAt: number;
 };
 
@@ -99,11 +101,13 @@ export function getDirectoryStats() {
 export function createGroup(input: {
   name: string;
   memberIds: string[];
+  createdByUserId: string;
 }): StoredGroup {
   const g: StoredGroup = {
     id: randomUUID(),
     name: input.name,
     memberIds: [...new Set(input.memberIds)],
+    createdByUserId: input.createdByUserId,
     createdAt: Date.now(),
   };
   groups.set(g.id, g);
@@ -141,7 +145,13 @@ export function removeGroupMember(
   if (g.memberIds.length === 0) {
     groups.delete(groupId);
     persistDirectory();
-    return { id: groupId, name: g.name, memberIds: [], createdAt: g.createdAt };
+    return {
+      id: groupId,
+      name: g.name,
+      memberIds: [],
+      createdByUserId: g.createdByUserId,
+      createdAt: g.createdAt,
+    };
   }
   persistDirectory();
   return g;

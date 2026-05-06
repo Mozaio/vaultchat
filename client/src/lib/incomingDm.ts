@@ -103,12 +103,11 @@ export async function decryptIncomingSealedDmWithReplayCheck(
   // Erst entschlüsseln
   const result = await decryptIncomingSealedDm(envelopeB64, session, resolvePeer);
   if (!result) return null;
-  
-  // Replay-Schutz: Prüfe Message-ID
-  if (isMessageDuplicate(result.plain.cid)) {
-    // Duplikat - verwerfen
+
+  const cid = result.plain.cid;
+  if (typeof cid === "string" && cid.length > 0 && isMessageDuplicate(cid)) {
     return null;
   }
-  
+
   return result;
 }

@@ -118,10 +118,13 @@ export type PlainPayload = {
   /** Text-Body bzw. Data-URL für Datei/Voice. Leer für Meta-Frames. */
   body?: string;
   fileName?: string;
-  fileSize?: number;
   mime?: string;
+  /** Originale Dateigröße in Bytes (für Anzeige in der Bubble). */
+  fileSize?: number;
   /** Laufzeit in Millisekunden für Sprachnachrichten. */
   durationMs?: number;
+  /** Empfänger-IDs einer Weiterleitung (Vorschau/Markierung). */
+  forwardedFromUserId?: string;
   /** Bezug auf frühere cid für Antworten. */
   replyToCid?: string;
   /** Kurzvorschau der zitierten Nachricht (wird vom Sender erzeugt, damit Empfänger rendern kann). */

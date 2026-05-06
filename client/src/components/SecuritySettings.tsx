@@ -1,14 +1,10 @@
 /**
- * Security Settings Panel für VaultChat
- * 
- * Ermöglicht das Ein-/Ausschalten der erweiterten Sicherheitsfunktionen:
- * - Extreme Security Mode (aggressives Memory-Wiping, kürzere Intervalle)
- * - Replay-Schutz
- * - Code-Integrity-Pinning
+ * Einstellungen: Tabs Allgemein · Datenschutz · Sicherheit · Über
  */
 import { useState, useEffect } from "react";
 import {
   startPeriodicWipe,
+  stopPeriodicWipe,
   immediateWipe,
   setSecurityMode,
 } from "../lib/exfilProtection";
@@ -20,14 +16,19 @@ import type { ServerStatus } from "../lib/api";
 import {
   IconAlertTriangle,
   IconCheck,
-  IconLock,
   IconRefreshCw,
   IconShieldCheck,
 } from "./Icons";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type SecurityLevel = "normal" | "extreme";
 
 const SECURITY_STORAGE_KEY = "vaultchat.security.level";
+
+/** Desktop-Toasts: an, wenn nicht "off" */
+export const NOTIFY_STORAGE_KEY = "vaultchat.privacy.notify";
+/** Textvorschau in System-Benachrichtigungen */
+export const NOTIFY_PREVIEW_STORAGE_KEY = "vaultchat.privacy.notifyPreview";
 
 export function loadSecurityLevel(): SecurityLevel {
   try {
@@ -46,6 +47,31 @@ export function saveSecurityLevel(level: SecurityLevel): void {
     localStorage.setItem(SECURITY_STORAGE_KEY, level);
   } catch {
     /* ignore */
+  }
+}
+
+type SettingsTabId = "general" | "privacy" | "security" | "about";
+
+const SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
+  { id: "general", label: "Allgemein" },
+  { id: "privacy", label: "Datenschutz" },
+  { id: "security", label: "Sicherheit" },
+  { id: "about", label: "Über" },
+];
+
+function readNotifyEnabled(): boolean {
+  try {
+    return localStorage.getItem(NOTIFY_STORAGE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function readNotifyPreview(): boolean {
+  try {
+    return localStorage.getItem(NOTIFY_PREVIEW_STORAGE_KEY) !== "off";
+  } catch {
+    return true;
   }
 }
 
@@ -69,10 +95,6 @@ interface SecuritySettingsProps {
   onRequestNotificationPermission?: () => void | Promise<void>;
 }
 
-/**
- * Security Settings Panel Component
- * Das Panel wird nur gerendert wenn es in ChatShell conditional gerendert wird
- */
 export function SecuritySettings({
   onClose,
   relayOnly = false,
@@ -92,11 +114,20 @@ export function SecuritySettings({
   notificationPermission = "default",
   onRequestNotificationPermission,
 }: SecuritySettingsProps) {
+  const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [replayStats, setReplayStats] = useState(getReplayStats());
+  const [desktopNotify, setDesktopNotify] = useState(readNotifyEnabled);
+  const [notifyPreview, setNotifyPreview] = useState(readNotifyPreview);
+  const [notifyPermission, setNotifyPermission] = useState<
+    NotificationPermission | "unsupported"
+  >(
+    typeof Notification !== "undefined"
+      ? Notification.permission
+      : "unsupported"
+  );
 
   useEffect(() => {
-    // Update replay stats periodically
     const interval = setInterval(() => {
       setReplayStats(getReplayStats());
     }, 5000);
@@ -109,11 +140,9 @@ export function SecuritySettings({
     setSecurityMode(newLevel);
 
     if (newLevel === "extreme") {
-      // Extreme Mode: Start aggressive wiping
       startPeriodicWipe();
     } else {
-      // Normal Mode: keep wiping enabled, only with less aggressive intervals.
-      startPeriodicWipe();
+      stopPeriodicWipe();
     }
   };
 
@@ -135,303 +164,588 @@ export function SecuritySettings({
     !serverStatus.privacy.messageContentPersistentOnServer &&
     !serverStatus.privacy.urlTokenAuthEnabled;
 
+  const setDesktopNotifyStored = (enabled: boolean) => {
+    setDesktopNotify(enabled);
+    try {
+      if (enabled) localStorage.removeItem(NOTIFY_STORAGE_KEY);
+      else localStorage.setItem(NOTIFY_STORAGE_KEY, "off");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const setNotifyPreviewStored = (enabled: boolean) => {
+    setNotifyPreview(enabled);
+    try {
+      if (enabled) localStorage.removeItem(NOTIFY_PREVIEW_STORAGE_KEY);
+      else localStorage.setItem(NOTIFY_PREVIEW_STORAGE_KEY, "off");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const requestNotifyPermission = () => {
+    if (!("Notification" in window)) return;
+    void Notification.requestPermission().then((p) => {
+      setNotifyPermission(p);
+    });
+  };
+
+  const appVersion =
+    (import.meta.env.VITE_APP_VERSION as string | undefined)?.trim() || "1.0.0";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="app-surface max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="flex items-center gap-2 text-lg font-semibold" style={{ color: "var(--text)" }}>
-            <IconLock size={18} />
-            Sicherheitseinstellungen
+      <div
+        className="app-surface flex max-h-[min(90vh,720px)] w-full max-w-lg flex-col rounded-2xl p-0 shadow-xl"
+        role="dialog"
+        aria-labelledby="settings-title"
+      >
+        <div
+          className="flex shrink-0 items-center justify-between border-b px-5 py-4"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <h2
+            id="settings-title"
+            className="text-lg font-semibold"
+            style={{ color: "var(--text)" }}
+          >
+            Einstellungen
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             style={{ color: "var(--text-muted)" }}
+            aria-label="Schließen"
           >
             x
           </button>
         </div>
 
-        <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-medium" style={{ color: "var(--text)" }}>
-                Produktstatus
-              </h3>
-              <p className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>
-                Server- und Datenschutz-Gates fuer den produktiven Betrieb.
-              </p>
-            </div>
-            {serverStatus ? (
-              <span
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
+        <div
+          className="settings-tabs mx-4 mt-3 shrink-0"
+          role="tablist"
+          aria-label="Einstellungsbereiche"
+        >
+          {SETTINGS_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={`settings-tab${tab === t.id ? " active" : ""}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-2"
+          role="tabpanel"
+        >
+          {tab === "general" && (
+            <div className="space-y-4">
+              <div
+                className="rounded-lg border p-3"
                 style={{
-                  background: productionReady ? "var(--accent-soft)" : "rgba(245, 158, 11, 0.12)",
-                  color: productionReady ? "var(--accent)" : "#f59e0b",
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
                 }}
               >
-                {productionReady ? <IconShieldCheck size={14} /> : <IconAlertTriangle size={14} />}
-                {productionReady ? "Produktionsbereit" : "Haertung offen"}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                <IconRefreshCw size={14} />
-                Pruefe
-              </span>
-            )}
-          </div>
-          {serverStatus ? (
-            <div className="space-y-2">
-              <StatusRow ok={serverStatus.profile === "production"} label="Profil" value={serverStatus.profile} />
-              <StatusRow
-                ok={serverStatus.state.mode === "persistent" && serverStatus.state.writable}
-                label="Server-State"
-                value={serverStatus.state.mode === "persistent" ? "persistent" : "fluechtig"}
-              />
-              <StatusRow
-                ok={serverStatus.registration.mode !== "open"}
-                label="Registrierung"
-                value={serverStatus.registration.mode}
-              />
-              <StatusRow
-                ok={!serverStatus.privacy.urlTokenAuthEnabled}
-                label="WebSocket-Token"
-                value={serverStatus.privacy.urlTokenAuthEnabled ? "URL erlaubt" : "nur Auth-Frame"}
-              />
-              <StatusRow
-                ok={!serverStatus.privacy.messageContentPersistentOnServer}
-                label="Server-Nachrichteninhalt"
-                value={serverStatus.privacy.messageContentPersistentOnServer ? "persistiert" : "nicht persistiert"}
-              />
-            </div>
-          ) : (
-            <p className="text-xs" style={{ color: serverStatusError ? "#fca5a5" : "var(--text-muted)" }}>
-              {serverStatusError
-                ? `Status nicht verfuegbar: ${serverStatusError}`
-                : "Status wird geladen."}
-            </p>
-          )}
-        </div>
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <h3
+                      className="text-sm font-medium"
+                      style={{ color: "var(--text)" }}
+                    >
+                      Produktstatus
+                    </h3>
+                    <p
+                      className="mt-0.5 text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Server- und Datenschutz-Gates für den produktiven Betrieb.
+                    </p>
+                  </div>
+                  {serverStatus ? (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
+                      style={{
+                        background: productionReady
+                          ? "var(--accent-soft)"
+                          : "rgba(245, 158, 11, 0.12)",
+                        color: productionReady ? "var(--accent)" : "#f59e0b",
+                      }}
+                    >
+                      {productionReady ? (
+                        <IconShieldCheck size={14} />
+                      ) : (
+                        <IconAlertTriangle size={14} />
+                      )}
+                      {productionReady ? "Produktionsbereit" : "Härtung offen"}
+                    </span>
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      <IconRefreshCw size={14} />
+                      Prüfe
+                    </span>
+                  )}
+                </div>
+                {serverStatus ? (
+                  <div className="space-y-2">
+                    <StatusRow
+                      ok={serverStatus.profile === "production"}
+                      label="Profil"
+                      value={serverStatus.profile}
+                    />
+                    <StatusRow
+                      ok={
+                        serverStatus.state.mode === "persistent" &&
+                        serverStatus.state.writable
+                      }
+                      label="Server-State"
+                      value={
+                        serverStatus.state.mode === "persistent"
+                          ? "persistent"
+                          : "flüchtig"
+                      }
+                    />
+                    <StatusRow
+                      ok={serverStatus.registration.mode !== "open"}
+                      label="Registrierung"
+                      value={serverStatus.registration.mode}
+                    />
+                    <StatusRow
+                      ok={!serverStatus.privacy.urlTokenAuthEnabled}
+                      label="WebSocket-Token"
+                      value={
+                        serverStatus.privacy.urlTokenAuthEnabled
+                          ? "URL erlaubt"
+                          : "nur Auth-Frame"
+                      }
+                    />
+                    <StatusRow
+                      ok={!serverStatus.privacy.messageContentPersistentOnServer}
+                      label="Server-Nachrichteninhalt"
+                      value={
+                        serverStatus.privacy.messageContentPersistentOnServer
+                          ? "persistiert"
+                          : "nicht persistiert"
+                      }
+                    />
+                  </div>
+                ) : (
+                  <p
+                    className="text-xs"
+                    style={{
+                      color: serverStatusError ? "#fca5a5" : "var(--text-muted)",
+                    }}
+                  >
+                    {serverStatusError
+                      ? `Status nicht verfügbar: ${serverStatusError}`
+                      : "Status wird geladen."}
+                  </p>
+                )}
+              </div>
 
-        <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
-          <h3 className="mb-2 text-sm font-medium" style={{ color: "var(--text)" }}>
-            Datenschutz & Anrufe
-          </h3>
-          <label className="settings-toggle-row">
-            <input
-              type="checkbox"
-              checked={relayOnly}
-              onChange={(e) => onRelayOnlyChange?.(e.target.checked)}
-              className="settings-toggle-input"
-            />
-            <span className="settings-switch" aria-hidden="true" />
-            <span>
-              Anrufe nur über TURN (Relay) leiten
-              <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
-                Verbirgt direkte Peer-Verbindungen, kann aber die Sprachqualität reduzieren.
-              </span>
-            </span>
-          </label>
-          <label className="settings-toggle-row mt-3">
-            <input
-              type="checkbox"
-              checked={sendTypingIndicators}
-              onChange={(e) => onSendTypingIndicatorsChange?.(e.target.checked)}
-              className="settings-toggle-input"
-            />
-            <span className="settings-switch" aria-hidden="true" />
-            <span>
-              Tippstatus senden
-              <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
-                Optionales Metadatum. Deaktivieren reduziert sichtbare Aktivitätsmuster.
-              </span>
-            </span>
-          </label>
-          <label className="settings-toggle-row mt-3">
-            <input
-              type="checkbox"
-              checked={sendReadReceipts}
-              onChange={(e) => onSendReadReceiptsChange?.(e.target.checked)}
-              className="settings-toggle-input"
-            />
-            <span className="settings-switch" aria-hidden="true" />
-            <span>
-              Lese-/Zustellbestätigungen senden
-              <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
-                Bleibt Ende-zu-Ende verschlüsselt, verrät Kontakten aber Aktivität.
-              </span>
-            </span>
-          </label>
-          <div className="mt-3 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
-            <div className="flex items-start justify-between gap-3">
-              <label className="settings-toggle-row">
-                <input
-                  type="checkbox"
-                  checked={notificationEnabled}
-                  onChange={(e) => onNotificationEnabledChange?.(e.target.checked)}
-                  className="settings-toggle-input"
-                />
-                <span className="settings-switch" aria-hidden="true" />
-                <span>
-                  Systembenachrichtigungen
-                  <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
-                    Fragt Berechtigung nur nach Klick an. Ohne Vorschau bleibt der Inhalt privat.
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Erscheinungsbild
+                </h3>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    Hell- / Dunkelmodus
                   </span>
-                </span>
-              </label>
-              {notificationPermission !== "granted" && notificationPermission !== "unsupported" && (
+                  <ThemeToggle />
+                </div>
+              </div>
+
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Gerät & Schlüssel
+                </h3>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                  Dein VaultChat-Konto ist an dieses Gerät gebunden. Ohne
+                  verschlüsseltes Backup gibt es auf einem neuen Gerät keinen
+                  Zugriff auf bestehende Chats.
+                </p>
+                {myFingerprint && (
+                  <p
+                    className="mt-3 break-all font-mono text-xs"
+                    style={{ color: "var(--accent)" }}
+                  >
+                    Öffentlicher Fingerprint: {myFingerprint}
+                  </p>
+                )}
+              </div>
+
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Datensicherung
+                </h3>
                 <button
                   type="button"
-                  onClick={() => void onRequestNotificationPermission?.()}
-                  className="rounded-lg px-2 py-1 text-xs font-medium"
-                  style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                  onClick={onExportBackup}
+                  className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                  style={{
+                    background: "var(--accent-soft)",
+                    color: "var(--accent)",
+                    border: "1px solid var(--border)",
+                  }}
                 >
-                  Erlauben
+                  Verschlüsseltes Backup herunterladen
                 </button>
+              </div>
+            </div>
+          )}
+
+          {tab === "privacy" && (
+            <div className="space-y-4">
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Metadaten & Anrufe
+                </h3>
+                <label
+                  className="flex cursor-pointer items-start gap-3 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={relayOnly}
+                    onChange={(e) => onRelayOnlyChange?.(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    Anrufe nur über TURN (Relay)
+                    <span
+                      className="mt-0.5 block text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Verbirgt direkte Peer-Verbindungen, kann die Qualität
+                      reduzieren.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className="mt-3 flex cursor-pointer items-start gap-3 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sendTypingIndicators}
+                    onChange={(e) =>
+                      onSendTypingIndicatorsChange?.(e.target.checked)
+                    }
+                    className="mt-1"
+                  />
+                  <span>
+                    Tippstatus senden
+                    <span
+                      className="mt-0.5 block text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Optional; ausgeschaltet weniger sichtbare Aktivität.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className="mt-3 flex cursor-pointer items-start gap-3 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sendReadReceipts}
+                    onChange={(e) =>
+                      onSendReadReceiptsChange?.(e.target.checked)
+                    }
+                    className="mt-1"
+                  />
+                  <span>
+                    Lese- & Zustellbestätigungen senden
+                    <span
+                      className="mt-0.5 block text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      E2EE, verrät Kontakten aber deine Aktivität.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Desktop-Benachrichtigungen
+                </h3>
+                {notifyPermission === "unsupported" ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    Werden von diesem Browser nicht unterstützt.
+                  </p>
+                ) : (
+                  <>
+                    <p
+                      className="mb-3 text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Nur wenn der Tab im Hintergrund ist. Berechtigung:{" "}
+                      <span className="font-medium" style={{ color: "var(--text-secondary)" }}>
+                        {notifyPermission === "granted"
+                          ? "erteilt"
+                          : notifyPermission === "denied"
+                            ? "verweigert"
+                            : "noch nicht festgelegt"}
+                      </span>
+                    </p>
+                    {notifyPermission !== "granted" && (
+                      <button
+                        type="button"
+                        className="mb-3 w-full rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
+                        style={{
+                          borderColor: "var(--border)",
+                          color: "var(--text)",
+                          background: "var(--bg-sidebar)",
+                        }}
+                        onClick={requestNotifyPermission}
+                      >
+                        Browser-Berechtigung anfragen
+                      </button>
+                    )}
+                    <label
+                      className="flex cursor-pointer items-start gap-3 text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={desktopNotify}
+                        onChange={(e) =>
+                          setDesktopNotifyStored(e.target.checked)
+                        }
+                        className="mt-1"
+                      />
+                      <span>
+                        Benachrichtigungen bei neuer Nachricht
+                        <span
+                          className="mt-0.5 block text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Master-Schalter (unabhängig von der Browser-Freigabe).
+                        </span>
+                      </span>
+                    </label>
+                    <label
+                      className="mt-3 flex cursor-pointer items-start gap-3 text-sm"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={notifyPreview}
+                        onChange={(e) =>
+                          setNotifyPreviewStored(e.target.checked)
+                        }
+                        disabled={!desktopNotify}
+                        className="mt-1 disabled:opacity-40"
+                      />
+                      <span>
+                        Textvorschau in der Benachrichtigung
+                        <span
+                          className="mt-0.5 block text-xs"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Aus: nur „Neue Nachricht“ (weniger Inhalt auf dem
+                          Sperrbildschirm).
+                        </span>
+                      </span>
+                    </label>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {tab === "security" && (
+            <div className="space-y-4">
+              <div>
+                <label
+                  className="mb-2 block text-sm font-medium"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Sicherheitsstufe (Speicher-Schutz)
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleLevelChange("normal")}
+                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      level === "normal"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                    }`}
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLevelChange("extreme")}
+                    className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                      level === "extreme"
+                        ? "bg-red-600 text-white"
+                        : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
+                    }`}
+                  >
+                    Extrem
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg p-3" style={{ background: "var(--bg-elevated)" }}>
+                {level === "normal" ? (
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    <strong style={{ color: "var(--accent)" }}>Normal:</strong>{" "}
+                    Standard Auto-Lock, moderate Memory-Wipe-Intervalle.
+                  </p>
+                ) : (
+                  <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+                    <strong style={{ color: "#ef4444" }}>Extrem:</strong>{" "}
+                    Aggressives Wiping, häufiger Speicher-Zyklen.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={() => void handleImmediateWipe()}
+                  className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                  style={{
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Jetzt sensiblen Arbeitsspeicher wischen
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleResetReplayProtection}
+                  className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                  style={{
+                    background: "var(--bg-elevated)",
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Replay-Schutz zurücksetzen
+                </button>
+              </div>
+
+              <div
+                className="border-t pt-3"
+                style={{ borderColor: "var(--border)" }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  Status
+                </h3>
+                <div className="space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                  <p>Replay-Cache: {replayStats.stored} Einträge</p>
+                  <p>Zeitfenster: {(replayStats.windowMs / 60000).toFixed(0)} Min.</p>
+                </div>
+              </div>
+
+              {level === "extreme" && (
+                <div
+                  className="rounded-lg p-3"
+                  style={{
+                    background: "rgba(127, 29, 29, 0.3)",
+                    border: "1px solid rgba(127, 29, 29, 0.5)",
+                  }}
+                >
+                  <p className="text-xs" style={{ color: "#fca5a5" }}>
+                    Extrem-Modus kann die Performance beeinträchtigen.
+                  </p>
+                </div>
               )}
             </div>
-            <label className="settings-toggle-row mt-3">
-              <input
-                type="checkbox"
-                checked={notificationPreview}
-                disabled={!notificationEnabled}
-                onChange={(e) => onNotificationPreviewChange?.(e.target.checked)}
-                className="settings-toggle-input"
-              />
-              <span className="settings-switch" aria-hidden="true" />
-              <span>
-                Vorschau in Benachrichtigungen anzeigen
-                <span className="mt-0.5 block text-xs" style={{ color: "var(--text-muted)" }}>
-                  Komfort gegen Privatsphaere: Titel und Nachrichtentext koennen im OS sichtbar werden.
-                </span>
-              </span>
-            </label>
-            <p className="mt-2 text-[11px]" style={{ color: "var(--text-muted)" }}>
-              Browser-Status: {notificationPermission}
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-4 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
-          <h3 className="mb-2 text-sm font-medium" style={{ color: "var(--text)" }}>
-            Datensicherung
-          </h3>
-          {myFingerprint && (
-            <p className="mb-3 break-all font-mono text-xs" style={{ color: "var(--accent)" }}>
-              Fingerprint: {myFingerprint}
-            </p>
           )}
-          <button
-            type="button"
-            onClick={onExportBackup}
-            className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
-            style={{
-              background: "var(--accent-soft)",
-              color: "var(--accent)",
-              border: "1px solid var(--border)",
-            }}
-          >
-            Verschlüsseltes Backup herunterladen
-          </button>
-        </div>
 
-        {/* Security Level Toggle */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-            Sicherheitsstufe
-          </label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => handleLevelChange("normal")}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                level === "normal"
-                  ? "bg-emerald-600 text-white"
-                  : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-              }`}
-            >
-              Normal
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLevelChange("extreme")}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                level === "extreme"
-                  ? "bg-red-600 text-white"
-                  : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
-              }`}
-            >
-              Extrem
-            </button>
-          </div>
-        </div>
-
-        {/* Security Level Description */}
-        <div className="mb-4 p-3 rounded-lg" style={{ background: "var(--bg-elevated)" }}>
-          {level === "normal" ? (
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              <strong style={{ color: "var(--accent)" }}>Normal:</strong> Standard
-              Auto-Lock (10 min), moderate Memory-Wiping-Intervalle (30-120s).
-            </p>
-          ) : (
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              <strong style={{ color: "#ef4444" }}>Extrem:</strong> Aggressives
-              Memory-Wiping (15-60s), sofortiges Wiping bei Tab-Wechsel.
-            </p>
+          {tab === "about" && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
+                  VaultChat
+                </p>
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  Version {appVersion} · {import.meta.env.MODE === "production" ? "Production" : "Development"}
+                </p>
+              </div>
+              <ul
+                className="list-inside list-disc space-y-2 text-sm"
+                style={{ color: "var(--text-secondary)" }}
+              >
+                <li>Ende-zu-Ende-Verschlüsselung (Double-Ratchet, libsodium)</li>
+                <li>Sealed Sender für Direktnachrichten</li>
+                <li>TOFU &amp; verifizierbare Sicherheitsnummern</li>
+                <li>Gruppennachrichten E2EE mit verteilten Schlüsseln</li>
+              </ul>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                Server sieht Nachrichteninhalte und DM-Absender nicht. Gruppen-
+                Frames enthalten nur ciphertext. Keine serverseitige
+                Nachrichtenhistorie (RAM-only Demo-Backend).
+              </p>
+            </div>
           )}
         </div>
-
-        {/* Manual Actions */}
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={handleImmediateWipe}
-            className="w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{ 
-              background: "var(--bg-elevated)", 
-              color: "var(--text-secondary)" 
-            }}
-          >
-            Jetzt Memory wischen
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleResetReplayProtection}
-            className="w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors"
-            style={{ 
-              background: "var(--bg-elevated)", 
-              color: "var(--text-secondary)" 
-            }}
-          >
-            Replay-Schutz zuruecksetzen
-          </button>
-        </div>
-
-        {/* Status Info */}
-        <div className="mt-4 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
-          <h3 className="text-sm font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-            Status
-          </h3>
-          <div className="text-xs space-y-1" style={{ color: "var(--text-muted)" }}>
-            <p>Replay-Protection: {replayStats.stored} Nachrichten gespeichert</p>
-            <p>Zeitfenster: {(replayStats.windowMs / 60000).toFixed(0)} Minuten</p>
-          </div>
-        </div>
-
-        {/* Warning for Extreme Mode */}
-        {level === "extreme" && (
-          <div className="mt-4 p-3 rounded-lg" style={{ 
-            background: "rgba(127, 29, 29, 0.3)", 
-            border: "1px solid rgba(127, 29, 29, 0.5)" 
-          }}>
-            <p className="text-xs" style={{ color: "#fca5a5" }}>
-              <strong>Extrem-Modus</strong> kann die Performance beeinträchtigen,
-              da der Speicher häufiger gewiped wird.
-            </p>
-          </div>
-        )}
       </div>
     </div>
   );

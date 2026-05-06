@@ -285,6 +285,9 @@ async function createX3dhPreKeyEnvelopeFromBundle(
   bundle: api.PreKeyBundle,
   options: { forceSignedPreKeyOnly?: boolean; forceClassicalOnly?: boolean } = {}
 ): Promise<{ innerB64: string; state: PersistedDRState; mode: "pqxdh" | "x3dh" }> {
+  if (bundle.identityKey !== peerPublicKeyB64) {
+    throw new Error("identity_bundle_mismatch");
+  }
   const sentAt = nextPreKeyStamp();
   const oneTimePreKey = options.forceSignedPreKeyOnly
     ? null
@@ -422,7 +425,8 @@ export async function drEncryptJsonForDm(
       }
     }
     return { innerB64: x3dh.innerB64, mode: x3dh.mode };
-  } catch {
+  } catch (e) {
+    if (e instanceof Error && e.message === "identity_bundle_mismatch") throw e;
     if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
     const st = await ensureDrSession(myIdentitySk, peerId, peerPublicKeyB64);
     const padded = pad(enc.encode(plainJson));

@@ -46,6 +46,7 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
       const next: ChatMsg & { _reactByUser: Map<string, string> } = {
         id: r.id,
         fromMe: r.fromMe,
+        fromUserId: r.fromUserId,
         plain: p,
         at: r.at,
         expiresAt: r.expiresAt,

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 type MailboxDm = {
   id: string;
   toUserId: string;
+  /** Client-outbox cid — dedupliziert Mailbox-Einträge pro Empfänger. */
   cid?: string;
   envelope: string;
   createdAt: number;
@@ -30,8 +31,14 @@ export function enqueueMailboxDm(input: {
   id?: string;
   cid?: string;
   createdAt?: number;
-}): MailboxDm {
+}): MailboxDm | null {
   const createdAt = input.createdAt ?? Date.now();
+  const list = (dmByRecipient.get(input.toUserId) ?? []).filter(
+    (x) => x.expiresAt > Date.now()
+  );
+  if (input.cid && list.some((x) => x.cid === input.cid)) {
+    return null;
+  }
   const item: MailboxDm = {
     id: input.id ?? randomUUID(),
     toUserId: input.toUserId,
@@ -40,10 +47,6 @@ export function enqueueMailboxDm(input: {
     createdAt,
     expiresAt: createdAt + DEFAULT_TTL_MS,
   };
-  const list = (dmByRecipient.get(input.toUserId) ?? []).filter((x) => {
-    if (x.expiresAt <= Date.now()) return false;
-    return !input.cid || x.cid !== input.cid;
-  });
   list.push(item);
   while (list.length > MAX_PER_RECIPIENT) list.shift();
   dmByRecipient.set(input.toUserId, list);

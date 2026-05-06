@@ -71,13 +71,13 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 
    **Verbesserung (v2)**: Code-Integrity-Pinning mit **passwortgeschütztem Hash** (`codeIntegrityEnhanced.ts`). Der Hash wird mit einem aus dem `secretKey` abgeleiteten Schlüssel verschlüsselt gespeichert und ein Mismatch blockiert Unlock/Session-Start. Einfaches Auslesen von localStorage reicht nicht aus — der Angreifer müsste den Browser-Prozess kontrollieren.
 
-2. **Kein auditiertes libsignal** *(residual)*: Unser Double Ratchet v4 ist konzeptionell korrekt, nutzt libsodium-Primitive (XChaCha20-Poly1305, X25519, BLAKE2b) und bindet Header per AAD. Der Handshake nutzt X3DH/One-Time-PreKeys und optional PQXDH-v1 mit ML-KEM-1024. Er ist dennoch **kein** Drop-in-Ersatz für `libsignal-protocol`; Deniable Signatures und ein formales externes Audit fehlen weiterhin.
+2. **Kein auditiertes libsignal** *(residual)*: Unser Double Ratchet v4 ist konzeptionell korrekt, nutzt libsodium-Primitive (XChaCha20-Poly1305, X25519, BLAKE2b) und bindet Header per AAD. Der Handshake nutzt X3DH/One-Time-PreKeys und optional PQXDH-v1 mit ML-KEM-1024; das Pre-Key-Bundle wird gegen die im Kontakt gespeicherte Identity-PK geprüft (`identity_bundle_mismatch` bei Abweichung). Er ist dennoch **kein** Drop-in-Ersatz für `libsignal-protocol`; Deniable Signatures und ein formales externes Audit fehlen weiterhin.
 
-3. **Metadaten-Leak am Relay** *(stark reduziert)*: Der Server kennt für DMs nur `toUserId`, nicht den Absender. Dadurch kann er nicht mehr trivial die Kommunikationsgraphen rekonstruieren. Residuell bleiben: Zeitkorrelation (Sende-/Empfangszeitpunkte) sowie Gruppenmitgliedschaften (weil der Server Mitglieder routen muss).
+3. **Metadaten-Leak am Relay** *(stark reduziert)*: Der Server kennt für DMs nur `toUserId`, nicht den Absender. Dadurch kann er nicht mehr trivial die Kommunikationsgraphen rekonstruieren. Residuell bleiben: Zeitkorrelation (Sende-/Empfangszeitpunkte) sowie Gruppenmitgliedschaften (weil der Server Mitglieder routen muss). Optionaler **Cover-Traffic** (`coverTraffic.ts`) sendet nach längerer Inaktivität zufällige Dummy-Envelopes; echte DM-/Gruppen-Sends setzen ein Aktivitätsfenster zurück (`markRealActivity`), damit aktive Chats nicht mit Dummies überlagert werden.
 
 4. **MITM bei Erstkontakt** *(stark reduziert)*: TOFU-Pinning detektiert Key-Wechsel automatisch und blockiert weitere DMs, bis der Nutzer verifiziert. Safety-Number-Vergleich bleibt der Goldstandard.
 
-5. **Offline/Neues Gerät** *(teilweise gelöst)*: Sender-Outbox übernimmt Store-and-Forward-Funktion, ohne dass der Server speichert. Ein neues Gerät benötigt weiterhin den Backup-Import für die Identität; neue Backups sind passwortgeschützte Argon2id/Secretbox-Bundles, Legacy-Klartext-JSON wird nur noch für Import-Kompatibilität akzeptiert.
+5. **Offline/Neues Gerät** *(teilweise gelöst)*: Sender-Outbox übernimmt Store-and-Forward-Funktion, ohne dass der Server speichert. Ein neues Gerät benötigt weiterhin den Backup-Import für die Identität. **Export/Import** nutzt ausschließlich das verschlüsselte Backup-Format (v2); Klartext-JSON-Export ist entfernt. Doppelte Outbox-Einträge pro `cid` werden idempotent übersprungen.
 
 6. **Browser-Forensik** *(reduziert)*: Auto-Lock + `memzero` entfernen LDK und SK nach 10 min Inaktivität bzw. manuellem Lock. Root-Zugriff auf ein laufendes, aktives Gerät bleibt außerhalb des Modells.
 
@@ -90,7 +90,8 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 7. **Nachrichten-Replay-Angriffe** *(neu, adressiert)*: Angreifer könnte gültige, bereits zugestellte Nachrichten erneut senden.
 
    **Lösung (v2)**: **Client-seitiger Replay-Schutz** (`replayProtection.ts`):
-   - Message-ID basierte Duplicate-Detection
+   - Message-ID (`cid`) basierte Duplicate-Detection nach erfolgreicher Entschlüsselung (DMs: `decryptIncomingSealedDmWithReplayCheck`, Gruppen: Prüfung pro `groupId` vor Persistenz)
+   - Nur Payloads mit nicht-leerer `cid` werden gegen Replay geprüft (ältere Clients ohne `cid` bleiben bewusst ohne diesen Schutz)
    - 5-Minuten-Zeitfenster mit automatischem Cleanup
    - Gruppenspezifische Sets für isolierte Prüfung
    - Automatisches Reset bei Lock

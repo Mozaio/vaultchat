@@ -38,6 +38,8 @@ export type ApiGroup = {
   id: string;
   name: string;
   memberIds: string[];
+  /** Fehlt bei älteren Servern bis Neustart. */
+  createdByUserId?: string;
   createdAt: number;
 };
 

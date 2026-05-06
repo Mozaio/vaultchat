@@ -172,6 +172,12 @@ export function AuthPanel({
           recoveryEmail: recoveryEmail.trim() || undefined,
         }
       );
+      try {
+        localStorage.setItem("vaultchat.onboarding.pending", "1");
+        localStorage.removeItem("vaultchat.backupReminder.dismissed");
+      } catch {
+        /* ignore */
+      }
       await onSession(session, local);
     } catch (err) {
       setError(humanError(err));

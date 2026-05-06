@@ -117,7 +117,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "12mb" }));
+app.use(express.json({ limit: process.env.VAULTCHAT_JSON_LIMIT ?? "12mb" }));
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -400,12 +400,17 @@ app.post("/api/groups", groupLimiter, async (req, res) => {
       return;
     }
   }
-  const g = createGroup({ name: parsed.data.name, memberIds });
+  const g = createGroup({
+    name: parsed.data.name,
+    memberIds,
+    createdByUserId: jwtUser.userId,
+  });
   res.json({
     group: {
       id: g.id,
       name: g.name,
       memberIds: g.memberIds,
+      createdByUserId: g.createdByUserId,
       createdAt: g.createdAt,
     },
   });
@@ -422,6 +427,7 @@ app.get("/api/groups", async (req, res) => {
     id: g.id,
     name: g.name,
     memberIds: g.memberIds,
+    createdByUserId: g.createdByUserId,
     createdAt: g.createdAt,
   }));
   res.json({ groups: list });
@@ -448,7 +454,13 @@ app.post("/api/groups/:id/members", groupLimiter, async (req, res) => {
     return;
   }
   res.json({
-    group: { id: g.id, name: g.name, memberIds: g.memberIds, createdAt: g.createdAt },
+    group: {
+      id: g.id,
+      name: g.name,
+      memberIds: g.memberIds,
+      createdByUserId: g.createdByUserId,
+      createdAt: g.createdAt,
+    },
   });
 });
 
@@ -467,7 +479,13 @@ app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) =
     return;
   }
   res.json({
-    group: { id: g.id, name: g.name, memberIds: g.memberIds, createdAt: g.createdAt },
+    group: {
+      id: g.id,
+      name: g.name,
+      memberIds: g.memberIds,
+      createdByUserId: g.createdByUserId,
+      createdAt: g.createdAt,
+    },
   });
 });
 
@@ -541,7 +559,7 @@ const PreKeyUploadBody = z.object({
     keyId: z.number(),
     publicKey: z.string(),
     signature: z.string(),
-    signingPublicKey: z.string().optional(),
+    signingPublicKey: z.string().min(1),
   }),
   oneTimePreKeys: z
     .array(z.object({ keyId: z.number(), publicKey: z.string() }))
@@ -561,7 +579,7 @@ function verifySignedPreKey(input: {
   signature: string;
   signingPublicKey?: string;
 }): boolean {
-  if (!input.signingPublicKey) return true; // Legacy clients are allowed but tracked as weaker.
+  if (!input.signingPublicKey) return false;
   try {
     const publicKey = Buffer.from(input.publicKey, "base64");
     const signature = Buffer.from(input.signature, "base64");
@@ -622,7 +640,7 @@ const server = createServer(app);
 const MAX_B64_CIPHERTEXT = Number(
   process.env.VAULTCHAT_MAX_B64_CIPHERTEXT_BYTES ?? 16 * 1024 * 1024
 );
-const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 512 * 1024;
+const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 4 * 1024 * 1024;
 
 const wss = new WebSocketServer({
   server,
@@ -795,9 +813,14 @@ wss.on("connection", (ws, req) => {
       cid: z.string().min(1).max(128),
     });
 
-    const Typing = z.object({
+    const TypingDm = z.object({
       type: z.literal("typing"),
       toUserId: z.string().uuid(),
+      state: z.enum(["start", "stop"]),
+    });
+    const TypingGroup = z.object({
+      type: z.literal("typing"),
+      groupId: z.string().uuid(),
       state: z.enum(["start", "stop"]),
     });
 
@@ -836,7 +859,9 @@ wss.on("connection", (ws, req) => {
       id: z.string().uuid(),
     });
 
-    const parsed = z.union([Dm, Typing, Group, Rtc, Ping, MailboxAck]).safeParse(msg);
+    const parsed = z
+      .union([Dm, TypingDm, TypingGroup, Group, Rtc, Ping, MailboxAck])
+      .safeParse(msg);
     if (!parsed.success) return;
 
     if (parsed.data.type === "ping") {
@@ -851,11 +876,25 @@ wss.on("connection", (ws, req) => {
     }
 
     if (parsed.data.type === "typing") {
-      sendToUser(parsed.data.toUserId, {
-        type: "typing",
-        fromUserId: jwtUser!.userId,
-        state: parsed.data.state,
-      });
+      if ("toUserId" in parsed.data) {
+        sendToUser(parsed.data.toUserId, {
+          type: "typing",
+          fromUserId: jwtUser!.userId,
+          state: parsed.data.state,
+        });
+      } else {
+        const g = getGroup(parsed.data.groupId);
+        if (!g || !g.memberIds.includes(jwtUser!.userId)) return;
+        for (const mid of g.memberIds) {
+          if (mid === jwtUser!.userId) continue;
+          sendToUser(mid, {
+            type: "typing",
+            groupId: parsed.data.groupId,
+            fromUserId: jwtUser!.userId,
+            state: parsed.data.state,
+          });
+        }
+      }
       return;
     }
 

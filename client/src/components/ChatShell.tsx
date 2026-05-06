@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Session } from "../lib/sessionHelpers";
 import * as api from "../lib/api";
-import { decryptIncomingSealedDm } from "../lib/incomingDm";
+import { decryptIncomingSealedDmWithReplayCheck } from "../lib/incomingDm";
 import { drEncryptJsonForDm } from "../lib/drSession";
 import { getWsUrl } from "../lib/wsUrl";
 import {
@@ -12,7 +12,6 @@ import { base64FromUint8, uint8FromBase64 } from "../lib/b64";
 import {
   idbDeleteDm,
   idbDeleteGroupMsg,
-  idbListAllDm,
   idbListDm,
   idbListGroup,
   idbPutDm,
@@ -24,6 +23,7 @@ import {
 import {
   decryptGroupPayload,
   encryptGroupPayload,
+  getGroupKeyState,
   initGroupKeyState,
   randomGroupKey,
   setGroupKey,
@@ -39,9 +39,9 @@ import {
   outboxAttempt,
 } from "../lib/outbox";
 import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
+import { isGroupMessageDuplicate } from "../lib/replayProtection";
 import {
   generateKeyMaterial,
-  ensurePostQuantumKem,
   loadKeyMaterial,
   replenishOneTimePreKeys,
   saveKeyMaterial,
@@ -49,9 +49,9 @@ import {
 } from "../lib/keyStore";
 import { encryptIdentityBackup } from "../lib/backup";
 import { loadLocalIdentity } from "../lib/localIdentity";
+import { previewForPayload } from "../lib/messagePreview";
 import {
   MessageBubble,
-  previewForPayload,
   type ChatMsg,
 } from "./MessageBubble";
 import {
@@ -65,13 +65,25 @@ import { ThemeToggle } from "./ThemeToggle";
 import { useShortcuts } from "../lib/shortcuts";
 import { SearchPanel } from "./SearchPanel";
 import { AddContactModal } from "./AddContactModal";
-import { SecuritySettings } from "./SecuritySettings";
-import { ChatEmptyState } from "./ChatEmptyState";
 import {
-  IconAlertTriangle,
+  SecuritySettings,
+  NOTIFY_PREVIEW_STORAGE_KEY,
+  NOTIFY_STORAGE_KEY,
+} from "./SecuritySettings";
+import { ChatEmptyState } from "./ChatEmptyState";
+import { EmojiPicker } from "./EmojiPicker";
+import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
+import { ToastRegion } from "./ToastRegion";
+import { pushToast } from "../lib/toastBus";
+import {
+  IconArrowDown,
+  IconBan,
   IconBell,
-  IconCheck,
+  IconBookmark,
+  IconCopy,
   IconFileText,
+  IconForward,
+  IconImage,
   IconInfo,
   IconLock,
   IconMic,
@@ -86,30 +98,16 @@ import {
   IconShield,
   IconShieldCheck,
   IconSmile,
+  IconStar,
   IconUsers,
+  IconVolumeMute,
+  IconWifiOff,
+  IconX,
 } from "./Icons";
 
 type Tab = "dm" | "group";
-type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread";
+type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread" | "star";
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
-const EMOJI_CHOICES = ["😀", "😂", "😍", "👍", "🔥", "🎉", "😮", "😢", "🙏", "✅"];
-
-type PendingGroupFrame = {
-  id: string;
-  groupId: string;
-  ciphertext: string;
-  createdAt: number;
-  mailbox?: boolean;
-};
-
-type PendingDmFrame = {
-  id: string;
-  cid?: string;
-  envelope: string;
-  createdAt: number;
-  mailbox?: boolean;
-};
-
 type SharedMediaItem = {
   id: string;
   kind: "file" | "voice";
@@ -117,27 +115,6 @@ type SharedMediaItem = {
   href: string;
   at: number;
 };
-
-function SidebarEmptyState({
-  title,
-  body,
-  action,
-}: {
-  title: string;
-  body: string;
-  action?: ReactNode;
-}) {
-  return (
-    <div className="sidebar-empty-state">
-      <div className="sidebar-empty-icon">
-        <IconUsers size={18} />
-      </div>
-      <p>{title}</p>
-      <span>{body}</span>
-      {action}
-    </div>
-  );
-}
 
 function loadStringSet(key: string): Set<string> {
   try {
@@ -151,6 +128,14 @@ function loadStringSet(key: string): Set<string> {
 
 function saveStringSet(key: string, value: Set<string>) {
   localStorage.setItem(key, JSON.stringify(Array.from(value)));
+}
+
+function isBackupReminderDismissed(): boolean {
+  try {
+    return localStorage.getItem("vaultchat.backupReminder.dismissed") === "1";
+  } catch {
+    return true;
+  }
 }
 
 type ReplyTarget = {
@@ -176,6 +161,29 @@ function newCid(): string {
   );
 }
 
+/** Weiterleitung als neuer DM-Frame (nur Text/Datei). */
+function buildForwardPayloadForSend(
+  m: ChatMsg,
+  sessionUserId: string,
+  dmPeerId: string | null
+): PlainPayload | null {
+  const p = m.plain;
+  if (p.kind !== "text" && p.kind !== "file") return null;
+  const origin = m.fromMe
+    ? sessionUserId
+    : (m.fromUserId ?? dmPeerId ?? "");
+  return {
+    v: 2,
+    cid: newCid(),
+    kind: p.kind,
+    body: p.body,
+    ...(p.kind === "file"
+      ? { fileName: p.fileName, mime: p.mime, fileSize: p.fileSize }
+      : {}),
+    ...(origin ? { forwardedFromUserId: origin } : {}),
+  };
+}
+
 /** Discord-like deterministic avatar color from user ID */
 function userColor(userId: string): string {
   const colors = [
@@ -195,34 +203,6 @@ function userGradient(userId: string): string {
   const base = userColor(userId);
   // Create a slightly darker variant for gradient
   return `linear-gradient(135deg, ${base} 0%, ${base}dd 100%)`;
-}
-
-function humanDmSendError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (msg === "prekey_bundle_unavailable" || msg === "x3dh_required") {
-    return "Sicherer X3DH-Schluesselaustausch fehlgeschlagen. Der Kontakt muss einmal online sein oder seine PreKeys neu hochladen.";
-  }
-  if (msg === "prekey_recovery_unavailable") {
-    return "Erste Nachricht noch nicht gesendet: sicherer PreKey-Recovery-Pfad des Kontakts ist noch nicht bereit. Bitte in ein paar Sekunden erneut senden.";
-  }
-  if (msg === "missing_ratchet_session") {
-    return "Keine sichere Ratchet-Session gefunden. Starte den Chat neu, sobald der Kontakt PreKeys verfuegbar hat.";
-  }
-  return msg;
-}
-
-function maxE2eFileBytes(): number {
-  const e2eMaxB64 = 128 * 1024 * 1024;
-  return Math.floor(e2eMaxB64 / 1.5);
-}
-
-async function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 /** WhatsApp/Telegram style date separator label */
@@ -262,8 +242,17 @@ export function ChatShell({
   const [groupMessages, setGroupMessages] = useState<ChatMsg[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const [preKeyReady, setPreKeyReady] = useState(false);
+  const [hasEverConnected, setHasEverConnected] = useState(false);
+  const [wsHadError, setWsHadError] = useState(false);
+  const [backupReminderVisible, setBackupReminderVisible] = useState(
+    () => !isBackupReminderDismissed()
+  );
+  const [onboardingOpen, setOnboardingOpen] = useState(readOnboardingPending);
   const [typing, setTyping] = useState(false);
+  /** groupId → User-IDs die gerade tippen */
+  const [groupTypingMap, setGroupTypingMap] = useState<
+    Map<string, Set<string>>
+  >(() => new Map());
   const [myFp, setMyFp] = useState<string | null>(null);
   const [peerFp, setPeerFp] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
@@ -279,24 +268,25 @@ export function ChatShell({
   const [showAddContact, setShowAddContact] = useState(false);
   // Notification settings per chat
   const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
-  const [mutedGroups, setMutedGroups] = useState<Set<string>>(new Set());
+  const [mutedGroups, setMutedGroups] = useState<Set<string>>(() =>
+    loadStringSet("vaultchat.muted.groups")
+  );
   const [favoritePeers, setFavoritePeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.favorites.peers")
   );
   const [blockedPeers, setBlockedPeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.blocked.peers")
   );
+  // Online status tracking
+  const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
   const [ttlGroup, setTtlGroup] = useState<number>(0);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [peerPin, setPeerPin] = useState<PeerPin | null>(null);
-  const [relayOnly, setRelayOnly] = useState(
-    () => localStorage.getItem("vaultchat.privacy.relayOnly") === "on"
-  );
+  const [relayOnly, setRelayOnly] = useState(false);
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
-  const [groupVoiceOpen, setGroupVoiceOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
@@ -304,9 +294,36 @@ export function ChatShell({
   const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>("all");
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [groupEmojiOpen, setGroupEmojiOpen] = useState(false);
+  const [groupDragOver, setGroupDragOver] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionStart, setMentionStart] = useState<number>(-1);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [jumpHighlightCid, setJumpHighlightCid] = useState<string | null>(null);
+  const [forwardTarget, setForwardTarget] = useState<ChatMsg | null>(null);
+  const [forwardPick, setForwardPick] = useState<Set<string>>(() => new Set());
+  const [starredCids, setStarredCids] = useState<Set<string>>(
+    () => loadStringSet("vaultchat.starred.cids")
+  );
+  const [pinnedPeers, setPinnedPeers] = useState<Set<string>>(
+    () => loadStringSet("vaultchat.pinned.peers")
+  );
+  const [pinnedMessageByPeer, setPinnedMessageByPeer] = useState<
+    Record<string, string>
+  >(() => {
+    try {
+      const raw = localStorage.getItem("vaultchat.pinned.messages");
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  });
   const [searchOpen, setSearchOpen] = useState(false);
   const [newDmMessageWaiting, setNewDmMessageWaiting] = useState(false);
   const [newGroupMessageWaiting, setNewGroupMessageWaiting] = useState(false);
+  const [dmScrollUnread, setDmScrollUnread] = useState(0);
+  const [groupScrollUnread, setGroupScrollUnread] = useState(0);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -314,22 +331,11 @@ export function ChatShell({
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sendTypingIndicators, setSendTypingIndicators] = useState(
-    () => localStorage.getItem("vaultchat.privacy.typing") === "on"
+    () => localStorage.getItem("vaultchat.privacy.typing") !== "off"
   );
   const [sendReadReceipts, setSendReadReceipts] = useState(
-    () => localStorage.getItem("vaultchat.privacy.receipts") === "on"
+    () => localStorage.getItem("vaultchat.privacy.receipts") !== "off"
   );
-  const [notificationEnabled, setNotificationEnabled] = useState(
-    () => localStorage.getItem("vaultchat.privacy.notifications") === "on"
-  );
-  const [notificationPreview, setNotificationPreview] = useState(
-    () => localStorage.getItem("vaultchat.privacy.notificationPreview") === "on"
-  );
-  const [notificationPermission, setNotificationPermission] = useState(
-    () => (typeof Notification === "undefined" ? "unsupported" : Notification.permission)
-  );
-  const [serverStatus, setServerStatus] = useState<api.ServerStatus | null>(null);
-  const [serverStatusError, setServerStatusError] = useState<string | null>(null);
 
   const callRef = useRef<{
     close: () => void;
@@ -339,8 +345,6 @@ export function ChatShell({
   const pendingRtcRef = useRef<Map<string, RtcPayload[]>>(new Map());
 
   const wsRef = useRef<WebSocket | null>(null);
-  const wsAuthenticatedRef = useRef(false);
-  const preKeyReadyRef = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttempts = useRef(0);
   const peerRef = useRef<api.ApiUser | null>(null);
@@ -348,9 +352,10 @@ export function ChatShell({
   const usersRef = useRef<api.ApiUser[]>([]);
   const groupsRef = useRef<api.ApiGroup[]>([]);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const groupTypingClearTimers = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map());
   const seen = useRef(new Set<string>());
-  const pendingDmFramesRef = useRef<PendingDmFrame[]>([]);
-  const pendingGroupFramesRef = useRef<PendingGroupFrame[]>([]);
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
   const dmInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -370,24 +375,43 @@ export function ChatShell({
   usersRef.current = users;
   groupsRef.current = groups;
   tokenRef.current = session.token;
-  preKeyReadyRef.current = preKeyReady;
+
+  useEffect(() => {
+    if (forwardTarget) setForwardPick(new Set());
+  }, [forwardTarget]);
 
   useShortcuts({
     onSearch: () => setSearchOpen(true),
     onEscape: () => {
       setSearchOpen(false);
       setEmojiOpen(false);
+      setGroupEmojiOpen(false);
       setSafetyOpen(false);
       setInfoOpen(false);
       setGroupPanelOpen(false);
       setDmMenuOpen(false);
       setGroupMenuOpen(false);
       setUserMenuOpen(false);
+      setForwardTarget(null);
+      setForwardPick(new Set());
+      setMentionOpen(false);
     },
     onLock: () => onLock(),
+    onSend: () => {
+      if (tab === "dm" && peer && text.trim()) {
+        void sendDmText();
+        return true;
+      }
+      if (tab === "group" && group && groupText.trim()) {
+        void sendGroupText();
+        return true;
+      }
+      return false;
+    },
   });
 
   const voice = useVoiceRecorder();
+  const groupVoice = useVoiceRecorder();
 
   useEffect(() => {
     const mq = window.matchMedia?.("(max-width: 768px)");
@@ -399,31 +423,6 @@ export function ChatShell({
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const [status, rtc] = await Promise.all([
-          api.serverStatus(session.token),
-          api.getRtcConfig(session.token),
-        ]);
-        if (cancelled) return;
-        setServerStatus(status);
-        setServerStatusError(null);
-        if (rtc.forceRelay) {
-          setRelayOnly(true);
-          localStorage.setItem("vaultchat.privacy.relayOnly", "on");
-        }
-      } catch (err) {
-        if (cancelled) return;
-        setServerStatusError(err instanceof Error ? err.message : "server_status_unavailable");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [session.token]);
-
-  useEffect(() => {
     if (!incomingOffer) return;
     const t = window.setTimeout(() => {
       setIncomingOffer(null);
@@ -433,18 +432,31 @@ export function ChatShell({
   }, [incomingOffer]);
 
   const maybeNotify = useCallback((title: string, body: string) => {
-    if (!notificationEnabled) return;
+    try {
+      if (localStorage.getItem(NOTIFY_STORAGE_KEY) === "off") return;
+    } catch {
+      /* ignore */
+    }
+    let showPreview = true;
+    try {
+      showPreview = localStorage.getItem(NOTIFY_PREVIEW_STORAGE_KEY) !== "off";
+    } catch {
+      /* ignore */
+    }
+    const displayBody = showPreview ? body : "Neue Nachricht";
     if (!("Notification" in window) || document.visibilityState === "visible") return;
-    if (Notification.permission !== "granted") return;
-    if (notificationPreview) {
-      new Notification(title, { body, tag: "vaultchat-message" });
-    } else {
-      new Notification("VaultChat", {
-        body: "Neue verschluesselte Nachricht",
-        tag: "vaultchat-message",
+    if (Notification.permission === "granted") {
+      new Notification(title, { body: displayBody, tag: "vaultchat-message" });
+      return;
+    }
+    if (Notification.permission === "default") {
+      void Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(title, { body: displayBody, tag: "vaultchat-message" });
+        }
       });
     }
-  }, [notificationEnabled, notificationPreview]);
+  }, []);
 
   const showConversation = tab === "dm" ? Boolean(peer) : Boolean(group);
   const showSidebar = !isMobile || !showConversation;
@@ -493,31 +505,11 @@ export function ChatShell({
 
   // Load only contacts from local messages (not from server)
   const loadContacts = useCallback(async () => {
-    const allRows = await idbListAllDm();
-    const byPeer = new Map<string, ReturnType<typeof authoredFromDm>>();
-    for (const row of allRows) {
-      const arr = byPeer.get(row.peerId) ?? [];
-      arr.push({
-        id: row.id,
-        fromMe: row.fromMe,
-        plainJson: row.plainJson,
-        at: row.at,
-        ...(row.expiresAt ? { expiresAt: row.expiresAt } : {}),
-      });
-      byPeer.set(row.peerId, arr);
-    }
-    for (const [peerId, rows] of byPeer) {
-      rawDmRef.current.set(peerId, rows.sort((a, b) => a.at - b.at));
-    }
-    const contactIds = Array.from(byPeer.keys());
-    if (contactIds.length === 0) return;
+    // Only show contacts we've exchanged messages with (from local storage)
+    const contactIds = Array.from(rawDmRef.current.keys());
     const { users: list } = await api.listUsers(session.token, contactIds);
     const contacts = list.filter((u) => contactIds.includes(u.id));
-    setUsers((prev) => {
-      const byId = new Map(prev.map((u) => [u.id, u]));
-      for (const u of contacts) byId.set(u.id, u);
-      return Array.from(byId.values());
-    });
+    setUsers(contacts);
     
     // Also observe peer keys for contacts
     for (const u of contacts) {
@@ -532,18 +524,7 @@ export function ChatShell({
   const loadGroups = useCallback(async () => {
     const { groups: g } = await api.listGroups(session.token);
     setGroups(g);
-    const memberIds = Array.from(new Set(g.flatMap((x) => x.memberIds))).filter(
-      (id) => id !== session.user.id
-    );
-    if (memberIds.length > 0) {
-      const { users: members } = await api.listUsers(session.token, memberIds);
-      setUsers((prev) => {
-        const byId = new Map(prev.map((u) => [u.id, u]));
-        for (const member of members) byId.set(member.id, member);
-        return Array.from(byId.values());
-      });
-    }
-  }, [session.token, session.user.id]);
+  }, [session.token]);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -563,18 +544,11 @@ export function ChatShell({
 
   /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
   useEffect(() => {
-    let cancelled = false;
-    setPreKeyReady(false);
     void (async () => {
       try {
         let km = await loadKeyMaterial();
         if (!km) {
           km = await generateKeyMaterial(session.secretKey);
-          await saveKeyMaterial(km);
-        }
-        const withPqKem = await ensurePostQuantumKem(km);
-        if (withPqKem !== km) {
-          km = withPqKem;
           await saveKeyMaterial(km);
         }
         const replenished = await replenishOneTimePreKeys(km);
@@ -583,16 +557,11 @@ export function ChatShell({
           await saveKeyMaterial(km);
         }
         await api.uploadPreKeys(session.token, toUploadBody(km));
-        if (!cancelled) setPreKeyReady(true);
       } catch (e) {
-        if (!cancelled) setPreKeyReady(false);
         // eslint-disable-next-line no-console
         console.error("[vaultchat] prekey upload", e);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [session.token, session.secretKey]);
 
   useEffect(() => {
@@ -706,16 +675,16 @@ export function ChatShell({
     if (!el) return;
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     if (isNearBottom) {
-      // Smooth scroll to bottom with animation
       el.scrollTo({
         top: el.scrollHeight,
         behavior: 'smooth'
       });
       setDmScrolledUp(false);
+      setDmScrollUnread(0);
     } else {
-      // User has scrolled up - show indicator
       setDmScrolledUp(true);
       setNewDmMessageWaiting(true);
+      setDmScrollUnread((c) => c + 1);
     }
   }, [messages]);
 
@@ -730,11 +699,21 @@ export function ChatShell({
         behavior: 'smooth'
       });
       setGroupScrolledUp(false);
+      setGroupScrollUnread(0);
     } else {
       setGroupScrolledUp(true);
       setNewGroupMessageWaiting(true);
+      setGroupScrollUnread((c) => c + 1);
     }
   }, [groupMessages]);
+
+  // Reset unread counters when chat changes
+  useEffect(() => {
+    setDmScrollUnread(0);
+  }, [peer?.id]);
+  useEffect(() => {
+    setGroupScrollUnread(0);
+  }, [group?.id]);
 
   // Scroll event handler für DM
   const handleDmScroll = useCallback(() => {
@@ -744,6 +723,7 @@ export function ChatShell({
     setDmScrolledUp(!isNearBottom);
     if (isNearBottom) {
       setNewDmMessageWaiting(false);
+      setDmScrollUnread(0);
     }
   }, []);
 
@@ -755,6 +735,7 @@ export function ChatShell({
     setGroupScrolledUp(!isNearBottom);
     if (isNearBottom) {
       setNewGroupMessageWaiting(false);
+      setGroupScrollUnread(0);
     }
   }, []);
 
@@ -767,14 +748,7 @@ export function ChatShell({
   }, []);
 
   const sendRtc = useCallback((toUserId: string, payload: RtcPayload) => {
-    if (!wsAuthenticatedRef.current) return;
     wsRef.current?.send(JSON.stringify({ type: "rtc", toUserId, payload }));
-  }, []);
-
-  const ackMailboxFrame = useCallback((kind: "dm" | "group", id: string) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthenticatedRef.current) return;
-    ws.send(JSON.stringify({ type: "mailbox_ack", kind, id }));
   }, []);
 
   /**
@@ -786,44 +760,19 @@ export function ChatShell({
     async (
       toUser: api.ApiUser,
       payload: PlainPayload,
-      suppressLocal = false,
-      options: { forceRecovery?: boolean } = {}
+      suppressLocal = false
     ): Promise<string | null> => {
-      if (!preKeyReadyRef.current) {
-        setError("Sichere Schluessel werden vorbereitet. Bitte in ein paar Sekunden erneut senden.");
-        return null;
-      }
       if (blockedPeers.has(toUser.id)) {
         setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
         return null;
       }
-      const existingLocalFrames = rawDmRef.current.get(toUser.id) ?? [];
-      const hasPeerContent = existingLocalFrames.some((row) => {
-        if (row.fromMe) return false;
-        try {
-          const plain = JSON.parse(row.plainJson) as PlainPayload;
-          return plain.kind !== "receipt";
-        } catch {
-          return false;
-        }
-      });
-      const requireRecovery =
-        Boolean(options.forceRecovery) ||
-        (!suppressLocal && !hasPeerContent);
-      let encrypted: Awaited<ReturnType<typeof drEncryptJsonForDm>>;
-      try {
-        encrypted = await drEncryptJsonForDm(
-          session.secretKey,
-          toUser.id,
-          toUser.publicKey,
-          JSON.stringify(payload),
-          tokenRef.current,
-          { requireRecovery }
-        );
-      } catch (err) {
-        setError(humanDmSendError(err));
-        return null;
-      }
+      const encrypted = await drEncryptJsonForDm(
+        session.secretKey,
+        toUser.id,
+        toUser.publicKey,
+        JSON.stringify(payload),
+        tokenRef.current
+      );
       const envelope = await sealSender(
         session.user.id,
         encrypted.innerB64,
@@ -832,7 +781,7 @@ export function ChatShell({
       if (encrypted.mode === "legacy") {
         setError("Legacy-DH-Fallback genutzt: Prekey-Bundle des Kontakts nicht verfügbar.");
       }
-      const cid = payload.cid || newCid();
+      const cid = newCid();
 
       const at = Date.now();
       const tmpId = `local-${newCid()}`;
@@ -858,58 +807,78 @@ export function ChatShell({
         if (peerRef.current?.id === toUser.id) rebuildDm(toUser.id);
       }
 
-      const ackMode = payload.kind === "receipt" ? "transport" : "e2e";
-      await outboxAdd(cid, toUser.id, envelope, { ackMode });
+      await outboxAdd(cid, toUser.id, envelope);
       await refreshPendingCount();
 
       const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN && wsAuthenticatedRef.current) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(
           JSON.stringify({ type: "dm", toUserId: toUser.id, envelope, cid })
         );
       }
+      coverRef.current?.markRealActivity();
       return tmpId;
     },
     [session.secretKey, session.user.id, rebuildDm, refreshPendingCount, blockedPeers]
   );
 
+  const commitForward = useCallback(async () => {
+    const src = forwardTarget;
+    if (!src) return;
+    const dmPeerId = tab === "dm" && peer ? peer.id : null;
+    if (forwardPick.size === 0) {
+      setError("Bitte mindestens einen Kontakt auswählen.");
+      return;
+    }
+    if (src.plain.kind !== "text" && src.plain.kind !== "file") {
+      setError("Nur Text und Dateien können weitergeleitet werden.");
+      setForwardTarget(null);
+      setForwardPick(new Set());
+      return;
+    }
+    setError(null);
+    let sent = 0;
+    for (const uid of forwardPick) {
+      const u = usersRef.current.find((x) => x.id === uid);
+      if (!u || blockedPeers.has(u.id)) continue;
+      const payload = buildForwardPayloadForSend(src, session.user.id, dmPeerId);
+      if (payload) {
+        await sendDmWire(u, payload);
+        sent += 1;
+      }
+    }
+    if (sent > 0) {
+      pushToast(
+        sent === 1 ? "Nachricht weitergeleitet" : `Weitergeleitet an ${sent} Kontakte`,
+        "success"
+      );
+    }
+    setForwardTarget(null);
+    setForwardPick(new Set());
+  }, [
+    forwardTarget,
+    forwardPick,
+    tab,
+    peer,
+    session.user.id,
+    sendDmWire,
+    blockedPeers,
+  ]);
+
   const sendGroupWire = useCallback(
-    async (g: api.ApiGroup, payload: PlainPayload, suppressLocal = false) => {
+    async (
+      g: api.ApiGroup,
+      payload: PlainPayload,
+      suppressLocal = false,
+      quiet = false
+    ) => {
       const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthenticatedRef.current) {
-        setError("Keine Verbindung.");
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        if (!quiet) setError("Keine Verbindung.");
         return null;
       }
       const p: PlainPayload = { ...payload, senderUserId: session.user.id };
-      let ciphertext = "";
-      let repairedKey = false;
-      for (;;) {
-        try {
-          ciphertext = await encryptGroupPayload(g.id, p);
-          break;
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          if (
-            !repairedKey &&
-            (message === "no_group_key" ||
-              message === "no_group_state" ||
-              message === "no_sender_state")
-          ) {
-            repairedKey = true;
-            await rotateGroupKey(g, g.memberIds);
-            continue;
-          }
-          if (message === "no_group_key" || message === "no_group_state" || message === "no_sender_state") {
-            setError(
-              "Gruppenschluessel fehlt auf diesem Geraet. Oeffne die Gruppe neu oder lasse dich erneut hinzufuegen."
-            );
-            void loadGroups().catch(() => {});
-            return null;
-          }
-          setError("Gruppennachricht konnte nicht verschluesselt werden.");
-          return null;
-        }
-      }
+      const ciphertext = await encryptGroupPayload(g.id, p);
       const at = Date.now();
       const tmpId = `local-g-${newCid()}`;
       const ttl = p.ttlMs ?? 0;
@@ -935,282 +904,16 @@ export function ChatShell({
         if (groupRef.current?.id === g.id) rebuildGroup(g.id);
       }
       ws.send(JSON.stringify({ type: "group", groupId: g.id, ciphertext }));
+      coverRef.current?.markRealActivity();
       return tmpId;
     },
-    [loadGroups, rebuildGroup, session.user.id]
+    [rebuildGroup, session.user.id]
   );
-
-  const handleIncomingGroupFrame = useCallback(
-    async (frame: PendingGroupFrame, allowQueue = true) => {
-      const seenKey = `seen:frame:${frame.id}`;
-      const wasPersisted = await metaGet(seenKey).catch(() => null);
-      if (seen.current.has(frame.id) || wasPersisted) {
-        if (frame.mailbox) ackMailboxFrame("group", frame.id);
-        return true;
-      }
-      let plain: PlainPayload;
-      try {
-        plain = await decryptGroupPayload(frame.groupId, frame.ciphertext);
-      } catch {
-        if (allowQueue) {
-          pendingGroupFramesRef.current = [
-            ...pendingGroupFramesRef.current.filter((x) => x.id !== frame.id),
-            frame,
-          ].slice(-100);
-        }
-        return false;
-      }
-      const fromUserId = plain.senderUserId ?? "";
-      const ttl = plain.ttlMs ?? 0;
-      await idbPutGroupMsg({
-        id: frame.id,
-        groupId: frame.groupId,
-        fromUserId,
-        plainJson: JSON.stringify(plain),
-        at: frame.createdAt,
-        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
-      });
-      seen.current.add(frame.id);
-      await metaSet(seenKey, "1").catch(() => {});
-      const arr = rawGroupRef.current.get(frame.groupId) ?? [];
-      arr.push({
-        id: frame.id,
-        fromMe: fromUserId === session.user.id,
-        fromUserId,
-        plainJson: JSON.stringify(plain),
-        at: frame.createdAt,
-        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
-      });
-      rawGroupRef.current.set(frame.groupId, arr);
-      if (!groupsRef.current.some((x) => x.id === frame.groupId)) {
-        void loadGroups().catch(() => {});
-      }
-      if (groupRef.current?.id === frame.groupId) rebuildGroup(frame.groupId);
-      if (groupRef.current?.id !== frame.groupId && !mutedGroups.has(frame.groupId)) {
-        const groupName = groupsRef.current.find((x) => x.id === frame.groupId)?.name ?? "Gruppe";
-        maybeNotify(groupName, previewForPayload(plain));
-      }
-      if (frame.mailbox) ackMailboxFrame("group", frame.id);
-      return true;
-    },
-    [ackMailboxFrame, loadGroups, maybeNotify, mutedGroups, rebuildGroup, session.user.id]
-  );
-
-  const retryPendingGroupFrames = useCallback(
-    async (groupId?: string) => {
-      const pending = pendingGroupFramesRef.current;
-      if (pending.length === 0) return;
-      const stillPending: PendingGroupFrame[] = [];
-      for (const frame of pending) {
-        if (groupId && frame.groupId !== groupId) {
-          stillPending.push(frame);
-          continue;
-        }
-        const handled = await handleIncomingGroupFrame(frame, false);
-        if (!handled && !seen.current.has(frame.id)) stillPending.push(frame);
-      }
-      pendingGroupFramesRef.current = stillPending;
-    },
-    [handleIncomingGroupFrame]
-  );
-
-  const handleIncomingDmFrame = useCallback(
-    async (frame: PendingDmFrame, allowQueue = true) => {
-      const seenKey = `seen:frame:${frame.id}`;
-      const cidSeenKey = frame.cid ? `seen:dmcid:${frame.cid}` : null;
-      const wasPersisted = await metaGet(seenKey).catch(() => null);
-      const cidWasPersisted = cidSeenKey
-        ? await metaGet(cidSeenKey).catch(() => null)
-        : null;
-      if (seen.current.has(frame.id) || wasPersisted) {
-        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
-        return true;
-      }
-      if (cidSeenKey && (seen.current.has(cidSeenKey) || cidWasPersisted)) {
-        if (
-          typeof cidWasPersisted === "string" &&
-          cidWasPersisted !== "1" &&
-          frame.cid &&
-          !blockedPeers.has(cidWasPersisted)
-        ) {
-          const sender = await resolveUser(cidWasPersisted);
-          if (sender) {
-            const receipt: PlainPayload = {
-              v: 2,
-              cid: newCid(),
-              kind: "receipt",
-              receiptKind: "delivered",
-              refCid: frame.cid,
-            };
-            void sendDmWire(sender, receipt, true);
-          }
-        }
-        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
-        return true;
-      }
-      const dec = await decryptIncomingSealedDm(
-        frame.envelope,
-        session,
-        resolveUser,
-        { receivedAt: frame.createdAt }
-      );
-      if (!dec) {
-        if (allowQueue) {
-          pendingDmFramesRef.current = [
-            ...pendingDmFramesRef.current.filter((x) => x.id !== frame.id),
-            frame,
-          ].slice(-100);
-        }
-        return false;
-      }
-      if (blockedPeers.has(dec.senderUserId)) {
-        seen.current.add(frame.id);
-        if (cidSeenKey) seen.current.add(cidSeenKey);
-        await metaSet(seenKey, "1").catch(() => {});
-        if (cidSeenKey) await metaSet(cidSeenKey, dec.senderUserId).catch(() => {});
-        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
-        return true;
-      }
-      const peerUser =
-        usersRef.current.find((u) => u.id === dec.senderUserId) ??
-        (await resolveUser(dec.senderUserId));
-      if (!peerUser) {
-        if (allowQueue) {
-          pendingDmFramesRef.current = [
-            ...pendingDmFramesRef.current.filter((x) => x.id !== frame.id),
-            frame,
-          ].slice(-100);
-        }
-        return false;
-      }
-      const plain = dec.plain;
-      if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
-        const keyBytes = uint8FromBase64(plain.keyB64);
-        await setGroupKey(plain.groupId, keyBytes);
-        await loadGroups();
-        const groupMembers =
-          groupsRef.current.find((x) => x.id === plain.groupId)?.memberIds ??
-          usersRef.current.map((u) => u.id);
-        await initGroupKeyState(
-          plain.groupId,
-          groupMembers,
-          session.user.id,
-          session.secretKey,
-          keyBytes
-        );
-        await retryPendingGroupFrames(plain.groupId);
-        seen.current.add(frame.id);
-        if (cidSeenKey) seen.current.add(cidSeenKey);
-        await metaSet(seenKey, "1").catch(() => {});
-        if (cidSeenKey) await metaSet(cidSeenKey, dec.senderUserId).catch(() => {});
-        if (plain.cid) {
-          const receipt: PlainPayload = {
-            v: 2,
-            cid: newCid(),
-            kind: "receipt",
-            receiptKind: "delivered",
-            refCid: plain.cid,
-          };
-          void sendDmWire(peerUser, receipt, true);
-        }
-        if (frame.mailbox) ackMailboxFrame("dm", frame.id);
-        return true;
-      }
-
-      const ttl = plain.ttlMs ?? 0;
-      await idbPutDm({
-        id: frame.id,
-        peerId: peerUser.id,
-        fromMe: false,
-        plainJson: JSON.stringify(plain),
-        at: frame.createdAt,
-        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
-      });
-      seen.current.add(frame.id);
-      if (cidSeenKey) seen.current.add(cidSeenKey);
-      await metaSet(seenKey, "1").catch(() => {});
-      if (cidSeenKey) await metaSet(cidSeenKey, dec.senderUserId).catch(() => {});
-      const arr = rawDmRef.current.get(peerUser.id) ?? [];
-      arr.push({
-        id: frame.id,
-        fromMe: false,
-        plainJson: JSON.stringify(plain),
-        at: frame.createdAt,
-        ...(ttl ? { expiresAt: frame.createdAt + ttl } : {}),
-      });
-      rawDmRef.current.set(peerUser.id, arr);
-      if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
-
-      if (peerRef.current?.id !== peerUser.id) {
-        if (!mutedPeers.has(peerUser.id)) {
-          maybeNotify(peerUser.username, previewForPayload(plain));
-        }
-        void (async () => {
-          const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
-            () => null
-          );
-          const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
-          if (frame.createdAt > seenAt) {
-            setUnreadByPeer((m) => ({
-              ...m,
-              [peerUser.id]: (m[peerUser.id] ?? 0) + 1,
-            }));
-          }
-        })();
-      }
-
-      if (plain.kind === "receipt" && plain.refCid) {
-        await outboxRemove(plain.refCid).catch(() => {});
-        await refreshPendingCount();
-      }
-
-      if (plain.kind !== "receipt" && plain.cid) {
-        const receipt: PlainPayload = {
-          v: 2,
-          cid: newCid(),
-          kind: "receipt",
-          receiptKind:
-            sendReadReceipts && peerRef.current?.id === peerUser.id
-              ? "read"
-              : "delivered",
-          refCid: plain.cid,
-        };
-        void sendDmWire(peerUser, receipt, true);
-      }
-      if (frame.mailbox) ackMailboxFrame("dm", frame.id);
-      return true;
-    },
-    [
-      ackMailboxFrame,
-      session,
-      resolveUser,
-      blockedPeers,
-      loadGroups,
-      retryPendingGroupFrames,
-      rebuildDm,
-      mutedPeers,
-      maybeNotify,
-      sendReadReceipts,
-      sendDmWire,
-      refreshPendingCount,
-    ]
-  );
-
-  const retryPendingDmFrames = useCallback(async () => {
-    const pending = pendingDmFramesRef.current;
-    if (pending.length === 0) return;
-    const stillPending: PendingDmFrame[] = [];
-    for (const frame of pending) {
-      const handled = await handleIncomingDmFrame(frame, false);
-      if (!handled && !seen.current.has(frame.id)) stillPending.push(frame);
-    }
-    pendingDmFramesRef.current = stillPending;
-  }, [handleIncomingDmFrame]);
 
   /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
   const flushOutbox = useCallback(async () => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthenticatedRef.current) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
     const pending = await outboxList();
     for (const row of pending) {
       const meta = await outboxGetMeta(row.cid).catch(() => null);
@@ -1236,25 +939,32 @@ export function ChatShell({
   }, [refreshPendingCount]);
 
   useEffect(() => {
-    if (!preKeyReady) {
-      setConnected(false);
-      return;
-    }
-    let stopped = false;
     const url = getWsUrl();
     const ws = new WebSocket(url);
     wsRef.current = ws;
-    wsAuthenticatedRef.current = false;
     ws.onopen = () => {
       const activeWs = wsRef.current;
       if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
       activeWs.send(JSON.stringify({ type: "auth", token: tokenRef.current }));
+      setHasEverConnected(true);
+      setWsHadError(false);
+      setConnected(true);
+      void flushOutbox();
+
+      // Starte Cover Traffic (Dummy-Envelopes bei Inaktivität)
+      const peerList = usersRef.current.map((u) => ({
+        id: u.id,
+        publicKey: u.publicKey,
+      }));
+      if (peerList.length > 0) {
+        coverRef.current = startCoverTraffic(activeWs, peerList, () => {
+          return activeWs.readyState === WebSocket.OPEN && session !== null;
+        });
+      }
     };
     ws.onclose = () => {
       setConnected(false);
-      wsAuthenticatedRef.current = false;
       wsRef.current = null;
-      if (stopped) return;
       // Stop cover traffic
       if (coverRef.current) {
         coverRef.current.stop();
@@ -1275,36 +985,19 @@ export function ChatShell({
         newWs.onmessage = ws.onmessage;
       }, delay);
     };
-    ws.onerror = () => setError("WebSocket-Fehler");
+    ws.onerror = () => {
+      setWsHadError(true);
+      setError("WebSocket-Fehler");
+    };
     ws.onmessage = (ev) => {
       void (async () => {
         try {
           const data = JSON.parse(String(ev.data)) as Record<string, unknown>;
 
           if (data.type === "auth_ok") {
-            const activeWs = wsRef.current;
-            if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
-            wsAuthenticatedRef.current = true;
             reconnectAttempts.current = 0;
-            setConnected(true);
-            void flushOutbox();
-            void retryPendingDmFrames();
-            if (coverRef.current) {
-              coverRef.current.stop();
-              coverRef.current = null;
-            }
-            const peerList = usersRef.current.map((u) => ({
-              id: u.id,
-              publicKey: u.publicKey,
-            }));
-            if (peerList.length > 0) {
-              coverRef.current = startCoverTraffic(activeWs, peerList, () => {
-                return activeWs.readyState === WebSocket.OPEN;
-              });
-            }
             return;
           }
-
           if (data.type === "dm_ack") {
             const cid = typeof data.cid === "string" ? data.cid : null;
             const delivered = Number(data.delivered ?? 0);
@@ -1312,9 +1005,7 @@ export function ChatShell({
             if (id) seen.current.add(id);
             if (cid) {
               if (delivered > 0) {
-                const pending = await outboxList().catch(() => []);
-                const row = pending.find((item) => item.cid === cid);
-                if (row?.ackMode !== "e2e") await outboxRemove(cid);
+                await outboxRemove(cid);
               }
               await refreshPendingCount();
             }
@@ -1347,15 +1038,57 @@ export function ChatShell({
             }
             return;
           }
-          const cur = peerRef.current;
-          if (
-            data.type === "typing" &&
-            cur &&
-            data.fromUserId === cur.id
-          ) {
-            setTyping(true);
-            if (typingTimer.current) clearTimeout(typingTimer.current);
-            typingTimer.current = setTimeout(() => setTyping(false), 2800);
+          if (data.type === "typing") {
+            const fromId =
+              typeof data.fromUserId === "string" ? data.fromUserId : "";
+            if (!fromId || fromId === session.user.id) return;
+            const state = data.state === "stop" ? "stop" : "start";
+            if (typeof data.groupId === "string") {
+              const gid = data.groupId;
+              const tk = `${gid}:${fromId}`;
+              if (state === "stop") {
+                const ex = groupTypingClearTimers.current.get(tk);
+                if (ex) clearTimeout(ex);
+                groupTypingClearTimers.current.delete(tk);
+                setGroupTypingMap((prev) => {
+                  const next = new Map(prev);
+                  const set = new Set(next.get(gid) ?? []);
+                  set.delete(fromId);
+                  if (set.size === 0) next.delete(gid);
+                  else next.set(gid, set);
+                  return next;
+                });
+              } else {
+                setGroupTypingMap((prev) => {
+                  const next = new Map(prev);
+                  const set = new Set(next.get(gid) ?? []);
+                  set.add(fromId);
+                  next.set(gid, set);
+                  return next;
+                });
+                const ex = groupTypingClearTimers.current.get(tk);
+                if (ex) clearTimeout(ex);
+                const t = window.setTimeout(() => {
+                  setGroupTypingMap((prev) => {
+                    const next = new Map(prev);
+                    const set = new Set(next.get(gid) ?? []);
+                    set.delete(fromId);
+                    if (set.size === 0) next.delete(gid);
+                    else next.set(gid, set);
+                    return next;
+                  });
+                  groupTypingClearTimers.current.delete(tk);
+                }, 2800);
+                groupTypingClearTimers.current.set(tk, t);
+              }
+              return;
+            }
+            const cur = peerRef.current;
+            if (cur && fromId === cur.id) {
+              setTyping(true);
+              if (typingTimer.current) clearTimeout(typingTimer.current);
+              typingTimer.current = setTimeout(() => setTyping(false), 2800);
+            }
             return;
           }
           if (
@@ -1363,22 +1096,154 @@ export function ChatShell({
             typeof data.id === "string" &&
             typeof data.envelope === "string"
           ) {
-            await handleIncomingDmFrame({
-              id: String(data.id),
-              ...(typeof data.cid === "string" ? { cid: String(data.cid) } : {}),
-              envelope: String(data.envelope),
-              createdAt: Number(data.createdAt ?? Date.now()),
-              mailbox: data.mailbox === true,
+            const id = data.id;
+            if (seen.current.has(id)) return;
+            const createdAt = Number(data.createdAt ?? Date.now());
+            const dec = await decryptIncomingSealedDmWithReplayCheck(
+              data.envelope,
+              session,
+              resolveUser
+            );
+            if (!dec) return;
+            if (blockedPeers.has(dec.senderUserId)) return;
+            seen.current.add(id);
+            const peerUser =
+              usersRef.current.find((u) => u.id === dec.senderUserId) ??
+              (await resolveUser(dec.senderUserId));
+            if (!peerUser) return;
+
+            const plain = dec.plain;
+            if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
+              const keyBytes = uint8FromBase64(plain.keyB64);
+              await setGroupKey(plain.groupId, keyBytes);
+              // Auch PFS-Key-State initialisieren, damit encryptGroupPayload
+              // den PFS-Pfad (GC2) nutzen kann statt Legacy (GC1)
+              const existingState = await getGroupKeyState(plain.groupId);
+              if (!existingState) {
+                const peers = usersRef.current.map(u => u.id);
+                await initGroupKeyState(plain.groupId, peers, session.user.id, session.secretKey);
+              }
+              await loadGroups();
+              return;
+            }
+
+            const ttl = plain.ttlMs ?? 0;
+            await idbPutDm({
+              id,
+              peerId: peerUser.id,
+              fromMe: false,
+              plainJson: JSON.stringify(plain),
+              at: createdAt,
+              ...(ttl ? { expiresAt: createdAt + ttl } : {}),
             });
+            const arr = rawDmRef.current.get(peerUser.id) ?? [];
+            arr.push({
+              id,
+              fromMe: false,
+              plainJson: JSON.stringify(plain),
+              at: createdAt,
+              ...(ttl ? { expiresAt: createdAt + ttl } : {}),
+            });
+            rawDmRef.current.set(peerUser.id, arr);
+            if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
+            // Update unread (if chat not currently open).
+            if (peerRef.current?.id !== peerUser.id) {
+              if (!mutedPeers.has(peerUser.id)) {
+                maybeNotify(peerUser.username, previewForPayload(plain));
+              }
+              void (async () => {
+                const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
+                  () => null
+                );
+                const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
+                if (createdAt > seenAt) {
+                  setUnreadByPeer((m) => ({
+                    ...m,
+                    [peerUser.id]: (m[peerUser.id] ?? 0) + 1,
+                  }));
+                }
+              })();
+            }
+
+            if (sendReadReceipts && plain.kind !== "receipt" && plain.cid) {
+              const receipt: PlainPayload = {
+                v: 2,
+                cid: newCid(),
+                kind: "receipt",
+                receiptKind:
+                  peerRef.current?.id === peerUser.id ? "read" : "delivered",
+                refCid: plain.cid,
+              };
+              void sendDmWire(peerUser, receipt, true);
+            }
           }
           if (data.type === "group" && typeof data.id === "string") {
-            await handleIncomingGroupFrame({
-              id: String(data.id),
-              groupId: String(data.groupId),
-              ciphertext: String(data.ciphertext),
-              createdAt: Number(data.createdAt ?? Date.now()),
-              mailbox: data.mailbox === true,
+            const id = String(data.id);
+            const gid = String(data.groupId);
+            if (seen.current.has(id)) return;
+            const ct = String(data.ciphertext);
+            let plain: PlainPayload;
+            try {
+              plain = await decryptGroupPayload(gid, ct);
+            } catch {
+              return;
+            }
+            if (
+              typeof plain.cid === "string" &&
+              plain.cid.length > 0 &&
+              isGroupMessageDuplicate(gid, plain.cid)
+            ) {
+              return;
+            }
+            seen.current.add(id);
+            const fromUserId = plain.senderUserId ?? "";
+            const at = Number(data.createdAt);
+            const ttl = plain.ttlMs ?? 0;
+            await idbPutGroupMsg({
+              id,
+              groupId: gid,
+              fromUserId,
+              plainJson: JSON.stringify(plain),
+              at,
+              ...(ttl ? { expiresAt: at + ttl } : {}),
             });
+            const arr = rawGroupRef.current.get(gid) ?? [];
+            arr.push({
+              id,
+              fromMe: fromUserId === session.user.id,
+              fromUserId,
+              plainJson: JSON.stringify(plain),
+              at,
+              ...(ttl ? { expiresAt: at + ttl } : {}),
+            });
+            rawGroupRef.current.set(gid, arr);
+            if (groupRef.current?.id === gid) rebuildGroup(gid);
+            if (groupRef.current?.id !== gid && !mutedGroups.has(gid)) {
+              const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? "Gruppe";
+              maybeNotify(groupName, previewForPayload(plain));
+            }
+            if (
+              sendReadReceipts &&
+              fromUserId &&
+              fromUserId !== session.user.id &&
+              plain.kind !== "receipt" &&
+              plain.cid &&
+              (plain.kind === "text" ||
+                plain.kind === "file" ||
+                plain.kind === "voice" ||
+                plain.kind === "system")
+            ) {
+              const receipt: PlainPayload = {
+                v: 2,
+                cid: newCid(),
+                kind: "receipt",
+                receiptKind:
+                  groupRef.current?.id === gid ? "read" : "delivered",
+                refCid: plain.cid,
+              };
+              const gMeta = groupsRef.current.find((x) => x.id === gid);
+              if (gMeta) void sendGroupWire(gMeta, receipt, true, true);
+            }
           }
         } catch {
           /* ignore malformed frames */
@@ -1387,31 +1252,19 @@ export function ChatShell({
     };
     const interval = setInterval(() => {
       void flushOutbox();
-      void retryPendingDmFrames();
     }, 15_000);
     return () => {
-      stopped = true;
       ws.close();
       clearInterval(interval);
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-        reconnectTimer.current = null;
-      }
-      if (coverRef.current) {
-        coverRef.current.stop();
-        coverRef.current = null;
-      }
       if (typingTimer.current) clearTimeout(typingTimer.current);
+      for (const t of groupTypingClearTimers.current.values()) clearTimeout(t);
+      groupTypingClearTimers.current.clear();
     };
   }, [
     session,
-    preKeyReady,
     loadGroups,
     sendDmWire,
-    handleIncomingGroupFrame,
-    retryPendingGroupFrames,
-    handleIncomingDmFrame,
-    retryPendingDmFrames,
+    sendGroupWire,
     rebuildDm,
     rebuildGroup,
     resolveUser,
@@ -1455,23 +1308,32 @@ export function ChatShell({
 
   async function sendDmFile(file: File) {
     if (!peer) return;
-    /** Server: 128 MB verschlüsselter Umschlag; Data-URL + DR + Seal wachsen ~1,4–1,5×. */
-    const maxFile = maxE2eFileBytes();
+    /**
+     * Ziel: echte Dateien bis ca. 128 MiB. Data-URL, JSON, Padding,
+     * Double-Ratchet-Wire und Sealed-Sender-Envelope wachsen deutlich darüber;
+     * der Serverrahmen ist deshalb standardmäßig auf 320 MiB gesetzt.
+     */
+    const maxFile = 128 * 1024 * 1024;
     if (file.size > maxFile) {
       setError(
-        `Datei zu groß: Der E2E-Server-Rahmen beträgt 128 MB (Umschlag). Wegen Data-URL und Verschlüsselung bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB.`
+        `Datei zu groß: Bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB senden.`
       );
       return;
     }
-    const body = await readFileAsDataUrl(file);
+    const body = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
     const payload: PlainPayload = {
       v: 2,
       cid: newCid(),
       kind: "file",
       body,
       fileName: file.name,
-      fileSize: file.size,
       mime: file.type,
+      fileSize: file.size,
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
     };
     await sendDmWire(peer, payload);
@@ -1516,8 +1378,7 @@ export function ChatShell({
         : {}),
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
     };
-    const sentId = await sendGroupWire(group, payload);
-    if (!sentId) return;
+    await sendGroupWire(group, payload);
     setGroupText("");
     resetTextarea(groupInputRef.current);
     setReplyGroup(null);
@@ -1525,23 +1386,28 @@ export function ChatShell({
 
   async function sendGroupFile(file: File) {
     if (!group) return;
-    const maxFile = maxE2eFileBytes();
+    const maxFile = 128 * 1024 * 1024;
     if (file.size > maxFile) {
       setError(
-        `Datei zu gross: Bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB senden.`
+        `Datei zu groß: Bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB senden.`
       );
       return;
     }
     setError(null);
-    const body = await readFileAsDataUrl(file);
+    const body = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
     const payload: PlainPayload = {
       v: 2,
       cid: newCid(),
       kind: "file",
       body,
       fileName: file.name,
-      fileSize: file.size,
       mime: file.type,
+      fileSize: file.size,
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
     };
     await sendGroupWire(group, payload);
@@ -1549,8 +1415,8 @@ export function ChatShell({
 
   async function sendGroupVoice() {
     if (!group) return;
-    if (voice.recording) {
-      const rec = await voice.stop();
+    if (groupVoice.recording) {
+      const rec = await groupVoice.stop();
       if (!rec) return;
       const payload: PlainPayload = {
         v: 2,
@@ -1563,7 +1429,7 @@ export function ChatShell({
       };
       await sendGroupWire(group, payload);
     } else {
-      const ok = await voice.start();
+      const ok = await groupVoice.start();
       if (!ok) setError("Mikrofon-Zugriff verweigert.");
     }
   }
@@ -1653,8 +1519,7 @@ export function ChatShell({
       kind: "delete",
       refCid,
     };
-    const sentId = await sendGroupWire(group, payload);
-    if (!sentId) return;
+    await sendGroupWire(group, payload);
     await idbDeleteGroupMsg(m.id);
     const arr = (rawGroupRef.current.get(group.id) ?? []).filter(
       (x) => x.id !== m.id
@@ -1664,24 +1529,17 @@ export function ChatShell({
   }
 
   function copyText(t: string) {
-    void navigator.clipboard?.writeText(t).catch(() => {});
+    if (!t) return;
+    void navigator.clipboard
+      ?.writeText(t)
+      .then(() => pushToast("In Zwischenablage kopiert", "success"))
+      .catch(() => pushToast("Kopieren fehlgeschlagen", "danger"));
   }
 
   async function distributeGroupKey(g: api.ApiGroup, memberIds: string[], keyB64: string) {
-    const knownUsers = new Map(usersRef.current.map((u) => [u.id, u]));
-    const missing = memberIds.filter((mid) => mid !== session.user.id && !knownUsers.has(mid));
-    if (missing.length > 0) {
-      const { users: fetched } = await api.listUsers(session.token, missing);
-      for (const u of fetched) knownUsers.set(u.id, u);
-      setUsers((prev) => {
-        const byId = new Map(prev.map((u) => [u.id, u]));
-        for (const u of fetched) byId.set(u.id, u);
-        return Array.from(byId.values());
-      });
-    }
     for (const mid of memberIds) {
       if (mid === session.user.id) continue;
-      const u = knownUsers.get(mid);
+      const u = usersRef.current.find((x) => x.id === mid);
       if (!u) continue;
       const p: PlainPayload = {
         v: 2,
@@ -1690,7 +1548,7 @@ export function ChatShell({
         groupId: g.id,
         keyB64,
       };
-      await sendDmWire(u, p, true, { forceRecovery: true });
+      await sendDmWire(u, p, true);
     }
   }
 
@@ -1707,7 +1565,6 @@ export function ChatShell({
     });
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
-    await initGroupKeyState(g.id, memberIds, session.user.id, session.secretKey, key);
     await loadGroups();
     await distributeGroupKey(g, memberIds, base64FromUint8(key));
     setNewGroupName("");
@@ -1721,7 +1578,6 @@ export function ChatShell({
   async function rotateGroupKey(g: api.ApiGroup, newMembers: string[]) {
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
-    await initGroupKeyState(g.id, newMembers, session.user.id, session.secretKey, key);
     await distributeGroupKey(g, newMembers, base64FromUint8(key));
   }
 
@@ -1769,11 +1625,12 @@ export function ChatShell({
     }
   }
 
-  async function beginCallWith(target: api.ApiUser) {
+  async function beginCall() {
+    if (!peer) return;
     setCallStatus("connecting");
     try {
       const ctrl = await startCall(
-        target,
+        peer,
         tokenRef.current,
         relayOnly,
         sendRtc,
@@ -1788,8 +1645,8 @@ export function ChatShell({
         }
       );
       callRef.current = ctrl;
-      const queued = pendingRtcRef.current.get(target.id) ?? [];
-      pendingRtcRef.current.delete(target.id);
+      const queued = pendingRtcRef.current.get(peer.id) ?? [];
+      pendingRtcRef.current.delete(peer.id);
       for (const payload of queued) {
         await ctrl.handleRemote?.(payload);
       }
@@ -1797,11 +1654,6 @@ export function ChatShell({
       setError(e instanceof Error ? e.message : "call_failed");
       setCallStatus("failed");
     }
-  }
-
-  async function beginCall() {
-    if (!peer) return;
-    await beginCallWith(peer);
   }
 
   async function acceptIncoming() {
@@ -1851,13 +1703,14 @@ export function ChatShell({
   function findReplyPreview(
     list: ChatMsg[],
     cid: string | undefined
-  ): { author: string; text: string } | null {
+  ): { author: string; text: string; cid?: string } | null {
     if (!cid) return null;
     const m = list.find((x) => x.plain.cid === cid);
     if (!m) return null;
     return {
       author: m.fromMe ? "Du" : peer?.username ?? "Peer",
       text: previewForPayload(m.plain),
+      cid,
     };
   }
 
@@ -1865,9 +1718,24 @@ export function ChatShell({
     list: ChatMsg[],
     msg: ChatMsg,
     fallbackAuthor: string
-  ): { author: string; text: string } | null {
+  ): { author: string; text: string; cid?: string } | null {
     if (msg.plain.replyToCid) {
-      return findReplyPreview(list, msg.plain.replyToCid);
+      const found = findReplyPreview(list, msg.plain.replyToCid);
+      if (found) return found;
+      // referenced message gone (expired/deleted) -> use stored preview if any
+      if (msg.plain.replyPreview) {
+        return {
+          author:
+            msg.plain.replyPreview.split(":")[0] ?? fallbackAuthor,
+          text: msg.plain.replyPreview
+            .split(":")
+            .slice(1)
+            .join(":")
+            .trim(),
+          cid: msg.plain.replyToCid,
+        };
+      }
+      return null;
     }
     if (!msg.plain.replyPreview) return null;
     return {
@@ -1880,42 +1748,151 @@ export function ChatShell({
     };
   }
 
+  const jumpClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jumpToCid = useCallback(
+    (cid: string, scrollEl: HTMLDivElement | null) => {
+      const el = scrollEl?.querySelector<HTMLElement>(
+        `[data-cid="${CSS.escape(cid)}"]`
+      );
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setJumpHighlightCid(cid);
+      if (jumpClearTimer.current) window.clearTimeout(jumpClearTimer.current);
+      jumpClearTimer.current = window.setTimeout(() => {
+        setJumpHighlightCid(null);
+      }, 1700);
+    },
+    []
+  );
+
+  const toggleStar = useCallback((m: ChatMsg) => {
+    const cid = m.plain.cid;
+    if (!cid) return;
+    setStarredCids((prev) => {
+      const next = new Set(prev);
+      if (next.has(cid)) {
+        next.delete(cid);
+      } else {
+        next.add(cid);
+      }
+      saveStringSet("vaultchat.starred.cids", next);
+      return next;
+    });
+  }, []);
+
+  const togglePinPeer = useCallback((peerId: string) => {
+    setPinnedPeers((prev) => {
+      const next = new Set(prev);
+      if (next.has(peerId)) {
+        next.delete(peerId);
+      } else {
+        next.add(peerId);
+      }
+      saveStringSet("vaultchat.pinned.peers", next);
+      return next;
+    });
+  }, []);
+
+  const togglePinMessage = useCallback(
+    (chatKey: string | null, m: ChatMsg) => {
+      if (!chatKey || !m.plain.cid) return;
+      setPinnedMessageByPeer((prev) => {
+        const next = { ...prev };
+        if (next[chatKey] === m.plain.cid) {
+          delete next[chatKey];
+        } else {
+          next[chatKey] = m.plain.cid as string;
+        }
+        try {
+          localStorage.setItem(
+            "vaultchat.pinned.messages",
+            JSON.stringify(next)
+          );
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    },
+    []
+  );
+
+  const dmPinnedCid = peer ? pinnedMessageByPeer[`dm:${peer.id}`] : undefined;
+  const groupPinnedCid = group
+    ? pinnedMessageByPeer[`group:${group.id}`]
+    : undefined;
+
+  const pinnedDmBanner = useMemo(() => {
+    if (!peer || !dmPinnedCid) return null;
+    const inList = messages.find((m) => m.plain.cid === dmPinnedCid);
+    if (inList) {
+      return { preview: previewForPayload(inList.plain), cid: dmPinnedCid };
+    }
+    const raw = rawDmRef.current.get(peer.id) ?? [];
+    for (const r of raw) {
+      try {
+        const p = JSON.parse(r.plainJson) as PlainPayload;
+        if (p.cid === dmPinnedCid) {
+          return { preview: previewForPayload(p), cid: dmPinnedCid };
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return { preview: "Angeheftete Nachricht", cid: dmPinnedCid };
+  }, [peer, dmPinnedCid, messages]);
+
+  const pinnedGroupBanner = useMemo(() => {
+    if (!group || !groupPinnedCid) return null;
+    const inList = groupMessages.find((m) => m.plain.cid === groupPinnedCid);
+    if (inList) {
+      return { preview: previewForPayload(inList.plain), cid: groupPinnedCid };
+    }
+    const raw = rawGroupRef.current.get(group.id) ?? [];
+    for (const r of raw) {
+      try {
+        const p = JSON.parse(r.plainJson) as PlainPayload;
+        if (p.cid === groupPinnedCid) {
+          return { preview: previewForPayload(p), cid: groupPinnedCid };
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return { preview: "Angeheftete Nachricht", cid: groupPinnedCid };
+  }, [group, groupPinnedCid, groupMessages]);
+
   const lastDmPreviewByPeer = useMemo(() => {
-    const out = new Map<string, { text: string; at: number }>();
+    const out = new Map<string, { text: string; at: number; fromMe: boolean }>();
     for (const [pid, msgs] of rawDmRef.current.entries()) {
-      const last = msgs[msgs.length - 1];
+      // find last non-meta frame for the preview
+      const last = [...msgs]
+        .reverse()
+        .find((r) => {
+          try {
+            const p = JSON.parse(r.plainJson) as PlainPayload;
+            return (
+              p.kind === "text" ||
+              p.kind === "file" ||
+              p.kind === "voice" ||
+              p.kind === "system"
+            );
+          } catch {
+            return false;
+          }
+        });
       if (!last) continue;
-      const plain = last.plainJson;
       let text = "";
       try {
-        const p = JSON.parse(plain) as PlainPayload;
+        const p = JSON.parse(last.plainJson) as PlainPayload;
         text = previewForPayload(p);
       } catch {
         text = "";
       }
-      out.set(pid, { text, at: last.at });
+      out.set(pid, { text, at: last.at, fromMe: last.fromMe });
     }
     return out;
-  }, [messages.length, users.length]);
-
-  const lastGroupPreviewByGroup = useMemo(() => {
-    const out = new Map<string, { text: string; at: number }>();
-    for (const [gid, msgs] of rawGroupRef.current.entries()) {
-      const last = msgs[msgs.length - 1];
-      if (!last) continue;
-      try {
-        const p = JSON.parse(last.plainJson) as PlainPayload;
-        const author =
-          last.fromUserId === session.user.id
-            ? "Du"
-            : usersRef.current.find((u) => u.id === last.fromUserId)?.username ?? "Mitglied";
-        out.set(gid, { text: `${author}: ${previewForPayload(p)}`, at: last.at });
-      } catch {
-        out.set(gid, { text: "Neue Nachricht", at: last.at });
-      }
-    }
-    return out;
-  }, [groupMessages.length, groups.length, users.length, session.user.id]);
+  }, [messages.length, users.length, peer?.id]);
 
   const fmtListTime = useCallback((at?: number) => {
     if (!at) return "";
@@ -1964,21 +1941,80 @@ export function ChatShell({
     return groups.filter((g) => g.name.toLowerCase().includes(q));
   }, [groups, query]);
 
+  const peersWithStars = useMemo(() => {
+    const out = new Set<string>();
+    for (const [pid, rows] of rawDmRef.current.entries()) {
+      for (const r of rows) {
+        try {
+          const p = JSON.parse(r.plainJson) as PlainPayload;
+          if (p.cid && starredCids.has(p.cid)) {
+            out.add(pid);
+            break;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return out;
+  }, [starredCids, messages.length, users.length]);
+
+  const groupsWithStars = useMemo(() => {
+    const out = new Set<string>();
+    for (const [gid, rows] of rawGroupRef.current.entries()) {
+      for (const r of rows) {
+        try {
+          const p = JSON.parse(r.plainJson) as PlainPayload;
+          if (p.cid && starredCids.has(p.cid)) {
+            out.add(gid);
+            break;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return out;
+  }, [starredCids, groupMessages.length, groups.length]);
+
   const visibleUsers = useMemo(() => {
+    let arr: api.ApiUser[];
     if (sidebarFilter === "group") return [];
     if (sidebarFilter === "fav") {
-      return filteredUsers.filter((u) => favoritePeers.has(u.id));
+      arr = filteredUsers.filter((u) => favoritePeers.has(u.id));
+    } else if (sidebarFilter === "unread") {
+      arr = filteredUsers.filter((u) => (unreadByPeer[u.id] ?? 0) > 0);
+    } else if (sidebarFilter === "star") {
+      arr = filteredUsers.filter((u) => peersWithStars.has(u.id));
+    } else {
+      arr = filteredUsers;
     }
-    if (sidebarFilter === "unread") {
-      return filteredUsers.filter((u) => (unreadByPeer[u.id] ?? 0) > 0);
-    }
-    return filteredUsers;
-  }, [filteredUsers, sidebarFilter, unreadByPeer, favoritePeers]);
+    // sort: pinned first, then by recency
+    return [...arr].sort((a, b) => {
+      const pa = pinnedPeers.has(a.id) ? 1 : 0;
+      const pb = pinnedPeers.has(b.id) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      const ta = lastDmPreviewByPeer.get(a.id)?.at ?? 0;
+      const tb = lastDmPreviewByPeer.get(b.id)?.at ?? 0;
+      return tb - ta;
+    });
+  }, [
+    filteredUsers,
+    sidebarFilter,
+    unreadByPeer,
+    favoritePeers,
+    pinnedPeers,
+    lastDmPreviewByPeer,
+    peersWithStars,
+  ]);
 
   const visibleGroups = useMemo(() => {
-    if (sidebarFilter === "dm" || sidebarFilter === "unread" || sidebarFilter === "fav") return [];
+    if (sidebarFilter === "dm" || sidebarFilter === "unread" || sidebarFilter === "fav")
+      return [];
+    if (sidebarFilter === "star")
+      return filteredGroups.filter((g) => groupsWithStars.has(g.id));
     return filteredGroups;
-  }, [filteredGroups, sidebarFilter]);
+  }, [filteredGroups, sidebarFilter, groupsWithStars]);
 
   const sharedMediaItems = useMemo<SharedMediaItem[]>(() => {
     const rows =
@@ -2024,15 +2060,27 @@ export function ChatShell({
   const peerList = useMemo(() => {
     return visibleUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
+      const subtitle =
+        peer?.id === u.id && typing
+          ? "schreibt…"
+          : prev
+            ? prev.fromMe
+              ? `Du: ${prev.text}`
+              : prev.text
+            : "Keine Nachrichten";
       return (
         <PeerRow
           key={u.id}
           u={u}
-          subtitle={prev?.text ?? "Keine Nachrichten"}
+          subtitle={subtitle}
+          isTyping={peer?.id === u.id && typing}
           metaRight={fmtListTime(prev?.at)}
           unread={unreadByPeer[u.id] ?? 0}
           isFavorite={favoritePeers.has(u.id)}
           isBlocked={blockedPeers.has(u.id)}
+          isPinned={pinnedPeers.has(u.id)}
+          isOnline={onlinePeers.has(u.id)}
+          onTogglePin={() => togglePinPeer(u.id)}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
@@ -2043,12 +2091,26 @@ export function ChatShell({
         />
       );
     });
-  }, [visibleUsers, peer, tab, lastDmPreviewByPeer, unreadByPeer, favoritePeers, blockedPeers]);
+  }, [
+    visibleUsers,
+    peer,
+    typing,
+    tab,
+    lastDmPreviewByPeer,
+    unreadByPeer,
+    favoritePeers,
+    blockedPeers,
+    pinnedPeers,
+    onlinePeers,
+    togglePinPeer,
+    fmtListTime,
+  ]);
 
   const groupList = useMemo(
     () =>
       visibleGroups.map((g) => {
-        const prev = lastGroupPreviewByGroup.get(g.id);
+        const gTyping = groupTypingMap.get(g.id);
+        const showGTyping = Boolean(gTyping && gTyping.size > 0);
         return (
           <button
             key={g.id}
@@ -2070,21 +2132,26 @@ export function ChatShell({
             </div>
             <div className="contact-info min-w-0">
               <span className="contact-name">{g.name}</span>
-              <p className="contact-preview">
-                {prev?.text ?? `${g.memberIds.length} Mitglieder`}
+              <p
+                className={`contact-preview${showGTyping ? " typing" : ""}`}
+              >
+                {showGTyping ? (
+                  <span className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    schreibt
+                  </span>
+                ) : (
+                  `${g.memberIds.length} Mitglieder`
+                )}
               </p>
-            </div>
-            <div className="contact-meta">
-              <span className="contact-time">{fmtListTime(prev?.at)}</span>
             </div>
           </button>
         );
       }),
-    [visibleGroups, group, tab, lastGroupPreviewByGroup, fmtListTime]
+    [visibleGroups, group, tab, groupTypingMap]
   );
-
-  const canCreateGroup = newGroupName.trim().length > 0 && newGroupMembers.length > 0;
-  const hasContacts = users.length > 0;
 
   return (
     <div className="flex h-full w-full flex-col bg-[var(--bg)] p-0 md:p-4">
@@ -2123,13 +2190,8 @@ export function ChatShell({
         <SecuritySettings
           onClose={() => setSecurityOpen(false)}
           relayOnly={relayOnly}
-          onRelayOnlyChange={(value) => {
-            setRelayOnly(value);
-            localStorage.setItem("vaultchat.privacy.relayOnly", value ? "on" : "off");
-          }}
+          onRelayOnlyChange={setRelayOnly}
           myFingerprint={myFp}
-          serverStatus={serverStatus}
-          serverStatusError={serverStatusError}
           sendTypingIndicators={sendTypingIndicators}
           onSendTypingIndicatorsChange={(value) => {
             setSendTypingIndicators(value);
@@ -2139,29 +2201,6 @@ export function ChatShell({
           onSendReadReceiptsChange={(value) => {
             setSendReadReceipts(value);
             localStorage.setItem("vaultchat.privacy.receipts", value ? "on" : "off");
-          }}
-          notificationEnabled={notificationEnabled}
-          onNotificationEnabledChange={(value) => {
-            setNotificationEnabled(value);
-            localStorage.setItem("vaultchat.privacy.notifications", value ? "on" : "off");
-          }}
-          notificationPreview={notificationPreview}
-          onNotificationPreviewChange={(value) => {
-            setNotificationPreview(value);
-            localStorage.setItem("vaultchat.privacy.notificationPreview", value ? "on" : "off");
-          }}
-          notificationPermission={notificationPermission}
-          onRequestNotificationPermission={async () => {
-            if (!("Notification" in window)) {
-              setNotificationPermission("unsupported");
-              return;
-            }
-            const permission = await Notification.requestPermission();
-            setNotificationPermission(permission);
-            if (permission === "granted") {
-              setNotificationEnabled(true);
-              localStorage.setItem("vaultchat.privacy.notifications", "on");
-            }
           }}
           onExportBackup={async () => {
             const local = loadLocalIdentity();
@@ -2179,14 +2218,165 @@ export function ChatShell({
             a.download = `vaultchat-backup-${local.username}-encrypted.json`;
             a.click();
             URL.revokeObjectURL(a.href);
+            try {
+              localStorage.setItem("vaultchat.backupReminder.dismissed", "1");
+            } catch {
+              /* ignore */
+            }
+            setBackupReminderVisible(false);
+            pushToast("Backup heruntergeladen", "success");
           }}
         />
       )}
-      <div className="app-surface flex min-h-0 w-full flex-1 overflow-visible rounded-2xl md:rounded-3xl">
+      {forwardTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => {
+            setForwardTarget(null);
+            setForwardPick(new Set());
+          }}
+        >
+          <div
+            className="app-surface w-full max-w-md rounded-2xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+                Weiterleiten
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
+                aria-label="Schließen"
+                onClick={() => {
+                  setForwardTarget(null);
+                  setForwardPick(new Set());
+                }}
+              >
+                <IconX size={18} />
+              </button>
+            </div>
+            <p className="mb-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
+              Vorschau
+            </p>
+            <p
+              className="mb-4 rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: "var(--border)", color: "var(--text)" }}
+            >
+              {previewForPayload(forwardTarget.plain)}
+            </p>
+            <p className="mb-2 text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
+              Kontakte auswählen (einzeln verschlüsselt per DM)
+            </p>
+            <div
+              className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-2"
+              style={{ borderColor: "var(--border)" }}
+            >
+              {users.filter((u) => !blockedPeers.has(u.id)).length === 0 ? (
+                <p className="py-4 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                  Keine Kontakte verfügbar.
+                </p>
+              ) : (
+                users
+                  .filter((u) => !blockedPeers.has(u.id))
+                  .map((u) => (
+                    <label
+                      key={u.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-[var(--bg-hover)]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={forwardPick.has(u.id)}
+                        onChange={() => {
+                          setForwardPick((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(u.id)) next.delete(u.id);
+                            else next.add(u.id);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span className="text-sm" style={{ color: "var(--text)" }}>
+                        {u.username}
+                      </span>
+                    </label>
+                  ))
+              )}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setForwardTarget(null);
+                  setForwardPick(new Set());
+                }}
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={forwardPick.size === 0}
+                onClick={() => void commitForward()}
+              >
+                Senden{forwardPick.size > 0 ? ` (${forwardPick.size})` : ""}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="app-surface flex min-h-0 w-full flex-1 flex-col overflow-visible rounded-2xl md:rounded-3xl">
+      {!connected && (
+        <div
+          className={`connection-banner shrink-0 rounded-t-2xl md:rounded-t-3xl${wsHadError ? " error" : ""}`}
+          role="status"
+        >
+          <IconWifiOff size={15} aria-hidden />
+          <span>
+            {hasEverConnected
+              ? "Verbindung getrennt. Erneuter Aufbau läuft automatisch. Ausgehende DMs warten in der Outbox."
+              : "Verbindung zum Server wird hergestellt …"}
+          </span>
+        </div>
+      )}
+      {backupReminderVisible && (
+        <div className="backup-reminder mx-3 mt-2 shrink-0 md:mx-4">
+          <IconShieldCheck size={18} className="shrink-0" style={{ color: "var(--accent)" }} aria-hidden />
+          <div className="backup-reminder-text">
+            <strong>Backup sichern</strong>
+            <span> — Exportiere deine Identität verschlüsselt, sonst kein Zugang von einem neuen Gerät.</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary !shrink-0 !px-2.5 !py-1 !text-xs"
+            onClick={() => setSecurityOpen(true)}
+          >
+            Export
+          </button>
+          <button
+            type="button"
+            className="!text-[var(--text-muted)] hover:!text-[var(--text)]"
+            title="Später erinnern"
+            aria-label="Erinnerung ausblenden"
+            onClick={() => {
+              try {
+                localStorage.setItem("vaultchat.backupReminder.dismissed", "1");
+              } catch {
+                /* ignore */
+              }
+              setBackupReminderVisible(false);
+            }}
+          >
+            <IconX size={16} />
+          </button>
+        </div>
+      )}
+      <div className="flex min-h-0 flex-1 overflow-visible">
       <aside
         className={`${
           showSidebar ? "flex" : "hidden"
-        } sidebar-shell w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
+        } w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -2206,36 +2396,13 @@ export function ChatShell({
             <ThemeToggle />
             <button
               type="button"
-              onClick={() => setSecurityOpen(true)}
-              className="btn btn-secondary btn-icon !h-9 !w-9"
-              title="Sicherheitseinstellungen"
-              aria-label="Sicherheitseinstellungen"
-            >
-              <IconSettings size={15} />
-            </button>
-            <button
-              type="button"
               onClick={onLock}
               className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
               title="Sofort sperren (LDK aus dem Speicher entfernen)"
             >
               <IconLock size={14} />
-              <span className="sidebar-lock-label">Sperren</span>
+              Sperren
             </button>
-          </div>
-        </div>
-
-        <div className="sidebar-security-strip mx-3 mt-3">
-          <span className={connected && preKeyReady ? "online" : "offline"} />
-          <div className="min-w-0">
-            <p>
-              {preKeyReady
-                ? connected
-                  ? "Sicher verbunden"
-                  : "Warte auf Verbindung"
-                : "Schluessel werden vorbereitet"}
-            </p>
-            <small>{relayOnly ? "Relay-only fuer Anrufe" : "E2E bereit, minimale Metadaten"}</small>
           </div>
         </div>
 
@@ -2259,14 +2426,14 @@ export function ChatShell({
             ["all", "Alle"],
             ["dm", "DMs"],
             ["group", "Gruppen"],
-            ["fav", "Favorit"],
-            ["unread", "Neu"],
+            ["fav", "Favoriten"],
+            ["unread", "Ungelesen"],
+            ["star", "Markiert"],
           ].map(([value, label]) => (
             <button
               key={value}
               type="button"
               className={`filter-chip ${sidebarFilter === value ? "active" : ""}`}
-              aria-label={`Filter: ${label}`}
               onClick={() => {
                 const next = value as SidebarFilter;
                 setSidebarFilter(next);
@@ -2279,7 +2446,10 @@ export function ChatShell({
           ))}
         </div>
 
-        {(sidebarFilter === "all" || sidebarFilter === "dm" || sidebarFilter === "unread") && (
+        {(sidebarFilter === "all" ||
+          sidebarFilter === "dm" ||
+          sidebarFilter === "unread" ||
+          sidebarFilter === "star") && (
           <>
             <div className="flex items-center justify-end gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
               <button
@@ -2301,30 +2471,22 @@ export function ChatShell({
             </div>
             <div
               className={`overflow-y-auto p-2 ${
-                sidebarFilter === "all" ? "max-h-[42%]" : "flex-1"
+                sidebarFilter === "all" || sidebarFilter === "star"
+                  ? "max-h-[42%]"
+                  : "flex-1"
               }`}
             >
-              {peerList.length > 0 ? (
-                peerList
-              ) : (
-                <SidebarEmptyState
-                  title={query.trim() ? "Keine Kontakte gefunden" : "Noch keine Kontakte"}
-                  body={
-                    query.trim()
-                      ? "Passe die Suche an oder fuege einen neuen Kontakt hinzu."
-                      : "Fuege deinen ersten Kontakt hinzu, um eine verschluesselte Unterhaltung zu starten."
-                  }
-                  action={
-                    <button
-                      type="button"
-                      onClick={() => setShowAddContact(true)}
-                      className="btn btn-secondary !mt-3 !px-3 !py-2 !text-xs"
-                    >
-                      Kontakt hinzufuegen
-                    </button>
-                  }
-                />
-              )}
+              {peerList}
+              {sidebarFilter === "star" &&
+                visibleUsers.length === 0 &&
+                visibleGroups.length > 0 && (
+                  <p
+                    className="px-2 py-4 text-center text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Keine DMs mit Markierungen. Unten: Gruppen mit Sternen.
+                  </p>
+                )}
             </div>
           </>
         )}
@@ -2334,10 +2496,11 @@ export function ChatShell({
             {peerList.length > 0 ? (
               peerList
             ) : (
-              <SidebarEmptyState
-                title="Keine Favoriten"
-                body="Markiere wichtige Kontakte als Favorit, damit sie hier erscheinen."
-              />
+              <div className="flex h-full items-center justify-center px-6 text-center">
+                <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                  Markiere Kontakte als Favorit, damit sie hier erscheinen.
+                </p>
+              </div>
             )}
           </div>
         )}
@@ -2345,62 +2508,30 @@ export function ChatShell({
         {sidebarFilter === "group" && (
           <>
             <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
-              <div className="group-create-header">
-                <p>Neue private Gruppe</p>
-                <span>Key-Rotation bei jeder Aenderung</span>
-              </div>
               <input
                 className="app-input w-full !py-2 text-sm"
                 placeholder="Gruppenname"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
               />
-              {hasContacts && (
-                <div className="group-member-picker" aria-label="Gruppenmitglieder aus Kontakten auswaehlen">
-                  {users.map((u) => {
-                    const selected = newGroupMembers.includes(u.id);
-                    return (
-                      <button
-                        key={u.id}
-                        type="button"
-                        className={`group-member-option ${selected ? "selected" : ""}`}
-                        onClick={() =>
-                          setNewGroupMembers((prev) =>
-                            prev.includes(u.id)
-                              ? prev.filter((id) => id !== u.id)
-                              : [...prev, u.id]
-                          )
-                        }
-                      >
-                        <span
-                          className="group-member-avatar"
-                          style={{ background: userGradient(u.id) }}
-                        >
-                          {u.username.slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className="truncate">{u.username}</span>
-                        <span className="group-member-check" aria-hidden>
-                          {selected ? <IconCheck size={13} /> : null}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              {!hasContacts && (
-                <p className="sidebar-form-hint">
-                  Fuege zuerst Kontakte hinzu. Gruppen koennen nur mit verifizierten Kontakten erstellt werden.
-                </p>
-              )}
-              {hasContacts && !canCreateGroup && (
-                <p className="sidebar-form-hint">
-                  Name und mindestens ein Kontakt sind erforderlich.
-                </p>
-              )}
+              <select
+                multiple
+                className="app-input h-24 !py-1 text-xs"
+                value={newGroupMembers}
+                onChange={(e) => {
+                  const o = [...e.target.selectedOptions].map((x) => x.value);
+                  setNewGroupMembers(o);
+                }}
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.username}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => void createGroup()}
-                disabled={!canCreateGroup}
                 className="btn btn-primary w-full"
               >
                 Gruppe erstellen
@@ -2409,25 +2540,27 @@ export function ChatShell({
           </>
         )}
 
-        {(sidebarFilter === "all" || sidebarFilter === "group") && (
+        {(sidebarFilter === "all" ||
+          sidebarFilter === "group" ||
+          sidebarFilter === "star") && (
           <div className="flex-1 overflow-y-auto p-2">
-            {sidebarFilter === "all" && visibleGroups.length > 0 && (
+            {(sidebarFilter === "all" || sidebarFilter === "star") &&
+              visibleGroups.length > 0 && (
               <p className="px-2 pb-1 pt-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
                 Gruppen
               </p>
             )}
-            {groupList.length > 0 ? (
-              groupList
-            ) : sidebarFilter === "group" ? (
-              <SidebarEmptyState
-                title={query.trim() ? "Keine Gruppen gefunden" : "Noch keine Gruppen"}
-                body={
-                  query.trim()
-                    ? "Passe die Suche an oder erstelle eine neue private Gruppe."
-                    : "Erstelle eine Gruppe, sobald du mindestens einen Kontakt hinzugefuegt hast."
-                }
-              />
-            ) : null}
+            {groupList}
+            {sidebarFilter === "star" &&
+              visibleGroups.length === 0 &&
+              visibleUsers.length === 0 && (
+                <p
+                  className="px-6 py-10 text-center text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Noch keine markierten Nachrichten. Sterne erscheinen hier in der Liste.
+                </p>
+              )}
           </div>
         )}
 
@@ -2455,7 +2588,6 @@ export function ChatShell({
             onClick={() => setSecurityOpen(true)}
             className="sidebar-footer-action"
             title="Einstellungen"
-            aria-label="Einstellungen oeffnen"
           >
             <IconSettings size={16} />
           </button>
@@ -2464,7 +2596,6 @@ export function ChatShell({
             onClick={() => setUserMenuOpen((v) => !v)}
             className="sidebar-footer-action"
             title="Mehr"
-            aria-label="Profilmenue oeffnen"
           >
             <IconMoreVertical size={16} />
           </button>
@@ -2554,67 +2685,99 @@ export function ChatShell({
         )}
 
         {tab === "dm" && !peer && (
-          <ChatEmptyState />
+          <ChatEmptyState
+            hasChats={users.length > 0 || groups.length > 0}
+            onAddContact={() => setShowAddContact(true)}
+            onCreateGroup={() => {
+              setTab("group");
+              setSidebarFilter("group");
+            }}
+            onSaveBackup={() => setSecurityOpen(true)}
+          />
         )}
 
         {tab === "dm" && peer && (
           <>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
               <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
-                <div className={`h-full transition-all duration-500 ${connected && preKeyReady ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
+                <div className={`h-full transition-all duration-500 ${connected ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
               </div>
               <div className="flex w-full items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-center gap-2">
                   {isMobile && (
                     <button
                       type="button"
-                      onClick={() => setPeer(null)}
-                      className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
+                      onClick={() => {
+                        setPeer(null);
+                        setInfoOpen(false);
+                      }}
+                      className="header-back-btn"
                       title="Zurück"
+                      aria-label="Zurück"
                     >
                       ←
                     </button>
                   )}
-                  <div className="relative">
-                    <div
-                      className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
-                      style={{
-                        background: peer
-                          ? userGradient(peer.id)
-                          : "linear-gradient(135deg, var(--accent-hover), var(--accent))",
-                      }}
-                    >
-                      {peer.username.slice(0, 1).toUpperCase()}
+                  <button
+                    type="button"
+                    className="header-identity"
+                    onClick={() => setInfoOpen((v) => !v)}
+                    title="Profil und Details öffnen"
+                  >
+                    <div className="header-avatar-wrap">
+                      <div
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
+                        style={{
+                          background: userGradient(peer.id),
+                        }}
+                      >
+                        {peer.username.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span
+                        className={`header-online-dot${
+                          onlinePeers.has(peer.id) ? " online" : ""
+                        }`}
+                      />
                     </div>
-                    <div
-                      className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg)] ${connected && preKeyReady ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                      title={connected && preKeyReady ? "Sicherer Kanal bereit" : "Kanal wird vorbereitet"}
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
-                      {peer.username}
-                    </p>
-                    {typing ? (
-                      <p className="text-xs text-emerald-500/80 flex items-center gap-1">
-                        <span className="flex gap-0.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '0ms'}} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '150ms'}} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{animationDelay: '300ms'}} />
-                        </span>
-                        schreibt...
+                    <div className="header-identity-text min-w-0">
+                      <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
+                        {peer.username}
                       </p>
-                    ) : (
-                      <p className="flex items-center gap-1.5 text-xs" style={{ color: connected && preKeyReady ? "var(--success)" : "var(--text-muted)" }}>
-                        <span className="h-2 w-2 rounded-full" style={{ background: connected && preKeyReady ? "var(--success)" : "var(--warning)" }} />
-                        {connected && preKeyReady
-                          ? "Sicherer Kanal bereit"
-                          : preKeyReady
-                            ? "Warte auf Realtime"
-                            : "Schluessel werden vorbereitet"}
-                      </p>
-                    )}
-                  </div>
+                      {typing ? (
+                        <p className="header-status typing">
+                          <span className="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                          </span>
+                          schreibt…
+                        </p>
+                      ) : (
+                        <p
+                          className="header-status"
+                          style={{
+                            color: onlinePeers.has(peer.id)
+                              ? "var(--success)"
+                              : "var(--text-muted)",
+                          }}
+                        >
+                          <span
+                            className="header-status-dot"
+                            style={{
+                              background: onlinePeers.has(peer.id)
+                                ? "var(--success)"
+                                : "var(--text-muted)",
+                            }}
+                          />
+                          {onlinePeers.has(peer.id)
+                            ? "Online"
+                            : connected
+                              ? "Zuletzt gesehen vor kurzem"
+                              : "Offline"}
+                        </p>
+                      )}
+                    </div>
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -2742,24 +2905,57 @@ export function ChatShell({
                   </div>
                 </div>
               )}
-              {newDmMessageWaiting && (
+              {(dmScrolledUp || newDmMessageWaiting) && (
                 <button
                   type="button"
                   onClick={() => {
-                    dmScrollRef.current?.scrollTo({ top: dmScrollRef.current.scrollHeight, behavior: "smooth" });
+                    dmScrollRef.current?.scrollTo({
+                      top: dmScrollRef.current.scrollHeight,
+                      behavior: "smooth",
+                    });
                     setNewDmMessageWaiting(false);
+                    setDmScrollUnread(0);
                   }}
-                  className="absolute bottom-4 right-4 z-10 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg hover:bg-emerald-500 transition-all"
+                  className="scroll-bottom-fab visible"
+                  aria-label="Zum Ende scrollen"
+                  title="Zum Ende"
                 >
-                  ↓ Neue Nachrichten
+                  <IconArrowDown size={18} />
+                  {dmScrollUnread > 0 && (
+                    <span className="scroll-bottom-badge">
+                      {dmScrollUnread > 99 ? "99+" : dmScrollUnread}
+                    </span>
+                  )}
                 </button>
               )}
-              {messages.length === 0 && (
-                <div className="chat-inline-empty">
-                  <IconShieldCheck size={24} />
-                  <p>Noch keine Nachrichten</p>
-                  <span>Bereit fuer die erste private Nachricht.</span>
+              {messages.length > 0 && (
+                <div className="e2ee-hint" key="e2ee-hint">
+                  <IconShieldCheck size={14} />
+                  <span>
+                    Ende-zu-Ende verschlüsselt mit {peer.username}.
+                    {peerPin?.state !== "verified" &&
+                      " Sicherheitsnummer prüfen für maximale Vertrauenswürdigkeit."}
+                  </span>
                 </div>
+              )}
+              {pinnedDmBanner && (
+                <button
+                  type="button"
+                  className="pinned-banner !mx-0 !mb-3 w-full shrink-0 text-left"
+                  onClick={() =>
+                    jumpToCid(pinnedDmBanner.cid, dmScrollRef.current)
+                  }
+                >
+                  <span className="pinned-banner-icon">
+                    <IconPin size={16} />
+                  </span>
+                  <span className="pinned-banner-content">
+                    <span className="pinned-banner-label">Angeheftet</span>
+                    <span className="pinned-banner-text">
+                      {pinnedDmBanner.preview}
+                    </span>
+                  </span>
+                </button>
               )}
               {messages.flatMap((m, i) => {
                 const items: JSX.Element[] = [];
@@ -2783,6 +2979,11 @@ export function ChatShell({
                       i === messages.length - 1 ||
                       messages[i + 1].fromMe !== m.fromMe
                     }
+                    isStarred={!!m.plain.cid && starredCids.has(m.plain.cid)}
+                    isHighlighted={
+                      !!m.plain.cid && m.plain.cid === jumpHighlightCid
+                    }
+                    isPinned={!!m.plain.cid && dmPinnedCid === m.plain.cid}
                     peerLabel={peer.username}
                     replyToPreview={replyPreviewForMessage(
                       messages,
@@ -2801,22 +3002,19 @@ export function ChatShell({
                     onEdit={(x, body) => void editDm(x, body)}
                     onDelete={(x) => void deleteDm(x)}
                     onCopy={copyText}
+                    onForward={(x) => setForwardTarget(x)}
+                    onJumpToCid={(cid) => jumpToCid(cid, dmScrollRef.current)}
+                    onToggleStar={toggleStar}
+                    onTogglePin={(x) => togglePinMessage(`dm:${peer.id}`, x)}
                   />
                 );
                 return items;
               })}
-              {typing && (
-                <p className="text-xs italic text-zinc-500">
-                  {peer.username} schreibt…
-                </p>
-              )}
+              {/* Typing-Indikator wird nun im Chat-Header angezeigt */}
             </div>
 
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {!preKeyReady && (
-                <ComposerNotice message="Sichere Schluessel werden vorbereitet. Nachrichten sind gleich bereit." />
-              )}
-              {error && <ComposerNotice message={error} onDismiss={() => setError(null)} />}
+              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
@@ -2835,45 +3033,37 @@ export function ChatShell({
                   </button>
                 </div>
               )}
-              <div className="relative flex items-end gap-2">
+              <div className="chat-input-row">
                 <button
                   type="button"
                   onClick={() => setEmojiOpen((v) => !v)}
-                  className="chat-tool-button"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  className={`chat-tool-button${emojiOpen ? " active" : ""}`}
                   title="Emoji"
+                  aria-label="Emoji einfügen"
                 >
                   <IconSmile size={18} />
                 </button>
                 {emojiOpen && (
-                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
-                    {EMOJI_CHOICES.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        className="rounded px-1.5 py-1 transition hover:bg-[var(--bg-hover)]"
-                        title={`Emoji ${e} einfügen`}
-                        onClick={() => {
-                          setText((current) => {
-                            const next = current ? `${current}${e}` : e;
-                            window.requestAnimationFrame(() => {
-                              resizeTextarea(dmInputRef.current);
-                              dmInputRef.current?.focus();
-                            });
-                            return next;
+                  <div className="emoji-picker-anchor">
+                    <EmojiPicker
+                      onPick={(e) => {
+                        setText((current) => {
+                          const next = current ? `${current}${e}` : e;
+                          window.requestAnimationFrame(() => {
+                            resizeTextarea(dmInputRef.current);
+                            dmInputRef.current?.focus();
                           });
-                          setEmojiOpen(false);
-                        }}
-                      >
-                        {e}
-                      </button>
-                    ))}
+                          return next;
+                        });
+                      }}
+                      onClose={() => setEmojiOpen(false)}
+                    />
                   </div>
                 )}
                 <label
                   className="chat-tool-button cursor-pointer"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
                   title="Datei anhängen"
+                  aria-label="Datei anhängen"
                 >
                   <IconPaperclip size={18} />
                   <input
@@ -2886,18 +3076,6 @@ export function ChatShell({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => void sendDmVoice()}
-                  className={`chat-tool-button ${
-                    voice.recording
-                      ? "border-red-500 bg-red-700/60 text-white"
-                      : ""
-                  }`}
-                  style={voice.recording ? {} : { borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                >
-                  {voice.recording ? "■" : <IconMic size={18} />}
-                </button>
                 <textarea
                   ref={dmInputRef}
                   className="chat-input-textarea"
@@ -2905,7 +3083,7 @@ export function ChatShell({
                     voice.recording ? "Aufnahme läuft…" : "Nachricht…"
                   }
                   value={text}
-                  disabled={!preKeyReady || voice.recording || peerPin?.state === "mismatch"}
+                  disabled={voice.recording || peerPin?.state === "mismatch"}
                   rows={1}
                   onChange={(e) => {
                     setText(e.target.value);
@@ -2926,28 +3104,75 @@ export function ChatShell({
                       );
                     }
                   }}
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    for (const it of Array.from(items)) {
+                      if (it.kind === "file" && it.type.startsWith("image/")) {
+                        const f = it.getAsFile();
+                        if (f) {
+                          e.preventDefault();
+                          const named = new File(
+                            [f],
+                            f.name && f.name !== "image.png"
+                              ? f.name
+                              : `image-${Date.now()}.${(f.type.split("/")[1] || "png")}`,
+                            { type: f.type }
+                          );
+                          void sendDmFile(named);
+                          break;
+                        }
+                      }
+                    }
+                  }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (e.key === "Enter" && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void sendDmText();
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                       e.preventDefault();
                       void sendDmText();
                     }
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => void sendDmText()}
-                  disabled={!preKeyReady || voice.recording || !text.trim()}
-                  className="btn-send"
-                >
-                  <IconSend size={16} />
-                </button>
+                {text.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => void sendDmText()}
+                    disabled={voice.recording}
+                    className="btn-send"
+                    aria-label="Senden"
+                    title="Senden (Enter)"
+                  >
+                    <IconSend size={16} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void sendDmVoice()}
+                    className={`btn-send${voice.recording ? " recording" : " mic"}`}
+                    aria-label={voice.recording ? "Aufnahme stoppen" : "Sprachnachricht aufnehmen"}
+                    title={voice.recording ? "Aufnahme stoppen" : "Sprachnachricht aufnehmen"}
+                  >
+                    {voice.recording ? (
+                      <span className="rec-dot" aria-hidden />
+                    ) : (
+                      <IconMic size={18} />
+                    )}
+                  </button>
+                )}
               </div>
             </footer>
           </>
         )}
 
         {tab === "group" && !group && (
-          <ChatEmptyState />
+          <ChatEmptyState
+            hasChats={users.length > 0 || groups.length > 0}
+            onAddContact={() => setShowAddContact(true)}
+            onSaveBackup={() => setSecurityOpen(true)}
+          />
         )}
 
         {tab === "group" && group && (
@@ -2970,20 +3195,39 @@ export function ChatShell({
                   </div>
                   <div>
                   <p className="font-medium" style={{ color: "var(--text)" }}>{group.name}</p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    Ende-zu-Ende verschluesselt · {group.memberIds.length} Mitglieder
-                  </p>
+                  {(() => {
+                    const ts = groupTypingMap.get(group.id);
+                    if (ts && ts.size > 0) {
+                      const names = [...ts].map(
+                        (id) =>
+                          users.find((u) => u.id === id)?.username ?? "Mitglied"
+                      );
+                      const label =
+                        names.length === 1
+                          ? `${names[0]} schreibt…`
+                          : names.length === 2
+                            ? `${names[0]} und ${names[1]} schreiben…`
+                            : `${names.length} schreiben…`;
+                      return (
+                        <p className="header-status typing text-xs">
+                          <span className="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                          </span>
+                          {label}
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                        E2EE symmetrisch · {group.memberIds.length} Mitglieder
+                      </p>
+                    );
+                  })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setGroupVoiceOpen((v) => !v)}
-                    className={`btn btn-secondary btn-icon !h-9 !w-9 ${groupVoiceOpen ? "!border-[var(--accent)] !bg-[var(--accent-soft)] !text-[var(--accent)]" : ""}`}
-                    title="Voice-Lounge"
-                  >
-                    <IconPhone size={18} />
-                  </button>
                   <button
                     type="button"
                     onClick={() => setGroupPanelOpen((v) => !v)}
@@ -3028,83 +3272,43 @@ export function ChatShell({
                 </div>
               </div>
 
-              {groupVoiceOpen && (
-                <div className="group-voice-panel">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                        Voice-Lounge
-                      </p>
-                      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                        Relay-Only schützt IP-Adressen. Mehrpersonen-Voice wird als sichere Mesh/SFU-Stufe vorbereitet.
-                      </p>
-                    </div>
-                    <span className="group-voice-badge">
-                      {relayOnly ? "Relay aktiv" : "Direkt/Relay"}
-                    </span>
-                  </div>
-                  <div className="chat-context-badges">
-                    <span>IP-Schutz</span>
-                    <span>E2E Signaling</span>
-                    <span>Private Member List</span>
-                  </div>
-                  <div className="group-voice-members">
-                    {group.memberIds
-                      .filter((mid) => mid !== session.user.id)
-                      .map((mid) => {
-                        const u = users.find((x) => x.id === mid);
-                        const label = u?.username ?? mid.slice(0, 8);
-                        return (
-                          <div key={mid} className="group-voice-member">
-                            <div className="flex min-w-0 items-center gap-2">
-                              <div
-                                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
-                                style={{ background: userGradient(mid) }}
-                              >
-                                {label.slice(0, 1).toUpperCase()}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="truncate text-xs font-semibold" style={{ color: "var(--text)" }}>
-                                  {label}
-                                </p>
-                                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-                                  {u ? "Kontakt bereit" : "Nicht in Kontakten"}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-primary !px-2 !py-1 !text-[11px]"
-                              disabled={!u || callStatus === "connecting" || callStatus === "connected"}
-                              onClick={() => u && void beginCallWith(u)}
-                            >
-                              Anrufen
-                            </button>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
               {groupPanelOpen && (
                 <div className="mt-3 rounded-xl border p-3 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text)" }}>
                   <ul className="mb-2 space-y-1">
                     {group.memberIds.map((mid) => {
                       const u = users.find((x) => x.id === mid);
                       const label = u?.username ?? (mid === session.user.id ? "Du" : mid.slice(0, 8));
+                      const isFounder =
+                        Boolean(group.createdByUserId) &&
+                        mid === group.createdByUserId;
+                      const canManageMembers =
+                        !group.createdByUserId ||
+                        group.createdByUserId === session.user.id;
                       return (
                         <li
                           key={mid}
-                          className="flex items-center justify-between rounded px-2 py-1"
+                          className="flex items-center justify-between gap-2 rounded px-2 py-1"
                           style={{ background: "var(--bg-hover)" }}
                         >
-                          <span>{label}</span>
-                          {mid !== session.user.id && (
+                          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <span className="truncate">{label}</span>
+                            {isFounder && (
+                              <span
+                                className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{
+                                  background: "var(--accent-soft)",
+                                  color: "var(--accent)",
+                                }}
+                              >
+                                Gründer
+                              </span>
+                            )}
+                          </span>
+                          {mid !== session.user.id && canManageMembers && (
                             <button
                               type="button"
                               onClick={() => void removeMember(mid)}
-                              className="btn btn-danger !px-2 !py-0.5 !text-[10px]"
+                              className="btn btn-danger shrink-0 !px-2 !py-0.5 !text-[10px]"
                             >
                               Entfernen
                             </button>
@@ -3149,79 +3353,119 @@ export function ChatShell({
             </header>
             <div
               ref={groupScrollRef}
-              className="messages-container !px-4 !py-4 relative"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4 relative"
+              onDragOver={(e) => {
+                e.preventDefault();
+                setGroupDragOver(true);
+              }}
+              onDragLeave={() => setGroupDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setGroupDragOver(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file && group) void sendGroupFile(file);
+              }}
             >
-              {newGroupMessageWaiting && (
+              {groupDragOver && (
+                <div className="absolute inset-0 z-50 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-emerald-400 bg-emerald-500/20 backdrop-blur-sm">
+                  <div className="text-center">
+                    <p className="mb-2 text-2xl">📎</p>
+                    <p className="text-sm font-medium text-emerald-700">Datei in die Gruppe legen</p>
+                  </div>
+                </div>
+              )}
+              {pinnedGroupBanner && (
+                <button
+                  type="button"
+                  className="pinned-banner !mx-0 w-full shrink-0 text-left"
+                  onClick={() =>
+                    jumpToCid(pinnedGroupBanner.cid, groupScrollRef.current)
+                  }
+                >
+                  <span className="pinned-banner-icon">
+                    <IconPin size={16} />
+                  </span>
+                  <span className="pinned-banner-content">
+                    <span className="pinned-banner-label">Angeheftet</span>
+                    <span className="pinned-banner-text">
+                      {pinnedGroupBanner.preview}
+                    </span>
+                  </span>
+                </button>
+              )}
+              {(groupScrolledUp || newGroupMessageWaiting) && (
                 <button
                   type="button"
                   onClick={() => {
-                    groupScrollRef.current?.scrollTo({ top: groupScrollRef.current.scrollHeight, behavior: "smooth" });
+                    groupScrollRef.current?.scrollTo({
+                      top: groupScrollRef.current.scrollHeight,
+                      behavior: "smooth",
+                    });
                     setNewGroupMessageWaiting(false);
+                    setGroupScrollUnread(0);
                   }}
-                  className="absolute bottom-4 right-4 z-10 rounded-full bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg hover:bg-emerald-500 transition-all"
+                  className="scroll-bottom-fab visible"
+                  aria-label="Zum Ende scrollen"
+                  title="Zum Ende"
                 >
-                  ↓ Neue Nachrichten
+                  <IconArrowDown size={18} />
+                  {groupScrollUnread > 0 && (
+                    <span className="scroll-bottom-badge">
+                      {groupScrollUnread > 99 ? "99+" : groupScrollUnread}
+                    </span>
+                  )}
                 </button>
               )}
-              {groupMessages.length === 0 && (
-                <div className="chat-inline-empty">
-                  <IconUsers size={24} />
-                  <p>Gruppe bereit</p>
-                  <span>Starte die Unterhaltung oder fuege spaeter weitere Mitglieder hinzu.</span>
-                </div>
-              )}
-              {groupMessages.flatMap((m, i) => {
-                const author =
-                  users.find((u) => u.id === m.fromUserId)?.username ??
-                  (m.fromMe ? "Du" : "Mitglied");
-                const previous = groupMessages[i - 1];
-                const next = groupMessages[i + 1];
-                const items: JSX.Element[] = [];
-                if (
-                  i === 0 ||
-                  new Date(m.at).toDateString() !== new Date(previous.at).toDateString()
-                ) {
-                  items.push(
-                    <div key={`date-${m.id}`} className="date-separator">
-                      <span>{fmtDateLabel(m.at)}</span>
-                    </div>
-                  );
-                }
-                items.push(
-                  <MessageBubble
-                    key={m.plain.cid ?? m.id}
-                    msg={m}
-                    peerLabel={author}
-                    replyToPreview={replyPreviewForMessage(groupMessages, m, author)}
-                    isGrouped={
-                      i > 0 &&
-                      previous.fromMe === m.fromMe &&
-                      previous.fromUserId === m.fromUserId
-                    }
-                    isLastInGroup={
-                      i === groupMessages.length - 1 ||
-                      next.fromMe !== m.fromMe ||
-                      next.fromUserId !== m.fromUserId
-                    }
-                    onReply={(x) =>
-                      setReplyGroup({
-                        cid: x.plain.cid ?? "",
-                        author: x.fromMe ? "Du" : author,
-                        text: previewForPayload(x.plain),
-                        expiresAt: x.expiresAt,
-                      })
-                    }
-                    onReact={(x, e) => void reactGroup(x, e)}
-                    onEdit={(x, body) => void editGroup(x, body)}
-                    onDelete={(x) => void deleteGroup(x)}
-                    onCopy={copyText}
-                  />
-                );
-                return items;
-              })}
+              {groupMessages.map((m, i) => (
+                <MessageBubble
+                  key={m.plain.cid ?? m.id}
+                  msg={m}
+                  isGrouped={
+                    i > 0 &&
+                    groupMessages[i - 1].fromUserId === m.fromUserId &&
+                    groupMessages[i - 1].fromMe === m.fromMe
+                  }
+                  isLastInGroup={
+                    i === groupMessages.length - 1 ||
+                    groupMessages[i + 1].fromUserId !== m.fromUserId
+                  }
+                  isStarred={!!m.plain.cid && starredCids.has(m.plain.cid)}
+                  isHighlighted={
+                    !!m.plain.cid && m.plain.cid === jumpHighlightCid
+                  }
+                  isPinned={!!m.plain.cid && groupPinnedCid === m.plain.cid}
+                  peerLabel={
+                    users.find((u) => u.id === m.fromUserId)?.username ?? group.name
+                  }
+                  replyToPreview={replyPreviewForMessage(
+                    groupMessages,
+                    m,
+                    users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied"
+                  )}
+                  onReply={(x) => {
+                    const author = x.fromMe
+                      ? "Du"
+                      : users.find((u) => u.id === x.fromUserId)?.username ?? "Mitglied";
+                    setReplyGroup({
+                      cid: x.plain.cid ?? "",
+                      author,
+                      text: previewForPayload(x.plain),
+                      expiresAt: x.expiresAt,
+                    });
+                  }}
+                  onReact={(x, e) => void reactGroup(x, e)}
+                  onEdit={(x, body) => void editGroup(x, body)}
+                  onDelete={(x) => void deleteGroup(x)}
+                  onCopy={copyText}
+                  onForward={(x) => setForwardTarget(x)}
+                  onJumpToCid={(cid) => jumpToCid(cid, groupScrollRef.current)}
+                  onToggleStar={toggleStar}
+                  onTogglePin={(x) => togglePinMessage(`group:${group.id}`, x)}
+                />
+              ))}
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <ComposerNotice message={error} onDismiss={() => setError(null)} />}
+              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
               {replyGroup && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
@@ -3240,45 +3484,37 @@ export function ChatShell({
                   </button>
                 </div>
               )}
-              <div className="relative flex items-end gap-2">
+              <div className="chat-input-row">
                 <button
                   type="button"
-                  onClick={() => setEmojiOpen((v) => !v)}
-                  className="chat-tool-button"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
+                  onClick={() => setGroupEmojiOpen((v) => !v)}
+                  className={`chat-tool-button${groupEmojiOpen ? " active" : ""}`}
                   title="Emoji"
+                  aria-label="Emoji einfügen"
                 >
                   <IconSmile size={18} />
                 </button>
-                {emojiOpen && (
-                  <div className="absolute bottom-[62px] left-3 z-20 rounded-2xl border p-2 text-lg shadow-xl backdrop-blur" style={{ borderColor: "var(--border)", background: "var(--bg-glass)" }}>
-                    {EMOJI_CHOICES.map((e) => (
-                      <button
-                        key={e}
-                        type="button"
-                        className="rounded px-1.5 py-1 transition hover:bg-[var(--bg-hover)]"
-                        title={`Emoji ${e} einfuegen`}
-                        onClick={() => {
-                          setGroupText((current) => {
-                            const nextText = current ? `${current}${e}` : e;
-                            window.requestAnimationFrame(() => {
-                              resizeTextarea(groupInputRef.current);
-                              groupInputRef.current?.focus();
-                            });
-                            return nextText;
+                {groupEmojiOpen && (
+                  <div className="emoji-picker-anchor">
+                    <EmojiPicker
+                      onPick={(e) => {
+                        setGroupText((current) => {
+                          const next = current ? `${current}${e}` : e;
+                          window.requestAnimationFrame(() => {
+                            resizeTextarea(groupInputRef.current);
+                            groupInputRef.current?.focus();
                           });
-                          setEmojiOpen(false);
-                        }}
-                      >
-                        {e}
-                      </button>
-                    ))}
+                          return next;
+                        });
+                      }}
+                      onClose={() => setGroupEmojiOpen(false)}
+                    />
                   </div>
                 )}
                 <label
                   className="chat-tool-button cursor-pointer"
-                  style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                  title="Datei an Gruppe senden"
+                  title="Datei anhängen"
+                  aria-label="Datei anhängen"
                 >
                   <IconPaperclip size={18} />
                   <input
@@ -3291,44 +3527,206 @@ export function ChatShell({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => void sendGroupVoice()}
-                  className={`chat-tool-button ${
-                    voice.recording
-                      ? "border-red-500 bg-red-700/60 text-white"
-                      : ""
-                  }`}
-                  style={voice.recording ? {} : { borderColor: "var(--border)", color: "var(--text-secondary)" }}
-                  title={voice.recording ? "Aufnahme stoppen und senden" : "Sprachnachricht aufnehmen"}
-                >
-                  {voice.recording ? "■" : <IconMic size={18} />}
-                </button>
                 <textarea
                   ref={groupInputRef}
                   className="chat-input-textarea"
-                  placeholder="Gruppennachricht…"
+                  placeholder={
+                    groupVoice.recording ? "Aufnahme läuft…" : "Gruppennachricht…"
+                  }
                   value={groupText}
+                  disabled={groupVoice.recording}
                   rows={1}
                   onChange={(e) => {
-                    setGroupText(e.target.value);
+                    const value = e.target.value;
+                    setGroupText(value);
                     resizeTextarea(e.currentTarget);
+                    // Mention detection: find last `@` before cursor
+                    const cursor = e.currentTarget.selectionStart ?? value.length;
+                    const before = value.slice(0, cursor);
+                    const at = before.lastIndexOf("@");
+                    if (at >= 0) {
+                      const sub = before.slice(at + 1);
+                      const hasSpace = /\s/.test(sub);
+                      if (!hasSpace) {
+                        setMentionOpen(true);
+                        setMentionStart(at);
+                        setMentionQuery(sub);
+                        setMentionIndex(0);
+                        return;
+                      }
+                    }
+                    if (mentionOpen) setMentionOpen(false);
+                    const ws = wsRef.current;
+                    if (
+                      sendTypingIndicators &&
+                      ws &&
+                      ws.readyState === WebSocket.OPEN &&
+                      group
+                    ) {
+                      ws.send(
+                        JSON.stringify({
+                          type: "typing",
+                          groupId: group.id,
+                          state: "start",
+                        })
+                      );
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const items = e.clipboardData?.items;
+                    if (!items) return;
+                    for (const it of Array.from(items)) {
+                      if (it.kind === "file" && it.type.startsWith("image/")) {
+                        const f = it.getAsFile();
+                        if (f) {
+                          e.preventDefault();
+                          const named = new File(
+                            [f],
+                            f.name && f.name !== "image.png"
+                              ? f.name
+                              : `image-${Date.now()}.${(f.type.split("/")[1] || "png")}`,
+                            { type: f.type }
+                          );
+                          void sendGroupFile(named);
+                          break;
+                        }
+                      }
+                    }
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    if (mentionOpen) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setMentionIndex((i) => i + 1);
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setMentionIndex((i) => Math.max(0, i - 1));
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setMentionOpen(false);
+                        return;
+                      }
+                      if (e.key === "Tab" || e.key === "Enter") {
+                        const candidates = users.filter((u) =>
+                          group.memberIds.includes(u.id) &&
+                          u.username.toLowerCase().startsWith(mentionQuery.toLowerCase())
+                        );
+                        const pick = candidates[mentionIndex % Math.max(1, candidates.length)];
+                        if (pick) {
+                          e.preventDefault();
+                          const before = groupText.slice(0, mentionStart);
+                          const after = groupText.slice(mentionStart + 1 + mentionQuery.length);
+                          const next = `${before}@${pick.username} ${after}`;
+                          setGroupText(next);
+                          setMentionOpen(false);
+                          window.requestAnimationFrame(() => {
+                            const el = groupInputRef.current;
+                            if (!el) return;
+                            const pos = before.length + 1 + pick.username.length + 1;
+                            el.focus();
+                            el.setSelectionRange(pos, pos);
+                          });
+                          return;
+                        }
+                      }
+                    }
+                    if (e.key === "Enter" && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void sendGroupText();
+                    }
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                       e.preventDefault();
                       void sendGroupText();
                     }
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => void sendGroupText()}
-                  disabled={voice.recording || !groupText.trim()}
-                  className="btn-send"
-                >
-                  <IconSend size={16} />
-                </button>
+                {mentionOpen && (() => {
+                  const candidates = users
+                    .filter(
+                      (u) =>
+                        group.memberIds.includes(u.id) &&
+                        u.id !== session.user.id &&
+                        u.username.toLowerCase().startsWith(mentionQuery.toLowerCase())
+                    )
+                    .slice(0, 6);
+                  if (candidates.length === 0) return null;
+                  return (
+                    <div className="mention-popover">
+                      {candidates.map((u, i) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          className={`mention-item${
+                            i === mentionIndex % candidates.length ? " active" : ""
+                          }`}
+                          onMouseDown={(ev) => {
+                            ev.preventDefault();
+                            const before = groupText.slice(0, mentionStart);
+                            const after = groupText.slice(
+                              mentionStart + 1 + mentionQuery.length
+                            );
+                            const next = `${before}@${u.username} ${after}`;
+                            setGroupText(next);
+                            setMentionOpen(false);
+                            window.requestAnimationFrame(() => {
+                              const el = groupInputRef.current;
+                              if (!el) return;
+                              const pos = before.length + 1 + u.username.length + 1;
+                              el.focus();
+                              el.setSelectionRange(pos, pos);
+                            });
+                          }}
+                        >
+                          <span
+                            className="mention-avatar"
+                            style={{ background: userGradient(u.id) }}
+                          >
+                            {u.username.charAt(0).toUpperCase()}
+                          </span>
+                          <span>@{u.username}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {groupText.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => void sendGroupText()}
+                    disabled={groupVoice.recording}
+                    className="btn-send"
+                    aria-label="Senden"
+                    title="Senden"
+                  >
+                    <IconSend size={16} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void sendGroupVoice()}
+                    className={`btn-send${groupVoice.recording ? " recording" : " mic"}`}
+                    aria-label={
+                      groupVoice.recording
+                        ? "Aufnahme stoppen"
+                        : "Sprachnachricht aufnehmen"
+                    }
+                    title={
+                      groupVoice.recording
+                        ? "Aufnahme stoppen"
+                        : "Sprachnachricht aufnehmen"
+                    }
+                  >
+                    {groupVoice.recording ? (
+                      <span className="rec-dot" aria-hidden />
+                    ) : (
+                      <IconMic size={18} />
+                    )}
+                  </button>
+                )}
               </div>
             </footer>
           </>
@@ -3361,6 +3759,8 @@ export function ChatShell({
             }}
             mutedPeers={mutedPeers}
             setMutedPeers={setMutedPeers}
+            mutedGroups={mutedGroups}
+            setMutedGroups={setMutedGroups}
             isFavorite={Boolean(peer && favoritePeers.has(peer.id))}
             onToggleFavorite={() => {
               if (!peer) return;
@@ -3435,6 +3835,8 @@ export function ChatShell({
               }}
               mutedPeers={mutedPeers}
               setMutedPeers={setMutedPeers}
+              mutedGroups={mutedGroups}
+              setMutedGroups={setMutedGroups}
               isFavorite={Boolean(peer && favoritePeers.has(peer.id))}
               onToggleFavorite={() => {
                 if (!peer) return;
@@ -3470,7 +3872,6 @@ export function ChatShell({
               onClick={() => setTab("dm")}
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
               style={tab === "dm" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
-              aria-label="Mobile Ansicht: Direktnachrichten"
             >
               Direkt
             </button>
@@ -3479,13 +3880,13 @@ export function ChatShell({
               onClick={() => setTab("group")}
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
               style={tab === "group" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
-              aria-label="Mobile Ansicht: Gruppen"
             >
               Gruppen
             </button>
           </div>
         </div>
       )}
+      </div>
       </div>
 
       <AddContactModal
@@ -3503,6 +3904,13 @@ export function ChatShell({
           setPeer(user);
         }}
       />
+      {onboardingOpen && (
+        <OnboardingOverlay
+          onDone={() => setOnboardingOpen(false)}
+          onRequestBackup={() => setSecurityOpen(true)}
+        />
+      )}
+      <ToastRegion />
     </div>
   );
 }
@@ -3514,6 +3922,10 @@ function PeerRow({
   unread,
   isFavorite,
   isBlocked,
+  isPinned,
+  isOnline,
+  isTyping,
+  onTogglePin,
   selected,
   onSelect,
 }: {
@@ -3523,6 +3935,10 @@ function PeerRow({
   unread?: number;
   isFavorite?: boolean;
   isBlocked?: boolean;
+  isPinned?: boolean;
+  isOnline?: boolean;
+  isTyping?: boolean;
+  onTogglePin?: () => void;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -3531,80 +3947,90 @@ function PeerRow({
     void getPin(u.id).then(setPin);
   }, [u.id, u.publicKey]);
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`contact-item w-full ${
-        selected ? "active" : ""
-      } !mx-0 items-center justify-between`}
-    >
-      <div
-        className="contact-avatar !h-9 !w-9 !text-sm"
-        style={{ background: userGradient(u.id) }}
+    <div className="peer-row-wrap">
+      <button
+        type="button"
+        onClick={onSelect}
+        className={`contact-item w-full ${
+          selected ? "active" : ""
+        } !mx-0 items-center justify-between`}
       >
-        {u.username.slice(0, 1).toUpperCase()}
-      </div>
-      <div className="contact-info min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="contact-name">{u.username}</span>
+        <div className="peer-avatar-wrap">
+          <div
+            className="contact-avatar !h-9 !w-9 !text-sm"
+            style={{ background: userGradient(u.id) }}
+          >
+            {u.username.slice(0, 1).toUpperCase()}
+          </div>
+          {isOnline && <span className="peer-online-dot" aria-label="Online" />}
+        </div>
+        <div className="contact-info min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className="contact-name">{u.username}</span>
+            {isPinned && (
+              <span className="row-badge row-badge-pin" title="An Anfang geheftet">
+                <IconPin size={11} />
+              </span>
+            )}
             {isFavorite && (
-              <span className="rounded-md border px-1.5 py-0.5 text-[10px]" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+              <span className="row-badge row-badge-fav" title="Favorit">
                 ★
               </span>
             )}
             {isBlocked && (
-              <span className="rounded-md border border-amber-700/70 bg-amber-950/30 px-1.5 py-0.5 text-[10px] text-amber-200">
+              <span className="row-badge row-badge-warning" title="Blockiert">
                 blockiert
               </span>
             )}
             {pin?.state === "mismatch" && (
-              <span className="rounded-md border border-red-700/70 bg-red-950/30 px-1.5 py-0.5 text-[10px] text-red-200">
+              <span className="row-badge row-badge-danger" title="Schlüssel hat gewechselt">
                 ⚠
               </span>
             )}
             {pin?.state === "verified" && (
-              <span
-                className="rounded-md border px-1.5 py-0.5 text-[10px]"
-                style={{
-                  borderColor: "var(--accent)",
-                  color: "var(--accent)",
-                  background: "var(--accent-soft)",
-                }}
-              >
+              <span className="row-badge row-badge-verified" title="Verifiziert">
                 ✓
               </span>
             )}
+          </div>
+          <p
+            className={`contact-preview${isTyping ? " typing" : ""}`}
+          >
+            {isTyping ? (
+              <span className="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+                schreibt
+              </span>
+            ) : (
+              subtitle ?? ""
+            )}
+          </p>
         </div>
-        <p className="contact-preview">{subtitle ?? ""}</p>
-      </div>
-      <div className="contact-meta">
-        <span className="contact-time">{metaRight ?? ""}</span>
-        {unread && unread > 0 ? (
-          <span className="unread-badge">
-            {unread > 99 ? "99+" : unread}
-          </span>
-        ) : null}
-      </div>
-    </button>
-  );
-}
-
-function ComposerNotice({
-  message,
-  onDismiss,
-}: {
-  message: string;
-  onDismiss?: () => void;
-}) {
-  return (
-    <div className="composer-notice" role="status">
-      <IconAlertTriangle size={16} />
-      <span>{message}</span>
-      {onDismiss ? (
-        <button type="button" onClick={onDismiss} title="Hinweis schliessen">
-          ×
+        <div className="contact-meta">
+          <span className="contact-time">{metaRight ?? ""}</span>
+          {unread && unread > 0 ? (
+            <span className="unread-badge">
+              {unread > 99 ? "99+" : unread}
+            </span>
+          ) : null}
+        </div>
+      </button>
+      {onTogglePin && (
+        <button
+          type="button"
+          className={`peer-pin-toggle${isPinned ? " active" : ""}`}
+          aria-label={isPinned ? "Pin entfernen" : "An Anfang heften"}
+          title={isPinned ? "Pin entfernen" : "An Anfang heften"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTogglePin();
+          }}
+        >
+          <IconPin size={12} />
         </button>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -3619,6 +4045,8 @@ function InfoPanel({
   onClearChat,
   mutedPeers,
   setMutedPeers,
+  mutedGroups,
+  setMutedGroups,
   isFavorite,
   onToggleFavorite,
   isBlocked,
@@ -3634,6 +4062,8 @@ function InfoPanel({
   onClearChat: () => void | Promise<void>;
   mutedPeers: Set<string>;
   setMutedPeers: React.Dispatch<React.SetStateAction<Set<string>>>;
+  mutedGroups: Set<string>;
+  setMutedGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   isBlocked: boolean;
@@ -3642,23 +4072,36 @@ function InfoPanel({
 }) {
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
-  const status = mode === "dm" ? "Privater Chat" : `${group?.memberIds.length ?? 0} Mitglieder`;
-  const isMuted = peer ? mutedPeers.has(peer.id) : false;
+  const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
+  const isMuted =
+    mode === "dm" && peer
+      ? mutedPeers.has(peer.id)
+      : mode === "group" && group
+        ? mutedGroups.has(group.id)
+        : false;
   const groupedSafetyNumber = peerFp
     ? peerFp.replace(/\s+/g, "").match(/.{1,4}/g)?.join(" ") ?? peerFp
     : "…";
 
   const toggleMute = () => {
-    if (!peer) return;
-    setMutedPeers((prev) => {
-      const next = new Set(prev);
-      if (next.has(peer.id)) {
-        next.delete(peer.id);
-      } else {
-        next.add(peer.id);
-      }
-      return next;
-    });
+    if (mode === "dm" && peer) {
+      setMutedPeers((prev) => {
+        const next = new Set(prev);
+        if (next.has(peer.id)) next.delete(peer.id);
+        else next.add(peer.id);
+        return next;
+      });
+      return;
+    }
+    if (mode === "group" && group) {
+      setMutedGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(group.id)) next.delete(group.id);
+        else next.add(group.id);
+        saveStringSet("vaultchat.muted.groups", next);
+        return next;
+      });
+    }
   };
 
   return (
@@ -3669,7 +4112,7 @@ function InfoPanel({
           <div className="info-avatar-large">
             {initials}
           </div>
-          {mode === "dm" && <span className="secure-dot" title="Sicherer Chat" />}
+          {mode === "dm" && <span className="online-dot" />}
         </div>
         <p className="text-center text-lg font-bold" style={{ color: "var(--text)" }}>
           {title}
@@ -3699,7 +4142,7 @@ function InfoPanel({
         >
           <IconBell size={18} />
           <span>
-            {isMuted ? "Stumm" : "Aktiv"}
+            {isMuted ? "Stumm" : "Benachrichtigungen"}
           </span>
         </button>
         <button

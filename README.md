@@ -122,6 +122,8 @@ docker compose up --build
 | `VAULTCHAT_TURN_USER` | TURN-Username |
 | `VAULTCHAT_TURN_PASS` | TURN-Passwort |
 | `VAULTCHAT_FORCE_RELAY` | `1` = Clients kriegen Hinweis, Relay-Only zu nutzen |
+| `VAULTCHAT_MAX_B64_CIPHERTEXT_BYTES` | Maximaler WS-Ciphertext/Envelope-Rahmen; Default ca. 320 MiB für Dateien bis 128 MiB |
+| `VAULTCHAT_JSON_LIMIT` | Limit für JSON-API-Requests; Default `12mb` |
 
 ## Security Roadmap
 

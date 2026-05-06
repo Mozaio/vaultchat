@@ -40,6 +40,18 @@ function assertKey() {
   if (!hasLocalKey()) throw new Error("local_key_missing");
 }
 
+export async function outboxHas(cid: string): Promise<boolean> {
+  assertKey();
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("outbox", "readonly");
+    const req = tx.objectStore("outbox").get(cid);
+    req.onsuccess = () => resolve(Boolean(req.result));
+    req.onerror = () => reject(req.error);
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function outboxAdd(
   cid: string,
   toUserId: string,
@@ -47,6 +59,7 @@ export async function outboxAdd(
   options: { ackMode?: "transport" | "e2e" } = {}
 ): Promise<void> {
   assertKey();
+  if (await outboxHas(cid)) return;
   const envelopeCipher = await encryptString(envelopeB64);
   const rec: OutboxRecord = {
     cid,
