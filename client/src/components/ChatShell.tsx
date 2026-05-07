@@ -75,6 +75,7 @@ import { ChatEmptyState } from "./ChatEmptyState";
 import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
+import { VaultChatLogo } from "./Logo";
 import { pushToast } from "../lib/toastBus";
 import {
   IconArrowDown,
@@ -2993,16 +2994,16 @@ export function ChatShell({
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
-              <IconShield size={18} />
-            </div>
+            <VaultChatLogo size={32} style={{ color: "var(--accent)", flexShrink: 0 }} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
-              VaultChat
+                VaultChat
               </p>
-              <p className="text-xs app-muted">
-                {pendingCount > 0 ? `${pendingCount} ausstehend` : "Secure Messenger"}
-              </p>
+              {pendingCount > 0 && (
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                  {pendingCount} ausstehend
+                </p>
+              )}
             </div>
           </div>
           <div className="flex gap-1.5">
