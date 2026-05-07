@@ -173,6 +173,7 @@ export function MessageBubble({
   onLocalDelete,
   onPollVote,
   threadReplyCount,
+  threadUnreadCount,
   onOpenThread,
 }: {
   msg: ChatMsg;
@@ -198,6 +199,8 @@ export function MessageBubble({
   onPollVote?: (m: ChatMsg, optionIndex: number) => void;
   /** Number of thread replies to this message (only shown on parents). */
   threadReplyCount?: number;
+  /** Number of replies arrived after the user last opened this thread. */
+  threadUnreadCount?: number;
   /** Click handler to open the thread side panel. */
   onOpenThread?: (m: ChatMsg) => void;
 }) {
@@ -812,10 +815,16 @@ export function MessageBubble({
         {threadReplyCount && threadReplyCount > 0 && onOpenThread && (
           <button
             type="button"
-            className={`thread-indicator ${msg.fromMe ? "end" : "start"}`}
+            className={`thread-indicator ${msg.fromMe ? "end" : "start"}${
+              threadUnreadCount && threadUnreadCount > 0 ? " has-unread" : ""
+            }`}
             onClick={() => onOpenThread(msg)}
             aria-label={`Thread mit ${threadReplyCount} ${
               threadReplyCount === 1 ? "Antwort" : "Antworten"
+            }${
+              threadUnreadCount && threadUnreadCount > 0
+                ? `, ${threadUnreadCount} neu`
+                : ""
             } öffnen`}
           >
             <span className="thread-indicator-icon">💬</span>
@@ -823,6 +832,9 @@ export function MessageBubble({
               {threadReplyCount}{" "}
               {threadReplyCount === 1 ? "Antwort" : "Antworten"}
             </span>
+            {threadUnreadCount && threadUnreadCount > 0 && (
+              <span className="thread-indicator-badge">{threadUnreadCount}</span>
+            )}
             <span className="thread-indicator-arrow">→</span>
           </button>
         )}

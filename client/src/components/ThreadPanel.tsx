@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatMsg } from "../lib/incomingDm";
 import { previewForPayload } from "../lib/messagePreview";
+import { markThreadSeen } from "../lib/threadState";
 import { IconX, IconSend, IconMessageSquare } from "./Icons";
 import { MessageBubble } from "./MessageBubble";
 
@@ -46,7 +47,13 @@ export function ThreadPanel({
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [replies.length]);
+    // Mark this thread as seen up to the most recent reply timestamp.
+    const cid = parent.plain.cid;
+    if (cid) {
+      const latest = replies.reduce((acc, r) => Math.max(acc, r.at), 0);
+      markThreadSeen(cid, latest > 0 ? latest : Date.now());
+    }
+  }, [replies.length, parent.plain.cid, replies]);
 
   async function handleSend() {
     const value = text.trim();

@@ -80,6 +80,7 @@ import {
 } from "./SecuritySettings";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ThreadPanel } from "./ThreadPanel";
+import { loadThreadSeen, type ThreadSeenMap } from "../lib/threadState";
 import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
@@ -371,6 +372,19 @@ export function ChatShell({
   const [folders, setFolders] = useState<ChatFolder[]>(() => loadFolders());
   const [foldersManageOpen, setFoldersManageOpen] = useState(false);
   const [openThreadCid, setOpenThreadCid] = useState<string | null>(null);
+  const [threadSeen, setThreadSeen] = useState<ThreadSeenMap>(() =>
+    loadThreadSeen()
+  );
+
+  // Reset open thread when switching chats so it doesn't bleed across DM/group/peer.
+  useEffect(() => {
+    setOpenThreadCid(null);
+  }, [peer?.id, group?.id, tab]);
+
+  // Refresh thread-seen state whenever the panel closes (it writes on close).
+  useEffect(() => {
+    if (!openThreadCid) setThreadSeen(loadThreadSeen());
+  }, [openThreadCid]);
   const [folderEdit, setFolderEdit] = useState<ChatFolder | null>(null);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
 
@@ -3875,12 +3889,28 @@ export function ChatShell({
                   </span>
                 </button>
               )}
-              {messages.flatMap((m, i) => {
+              {(() => {
+                const dmThreadCounts = new Map<string, number>();
+                const dmThreadUnread = new Map<string, number>();
+                for (const m of messages) {
+                  const pCid = m.plain.threadParentCid;
+                  if (pCid) {
+                    dmThreadCounts.set(pCid, (dmThreadCounts.get(pCid) ?? 0) + 1);
+                    const seenAt = threadSeen[pCid] ?? 0;
+                    if (m.at > seenAt && !m.fromMe) {
+                      dmThreadUnread.set(pCid, (dmThreadUnread.get(pCid) ?? 0) + 1);
+                    }
+                  }
+                }
+                const mainDmMsgs = messages.filter(
+                  (m) => !m.plain.threadParentCid
+                );
+                return mainDmMsgs.flatMap((m, i) => {
                 const items: JSX.Element[] = [];
                 if (
                   i === 0 ||
                   new Date(m.at).toDateString() !==
-                    new Date(messages[i - 1].at).toDateString()
+                    new Date(mainDmMsgs[i - 1].at).toDateString()
                 ) {
                   items.push(
                     <div key={`date-${m.id}`} className="date-separator">
@@ -3892,11 +3922,20 @@ export function ChatShell({
                   <MessageBubble
                     key={m.plain.cid ?? m.id}
                     msg={m}
-                    isGrouped={i > 0 && messages[i - 1].fromMe === m.fromMe}
+                    isGrouped={i > 0 && mainDmMsgs[i - 1].fromMe === m.fromMe}
                     isLastInGroup={
-                      i === messages.length - 1 ||
-                      messages[i + 1].fromMe !== m.fromMe
+                      i === mainDmMsgs.length - 1 ||
+                      mainDmMsgs[i + 1].fromMe !== m.fromMe
                     }
+                    threadReplyCount={
+                      m.plain.cid ? dmThreadCounts.get(m.plain.cid) : undefined
+                    }
+                    threadUnreadCount={
+                      m.plain.cid ? dmThreadUnread.get(m.plain.cid) : undefined
+                    }
+                    onOpenThread={(x) => {
+                      if (x.plain.cid) setOpenThreadCid(x.plain.cid);
+                    }}
                     isStarred={!!m.plain.cid && starredCids.has(m.plain.cid)}
                     isHighlighted={
                       !!m.plain.cid && m.plain.cid === jumpHighlightCid
@@ -3929,7 +3968,8 @@ export function ChatShell({
                   />
                 );
                 return items;
-              })}
+              });
+              })()}
               {/* Typing-Indikator wird nun im Chat-Header angezeigt */}
             </div>
 
@@ -4707,10 +4747,15 @@ export function ChatShell({
               )}
               {(() => {
                 const threadCounts = new Map<string, number>();
+                const threadUnread = new Map<string, number>();
                 for (const m of groupMessages) {
                   const parentCid = m.plain.threadParentCid;
                   if (parentCid) {
                     threadCounts.set(parentCid, (threadCounts.get(parentCid) ?? 0) + 1);
+                    const seenAt = threadSeen[parentCid] ?? 0;
+                    if (m.at > seenAt && !m.fromMe) {
+                      threadUnread.set(parentCid, (threadUnread.get(parentCid) ?? 0) + 1);
+                    }
                   }
                 }
                 const mainMsgs = groupMessages.filter(
@@ -4731,6 +4776,9 @@ export function ChatShell({
                   }
                   threadReplyCount={
                     m.plain.cid ? threadCounts.get(m.plain.cid) : undefined
+                  }
+                  threadUnreadCount={
+                    m.plain.cid ? threadUnread.get(m.plain.cid) : undefined
                   }
                   onOpenThread={(x) => {
                     if (x.plain.cid) setOpenThreadCid(x.plain.cid);
@@ -5176,16 +5224,24 @@ export function ChatShell({
         )}
       </main>
 
-      {openThreadCid && group && (() => {
-        const parent = groupMessages.find((m) => m.plain.cid === openThreadCid);
+      {openThreadCid && (() => {
+        const isGroupCtx = tab === "group" && !!group;
+        const isDmCtx = tab === "dm" && !!peer;
+        if (!isGroupCtx && !isDmCtx) return null;
+
+        const allMsgs = isGroupCtx ? groupMessages : messages;
+        const parent = allMsgs.find((m) => m.plain.cid === openThreadCid);
         if (!parent) return null;
-        const replies = groupMessages.filter(
+        const replies = allMsgs.filter(
           (m) => m.plain.threadParentCid === openThreadCid
         );
-        const resolveAuthor = (m: ChatMsg) =>
-          m.fromMe
-            ? "Du"
-            : users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied";
+        const resolveAuthor = isGroupCtx
+          ? (m: ChatMsg) =>
+              m.fromMe
+                ? "Du"
+                : users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied"
+          : (m: ChatMsg) => (m.fromMe ? "Du" : peer!.username);
+
         return (
           <ThreadPanel
             parent={parent}
@@ -5200,15 +5256,34 @@ export function ChatShell({
                 body,
                 threadParentCid: openThreadCid,
               };
-              await sendGroupWire(group, payload);
+              if (isGroupCtx) {
+                await sendGroupWire(group!, payload);
+              } else if (peer!.id === session.user.id) {
+                await appendSelfMessage(payload);
+              } else {
+                await sendDmWire(peer!, payload);
+              }
             }}
-            onReact={(x, e) => void reactGroup(x, e)}
-            onEdit={(x, body) => void editGroup(x, body)}
-            onDelete={(x) => void deleteGroup(x)}
-            onLocalDelete={(x) => void localDeleteGroupMsg(x)}
+            onReact={(x, e) =>
+              void (isGroupCtx ? reactGroup(x, e) : reactDm(x, e))
+            }
+            onEdit={(x, body) =>
+              void (isGroupCtx ? editGroup(x, body) : editDm(x, body))
+            }
+            onDelete={(x) =>
+              void (isGroupCtx ? deleteGroup(x) : deleteDm(x))
+            }
+            onLocalDelete={(x) =>
+              void (isGroupCtx ? localDeleteGroupMsg(x) : localDeleteDm(x))
+            }
             onCopy={copyText}
             onForward={(x) => setForwardTarget(x)}
-            onJumpToCid={(cid) => jumpToCid(cid, groupScrollRef.current)}
+            onJumpToCid={(cid) =>
+              jumpToCid(
+                cid,
+                isGroupCtx ? groupScrollRef.current : dmScrollRef.current
+              )
+            }
           />
         );
       })()}
