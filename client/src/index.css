@@ -684,10 +684,15 @@ select:focus-visible {
 }
 
 .code-integrity-banner.danger {
-  align-items: flex-start;
-  flex-direction: column;
   color: var(--danger);
   background: var(--danger-soft);
+}
+
+.code-integrity-dismiss {
+  margin-left: 0;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1;
 }
 
 .code-integrity-action {

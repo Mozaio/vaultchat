@@ -333,28 +333,39 @@ function CodeIntegrityBanner({
   }
   return (
     <div className="code-integrity-banner danger">
-      <p className="font-semibold">
-        Build-Integrität stimmt nicht mit dem verifizierten Wert überein.
-      </p>
-      <p className="font-mono">Aktuell: {check.hash}</p>
-      <p className="font-mono">Gepinnt: {check.pinned}</p>
-      <div className="mt-1 flex gap-2">
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              await securePinCodeHash(check.hash);
-            } catch {
-              pinCodeHash(check.hash);
-            }
-            await onPinned();
-            setDismissed(true);
-          }}
-          className="code-integrity-action"
+      <span className="code-integrity-copy">
+        <strong>Build-Integrität geändert</strong>
+        <span
+          className="font-mono"
+          title={`Aktuell: ${check.hash}\nGepinnt: ${check.pinned}`}
         >
-          Neu verifizieren
-        </button>
-      </div>
+          aktuell {check.hash.slice(0, 12)}… · gepinnt {check.pinned.slice(0, 12)}…
+        </span>
+      </span>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await securePinCodeHash(check.hash);
+          } catch {
+            pinCodeHash(check.hash);
+          }
+          await onPinned();
+          setDismissed(true);
+        }}
+        className="code-integrity-action"
+      >
+        Neu verifizieren
+      </button>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="code-integrity-action code-integrity-dismiss"
+        aria-label="Banner ausblenden"
+        title="Ausblenden"
+      >
+        ×
+      </button>
     </div>
   );
 }
