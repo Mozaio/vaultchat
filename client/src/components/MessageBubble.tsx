@@ -557,7 +557,17 @@ export function MessageBubble({
             {msg.edited && !msg.deleted && (
               <span className="meta-edited">bearbeitet</span>
             )}
-            <span className="meta-time">
+            <span
+              className="meta-time"
+              title={new Date(msg.at).toLocaleString(undefined, {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            >
               {new Date(msg.at).toLocaleTimeString(undefined, {
                 hour: "2-digit",
                 minute: "2-digit",
