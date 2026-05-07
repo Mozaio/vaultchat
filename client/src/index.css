@@ -509,8 +509,9 @@ select:focus-visible {
   gap: 0.35rem;
   padding: 4px 12px;
   border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   font-size: 12px;
 }
 
@@ -526,20 +527,19 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  padding: 0.65rem 0.85rem;
+  padding: 0.6rem 0.8rem;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .empty-quick-action:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  transform: translateY(-1px);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
 }
 
 .empty-quick-action-icon {
@@ -1027,12 +1027,12 @@ select:focus-visible {
 .date-separator span {
   position: relative;
   z-index: 1;
-  padding: 0.25rem 0.75rem;
-  background: var(--bg-glass);
-  backdrop-filter: blur(8px);
+  padding: 0.25rem 0.85rem;
+  background: var(--bg-chat);
+  border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  font-size: 0.6875rem;
-  font-weight: 600;
+  font-size: 0.7rem;
+  font-weight: 500;
   color: var(--text-muted);
   border: 1px solid var(--border);
 }
@@ -2379,9 +2379,9 @@ select:focus-visible {
 
 .pinned-banner-label {
   font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
