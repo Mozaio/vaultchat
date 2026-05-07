@@ -710,9 +710,21 @@ export function ChatShell({
         return;
       }
       setPeerFp(await fingerprintFromPublicKeyB64(peer.publicKey));
+      // Saved Messages / self-chat: there's no MITM threat against
+      // your own identity key, so always treat as verified and skip
+      // the TOFU lookup entirely.
+      if (peer.id === session.user.id) {
+        setPeerPin({
+          publicKey: peer.publicKey,
+          state: "verified",
+          firstSeen: Date.now(),
+          verifiedAt: Date.now(),
+        });
+        return;
+      }
       setPeerPin(await getPin(peer.id));
     })();
-  }, [peer]);
+  }, [peer, session.user.id]);
 
   const rebuildDm = useCallback((peerId: string) => {
     const raw = rawDmRef.current.get(peerId) ?? [];
@@ -1447,7 +1459,8 @@ export function ChatShell({
 
   async function sendDmText() {
     if (!peer || !text.trim()) return;
-    if (peerPin?.state === "mismatch") {
+    const isSelf = peer.id === session.user.id;
+    if (!isSelf && peerPin?.state === "mismatch") {
       setError("Schlüssel dieses Peers hat gewechselt. Bitte zuerst Sicherheitsnummer prüfen.");
       return;
     }
@@ -1469,7 +1482,11 @@ export function ChatShell({
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
       ...(viewOnceDm ? { viewOnce: true } : {}),
     };
-    await sendDmWire(peer, payload);
+    if (isSelf) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
     setText("");
     resetTextarea(dmInputRef.current);
     setReplyDm(null);
@@ -1507,7 +1524,11 @@ export function ChatShell({
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
       ...(viewOnceDm ? { viewOnce: true } : {}),
     };
-    await sendDmWire(peer, payload);
+    if (peer.id === session.user.id) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
     setViewOnceDm(false);
   }
 
@@ -1526,7 +1547,11 @@ export function ChatShell({
         ...(ttlDm ? { ttlMs: ttlDm } : {}),
         ...(viewOnceDm ? { viewOnce: true } : {}),
       };
-      await sendDmWire(peer, payload);
+      if (peer.id === session.user.id) {
+        await appendSelfMessage(payload);
+      } else {
+        await sendDmWire(peer, payload);
+      }
       setViewOnceDm(false);
     } else {
       const ok = await voice.start();
@@ -1625,7 +1650,11 @@ export function ChatShell({
       refCid,
       emoji,
     };
-    await sendDmWire(peer, payload);
+    if (peer.id === session.user.id) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
   }
 
   async function reactGroup(m: ChatMsg, emoji: string) {
@@ -1653,7 +1682,11 @@ export function ChatShell({
       refCid,
       body,
     };
-    await sendDmWire(peer, payload);
+    if (peer.id === session.user.id) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
   }
 
   async function editGroup(m: ChatMsg, body: string) {
@@ -1680,7 +1713,11 @@ export function ChatShell({
       kind: "delete",
       refCid,
     };
-    await sendDmWire(peer, payload);
+    if (peer.id === session.user.id) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
     await idbDeleteDm(m.id);
     const arr = (rawDmRef.current.get(peer.id) ?? []).filter(
       (x) => x.id !== m.id
@@ -1782,6 +1819,37 @@ export function ChatShell({
     setTab("group");
     // Refresh group list immediately
     await loadGroups();
+  }
+
+  /**
+   * Persist a payload directly into the local DM history for the current
+   * user (Saved Messages / self-chat). No wire frame is sent — Saved
+   * Messages stay on this device.
+   */
+  async function appendSelfMessage(payload: PlainPayload) {
+    const selfId = session.user.id;
+    const id = `self:${newCid()}`;
+    const at = Date.now();
+    const ttl = payload.ttlMs ?? 0;
+    const stored = {
+      id,
+      peerId: selfId,
+      fromMe: true,
+      plainJson: JSON.stringify(payload),
+      at,
+      ...(ttl ? { expiresAt: at + ttl } : {}),
+    };
+    await idbPutDm(stored);
+    const arr = rawDmRef.current.get(selfId) ?? [];
+    arr.push({
+      id,
+      fromMe: true,
+      plainJson: stored.plainJson,
+      at,
+      ...(ttl ? { expiresAt: at + ttl } : {}),
+    });
+    rawDmRef.current.set(selfId, arr);
+    if (peerRef.current?.id === selfId) rebuildDm(selfId);
   }
 
   async function rotateGroupKey(g: api.ApiGroup, newMembers: string[]) {
@@ -2960,6 +3028,42 @@ export function ChatShell({
                   : "flex-1"
               }`}
             >
+              {(sidebarFilter === "all" || sidebarFilter === "dm") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTab("dm");
+                    setGroup(null);
+                    setPeer({
+                      id: session.user.id,
+                      username: "Saved Messages",
+                      publicKey: session.user.publicKey,
+                    });
+                    setInfoOpen(false);
+                  }}
+                  className={`contact-item w-full !mx-0 ${
+                    peer?.id === session.user.id && tab === "dm"
+                      ? "active"
+                      : ""
+                  }`}
+                >
+                  <div
+                    className="contact-avatar !h-9 !w-9"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    <IconBookmark size={16} />
+                  </div>
+                  <div className="contact-info min-w-0">
+                    <span className="contact-name">Saved Messages</span>
+                    <p
+                      className="contact-preview"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      Notizen für dich
+                    </p>
+                  </div>
+                </button>
+              )}
               {peerList}
               {sidebarFilter === "star" &&
                 visibleUsers.length === 0 &&
@@ -3299,16 +3403,25 @@ export function ChatShell({
                       <div
                         className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
                         style={{
-                          background: userGradient(peer.id),
+                          background:
+                            peer.id === session.user.id
+                              ? "var(--accent)"
+                              : userGradient(peer.id),
                         }}
                       >
-                        {peer.username.slice(0, 1).toUpperCase()}
+                        {peer.id === session.user.id ? (
+                          <IconBookmark size={16} />
+                        ) : (
+                          peer.username.slice(0, 1).toUpperCase()
+                        )}
                       </div>
-                      <span
-                        className={`header-online-dot${
-                          onlinePeers.has(peer.id) ? " online" : ""
-                        }`}
-                      />
+                      {peer.id !== session.user.id && (
+                        <span
+                          className={`header-online-dot${
+                            onlinePeers.has(peer.id) ? " online" : ""
+                          }`}
+                        />
+                      )}
                     </div>
                     <div className="header-identity-text min-w-0">
                       <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
