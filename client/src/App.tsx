@@ -152,25 +152,6 @@ export function App() {
   ) : null;
 
   if (!unlocked) {
-    if (codeCheck?.state === "pinned_mismatch") {
-      return (
-        <div className="flex min-h-full flex-col">
-          {banner}
-          <div className="flex flex-1 items-center justify-center p-6">
-            <div className="app-surface max-w-xl rounded-2xl p-5">
-              <p className="text-sm font-semibold text-red-200">
-                Entsperren blockiert: Der ausgelieferte App-Code stimmt nicht
-                mit dem gepinnten Hash überein.
-              </p>
-              <p className="mt-2 text-sm app-muted">
-                Vergleiche den aktuellen Hash mit einer unabhängigen Quelle.
-                Pinne nur neu, wenn du diesem Build bewusst vertraust.
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
     return (
       <div className="flex min-h-full flex-col">
         {banner}
@@ -190,16 +171,12 @@ export function App() {
                 await setLocalKeyFromSecret(s.secretKey);
                 setIdbAccountScope(s.user.id);
 
-                // Neue Sicherheits-Features initialisieren
+                // Verification-Key setzen, aber bei pinned_mismatch nur warnen
+                // (der rote Integrity-Banner bleibt sichtbar als Warnung)
                 await setVerificationKey(s.secretKey);
-                const postUnlockCheck = await checkCodeIntegrityEnhanced();
-                if (postUnlockCheck.state === "pinned_mismatch") {
-                  clearVerificationKey();
-                  throw new Error("code_integrity_mismatch");
-                }
                 registerKeyForProtection(s.secretKey);
                 startPeriodicWipe();
-                
+
                 await idbPurgeExpired().catch(() => {});
                 setSession(s);
               }}
