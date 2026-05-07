@@ -97,6 +97,7 @@ import {
   IconForward,
   IconImage,
   IconInfo,
+  IconHelpCircle,
   IconLock,
   IconMic,
   IconMoreVertical,
@@ -3460,6 +3461,15 @@ export function ChatShell({
             title={myFp ? `Fingerprint: ${myFp}` : "Eigenes Profil"}
           >
             {session.user.username}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShortcutsHelpOpen(true)}
+            className="sidebar-footer-action"
+            title="Tastatur-Shortcuts (?)"
+            aria-label="Tastatur-Shortcuts anzeigen"
+          >
+            <IconHelpCircle size={16} />
           </button>
           <button
             type="button"
