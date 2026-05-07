@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   buildSessionFromLogin,
   buildSessionFromRegister,
@@ -13,50 +13,50 @@ import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
 import { parseIdentityBackup } from "../lib/backup";
 import { ThemeToggle } from "./ThemeToggle";
-import { IconAlertTriangle, IconLock, IconShieldCheck, IconTimer } from "./Icons";
+import {
+  IconAlertTriangle,
+  IconLock,
+  IconShieldCheck,
+  IconTimer,
+  IconBookmark,
+} from "./Icons";
 import { VaultChatLogo } from "./Logo";
 
 type Mode = "unlock" | "login" | "register" | "import";
 type ProductPlanId = "personal" | "pro" | "team";
 
-// Discord-like username validation
 function validateUsername(username: string): { valid: boolean; error?: string } {
-  if (!username) {
-    return { valid: false, error: "Benutzername erforderlich" };
-  }
-  if (username.length < 2) {
-    return { valid: false, error: "Mindestens 2 Zeichen" };
-  }
-  if (username.length > 32) {
-    return { valid: false, error: "Maximal 32 Zeichen" };
-  }
-  // Alphanumeric, underscore, hyphen
-  if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-    return { valid: false, error: "Nur Buchstaben, Zahlen, _ und - erlaubt" };
-  }
-  if (!/^[a-zA-Z]/.test(username)) {
+  if (!username) return { valid: false, error: "Benutzername erforderlich" };
+  if (username.length < 2) return { valid: false, error: "Mindestens 2 Zeichen" };
+  if (username.length > 32) return { valid: false, error: "Maximal 32 Zeichen" };
+  if (!/^[a-zA-Z0-9_-]+$/.test(username))
+    return { valid: false, error: "Nur Buchstaben, Zahlen, _ und -" };
+  if (!/^[a-zA-Z]/.test(username))
     return { valid: false, error: "Muss mit einem Buchstaben beginnen" };
-  }
-  // Can't start or end with underscore/hyphen
-  if (/^[_-]|[_-]$/.test(username)) {
+  if (/^[_-]|[_-]$/.test(username))
     return { valid: false, error: "Darf nicht mit _ oder - beginnen/enden" };
-  }
-  // No double or adjacent separator characters
-  if (/__|--|-_|_-/.test(username)) {
-    return { valid: false, error: "Keine doppelte Zeichen wie __ oder -- erlaubt" };
-  }
-  if (["admin", "support", "vaultchat", "system", "signal", "telegram", "discord"].includes(username.toLowerCase())) {
+  if (/__|--|-_|_-/.test(username))
+    return { valid: false, error: "Keine doppelten Trennzeichen" };
+  if (
+    [
+      "admin",
+      "support",
+      "vaultchat",
+      "system",
+      "signal",
+      "telegram",
+      "discord",
+    ].includes(username.toLowerCase())
+  )
     return { valid: false, error: "Dieser Name ist reserviert" };
-  }
   return { valid: true };
 }
 
-// Check icon component
 function CheckIcon({ valid }: { valid: boolean }) {
   return valid ? (
-    <span className="text-emerald-400">✓</span>
+    <span style={{ color: "var(--accent)" }}>✓</span>
   ) : (
-    <span className="text-zinc-500">○</span>
+    <span style={{ color: "var(--text-muted)" }}>○</span>
   );
 }
 
@@ -64,20 +64,22 @@ function humanError(err: unknown): string {
   const msg = err instanceof Error ? err.message : "unknown_error";
   if (msg.startsWith("api_base_misconfigured:")) {
     const b = msg.slice("api_base_misconfigured:".length);
-    return `API-Server falsch konfiguriert. Aktuelle API-Basis: ${b}. In Render beim Client bitte VITE_API_BASE auf deinen Server setzen (z. B. https://vaultchat-server.onrender.com).`;
+    return `API-Server falsch konfiguriert. Aktuelle API-Basis: ${b}.`;
   }
-  if (msg === "network_error_or_cors") {
-    return "Netzwerk/CORS-Fehler. Prüfe, ob der Server erreichbar ist und VAULTCHAT_CORS_ORIGIN im Server korrekt auf die Client-URL zeigt.";
-  }
-  if (msg === "api_timeout") {
-    return "Server antwortet nicht rechtzeitig (Timeout). Auf Render Free evtl. schläft der Server gerade; versuche es nach 20-30 Sekunden erneut.";
-  }
+  if (msg === "network_error_or_cors")
+    return "Netzwerk- oder CORS-Fehler. Server vielleicht nicht erreichbar.";
+  if (msg === "api_timeout")
+    return "Server antwortet nicht (Timeout). Render Free schläft evtl. — in 20-30 Sekunden erneut versuchen.";
   if (msg === "username_taken") return "Benutzername bereits vergeben.";
-  if (msg === "invite_required") return "Registrierung erfordert einen Einladungscode.";
-  if (msg === "invalid_invite") return "Einladungscode ist ungueltig.";
-  if (msg === "registration_closed") return "Registrierung ist aktuell geschlossen.";
-  if (msg === "invalid_body") return "Eingaben ungültig. Prüfe Benutzername/Passwort.";
-  if (msg === "invalid_credentials") return "Login fehlgeschlagen: Benutzername oder Passwort falsch.";
+  if (msg === "invite_required")
+    return "Registrierung erfordert einen Einladungscode.";
+  if (msg === "invalid_invite") return "Einladungscode ist ungültig.";
+  if (msg === "registration_closed")
+    return "Registrierung ist aktuell geschlossen.";
+  if (msg === "invalid_body")
+    return "Eingaben ungültig. Prüfe Benutzername und Passwort.";
+  if (msg === "invalid_credentials")
+    return "Benutzername oder Passwort falsch.";
   return msg;
 }
 
@@ -97,14 +99,19 @@ export function AuthPanel({
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<ProductPlanId>("personal");
   const [showAdvancedAuth, setShowAdvancedAuth] = useState(false);
-  const [registrationMode, setRegistrationMode] = useState<"open" | "invite" | "closed">("open");
-  const [productConfig, setProductConfig] = useState<api.PublicConfig["product"] | null>(null);
+  const [registrationMode, setRegistrationMode] = useState<
+    "open" | "invite" | "closed"
+  >("open");
+  const [productConfig, setProductConfig] = useState<
+    api.PublicConfig["product"] | null
+  >(null);
   const [importJson, setImportJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void api.publicConfig()
+    void api
+      .publicConfig()
       .then((config) => {
         setRegistrationMode(config.registration.mode);
         setProductConfig(config.product ?? null);
@@ -187,311 +194,282 @@ export function AuthPanel({
     }
   }
 
+  const cardTitle = hasLocal
+    ? mode === "unlock"
+      ? "Willkommen zurück"
+      : "Anderes Konto"
+    : mode === "import"
+      ? "Backup importieren"
+      : mode === "register"
+        ? "Konto erstellen"
+        : "Anmelden";
+
+  const cardSubtitle = hasLocal
+    ? mode === "unlock"
+      ? "Lokale Schlüssel mit deinem Passwort entsperren."
+      : "Mit anderem Konto auf diesem Gerät einloggen."
+    : mode === "register"
+      ? "Wähle einen Benutzernamen und ein starkes Passwort. Keine E-Mail nötig."
+      : mode === "import"
+        ? "Importiere ein verschlüsseltes Backup, um auf diesem Gerät weiter zu chatten."
+        : "Mit Benutzername und Passwort einloggen.";
+
   return (
-    <div className="landing-container min-h-full w-full bg-[var(--bg)]">
-      <div className="landing-hero">
-        <div className="landing-logo" aria-hidden>
-          <VaultChatLogo size={44} style={{ color: "var(--accent)" }} />
+    <div className="landing-page">
+      {/* Top brand bar */}
+      <header className="landing-topbar">
+        <div className="landing-brand">
+          <VaultChatLogo size={28} style={{ color: "var(--accent)" }} />
           <span>VaultChat</span>
         </div>
-        <h1 className="landing-title">
-          Verschlüsselter Messenger.
-        </h1>
-        <p className="landing-subtitle">
-          Ende-zu-Ende verschlüsselt. Sealed Sender. Private Gruppen — ganz ohne
-          Telefonnummer oder Pflicht-E-Mail.
-        </p>
-        <div className="feature-list max-w-lg">
-          <Feature
-            icon={<IconLock size={18} />}
-            title="Sealed Sender"
-            desc="Der Server sieht keinen Absender"
-          />
-          <Feature
-            icon={<IconShieldCheck size={18} />}
-            title="TOFU + Sicherheitsnummer"
-            desc="Schlüsselwechsel werden erkannt"
-          />
-          <Feature
-            icon={<IconTimer size={18} />}
-            title="Auto-Lock"
-            desc="Schlüssel nach Inaktivität gelöscht"
-          />
-        </div>
-        <div className="landing-trust-grid">
-          <div>Keine Pflicht-E-Mail</div>
-          <div>Lokale Schlüssel</div>
-          <div>Privacy Controls</div>
-        </div>
-      </div>
+        <ThemeToggle />
+      </header>
 
-      <div className="flex min-h-full w-full min-w-0 items-center justify-center p-4">
-        <div className="auth-card w-full max-w-md">
-          <div className="mb-5 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="auth-brand">
-                <VaultChatLogo size={26} style={{ color: "var(--accent)" }} aria-hidden />
-                <span>VaultChat</span>
+      <main className="landing-stage">
+        {/* Eyebrow above the auth card */}
+        <div className="landing-eyebrow">
+          <h1>Verschlüsselter Browser-Messenger.</h1>
+          <p>
+            Sealed Sender, Zero-Knowledge-Relay, ohne Telefonnummer oder
+            Pflicht-E-Mail.
+          </p>
+        </div>
+
+        {/* Auth card — the centerpiece */}
+        <section className="auth-card-v2" aria-labelledby="auth-card-title">
+          <header className="auth-card-v2-head">
+            <h2 id="auth-card-title">{cardTitle}</h2>
+            <p>{cardSubtitle}</p>
+          </header>
+
+          {hasLocal && mode !== "import" && (
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={mode === "unlock" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("unlock")}
+              >
+                Entsperren
+              </button>
+              <button
+                type="button"
+                className={mode === "login" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("login")}
+              >
+                Anderes Konto
+              </button>
+            </div>
+          )}
+
+          {!hasLocal && mode !== "import" && (
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={mode === "login" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("login")}
+              >
+                Anmelden
+              </button>
+              <button
+                type="button"
+                className={mode === "register" ? "auth-tab active" : "auth-tab"}
+                onClick={() => setMode("register")}
+              >
+                Registrieren
+              </button>
+            </div>
+          )}
+
+          {mode === "unlock" && hasLocal && (
+            <div className="auth-form">
+              <div className="auth-input-group">
+                <label htmlFor="auth-password">Passwort für lokale Schlüssel</label>
+                <input
+                  id="auth-password"
+                  type="password"
+                  autoComplete="current-password"
+                  className="auth-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoFocus
+                />
               </div>
-              <h2
-                className="mt-4 text-lg font-bold tracking-tight"
-                style={{ color: "var(--text)" }}
+              <button
+                type="button"
+                onClick={() => void handleUnlock()}
+                disabled={busy}
+                className="auth-button"
               >
-                {hasLocal
-                  ? mode === "unlock"
-                    ? "Willkommen zurück"
-                    : "Anderes Konto"
-                  : mode === "import"
-                    ? "Backup importieren"
-                    : mode === "register"
-                      ? "Konto erstellen"
-                      : "Anmelden"}
-              </h2>
-              <p
-                className="mt-0.5 text-sm"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {hasLocal
-                  ? "Lokale Schluessel mit deinem Passwort entsperren."
-                  : "Privater Messenger mit lokalem Schluessel-Backup."}
+                {busy ? "…" : "Entsperren"}
+              </button>
+              <p className="auth-hint">
+                Backup &amp; Fingerprint findest du nach dem Entsperren in den
+                Einstellungen.
               </p>
             </div>
-            <ThemeToggle />
-          </div>
+          )}
 
-          <div className="mb-6 border-b pb-5 md:hidden" style={{ borderColor: "var(--border)" }}>
-            <h3
-              className="text-2xl font-bold tracking-tight"
-              style={{ color: "var(--text)" }}
-            >
-              VaultChat
-            </h3>
-            <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-              Verschluesselt, privat, minimal Metadaten.
-            </p>
-          </div>
-
-        {hasLocal && mode !== "import" && (
-          <div className="auth-tabs mb-5">
-            <button
-              type="button"
-              className={mode === "unlock" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("unlock")}
-            >
-              Entsperren
-            </button>
-            <button
-              type="button"
-              className={mode === "login" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("login")}
-            >
-              Anderes Konto
-            </button>
-          </div>
-        )}
-
-        {!hasLocal && mode !== "import" && (
-          <div className="auth-tabs mb-5">
-            <button
-              type="button"
-              className={mode === "login" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("login")}
-            >
-              Anmelden
-            </button>
-            <button
-              type="button"
-              className={mode === "register" ? "auth-tab active" : "auth-tab"}
-              onClick={() => setMode("register")}
-            >
-              Registrieren
-            </button>
-          </div>
-        )}
-
-        {mode === "unlock" && hasLocal && (
-          <div className="space-y-4">
-            <div className="auth-input-group">
-              <label>Passwort fuer lokale Schluessel</label>
-              <input
-                type="password"
-                autoComplete="current-password"
-                className="auth-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => void handleUnlock()}
-              disabled={busy}
-              className="auth-button"
-            >
-              {busy ? "…" : "Entsperren"}
-            </button>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Datensicherung und Fingerprint findest du nach dem Entsperren in den Einstellungen.
-            </p>
-          </div>
-        )}
-
-        {mode === "login" && (
-          <div className="space-y-4">
-            <div className="auth-input-group">
-              <label>Benutzername</label>
-              <input
-                className="auth-input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                required
-              />
-            </div>
-            <div className="auth-input-group">
-              <label>Passwort</label>
-              <input
-                type="password"
-                className="auth-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => void handleLogin()}
-              disabled={busy}
-              className="auth-button"
-            >
-              {busy ? "…" : "Anmelden"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("import")}
-              className="btn btn-secondary w-full"
-            >
-              Neues Gerät? Backup importieren
-            </button>
-          </div>
-        )}
-
-        {mode === "register" && !hasLocal && (
-          <div className="space-y-4">
-            <div className="auth-input-group">
-              <label className="auth-label-row">
-                <span>Benutzername</span>
-                <span>
-                  2-32 Zeichen
-                </span>
-              </label>
-              <input
-                className="auth-input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                autoComplete="username"
-                placeholder="z.B. cool_user123"
-                required
-              />
-              {/* Username validation checklist */}
-              {username.length > 0 && (
-                <div className="mt-2 space-y-1 rounded-lg border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-sidebar)" }}>
-                  <div className={`flex items-center gap-2 text-xs ${username.length >= 2 && username.length <= 32 ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={username.length >= 2 && username.length <= 32} />
-                    <span>2-32 Zeichen</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z0-9_-]+$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={/^[a-zA-Z0-9_-]+$/.test(username)} />
-                    <span>Nur a-z, A-Z, 0-9, _, -</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${/^[a-zA-Z]/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={/^[a-zA-Z]/.test(username)} />
-                    <span>Beginnt mit Buchstabe</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${!/[_-]$/.test(username) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={!/[_-]$/.test(username)} />
-                    <span>Endet nicht mit _ oder -</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="auth-input-group">
-              <label>Passwort (min. 10 Zeichen)</label>
-              <input
-                type="password"
-                className="auth-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="new-password"
-                minLength={10}
-                required
-              />
-              {password.length > 0 && password.length < 10 && (
-                <p className="mt-1 text-xs text-amber-500">
-                  Noch {10 - password.length} Zeichen erforderlich
-                </p>
-              )}
-              {password.length > 0 && (
-                <div className="auth-safety-checks">
-                  <div className={`flex items-center gap-2 text-xs ${password.length >= 10 ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={password.length >= 10} />
-                    <span>Mindestens 10 Zeichen</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${/[A-Z]/.test(password) && /[a-z]/.test(password) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={/[A-Z]/.test(password) && /[a-z]/.test(password)} />
-                    <span>Gross- und Kleinbuchstaben</span>
-                  </div>
-                  <div className={`flex items-center gap-2 text-xs ${/\d/.test(password) || /[^a-zA-Z0-9]/.test(password) ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <CheckIcon valid={/\d/.test(password) || /[^a-zA-Z0-9]/.test(password)} />
-                    <span>Zahl oder Sonderzeichen</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            {registrationMode !== "open" && (
+          {mode === "login" && (
+            <div className="auth-form">
               <div className="auth-input-group">
-                <label>Einladungscode</label>
+                <label htmlFor="auth-username">Benutzername</label>
                 <input
+                  id="auth-username"
+                  className="auth-input"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="auth-input-group">
+                <label htmlFor="auth-password-login">Passwort</label>
+                <input
+                  id="auth-password-login"
                   type="password"
                   className="auth-input"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  autoComplete="one-time-code"
-                  disabled={registrationMode === "closed"}
-                  required={registrationMode === "invite"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
                 />
-                <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  {registrationMode === "closed"
-                    ? "Registrierung ist derzeit geschlossen."
-                    : "Dieser Server nimmt neue Konten nur mit Einladung an."}
-                </p>
               </div>
-            )}
-            <button
-              type="button"
-              className="auth-advanced-toggle"
-              onClick={() => setShowAdvancedAuth((v) => !v)}
-            >
-              {showAdvancedAuth ? "Erweiterte Optionen ausblenden" : "Recovery und Plan optional einstellen"}
-            </button>
-            {showAdvancedAuth && (
-              <div className="auth-advanced-stack">
-                <div className="auth-choice-panel">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                        Authentizitaet & Recovery
-                      </p>
-                      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                        Optional. Der Server speichert keinen Klartext, sondern nur einen HMAC-Hash.
-                      </p>
-                    </div>
-                    <span className="auth-badge">Privacy-first</span>
+              <button
+                type="button"
+                onClick={() => void handleLogin()}
+                disabled={busy}
+                className="auth-button"
+              >
+                {busy ? "…" : "Anmelden"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("import")}
+                className="auth-link"
+              >
+                Neues Gerät? Backup importieren
+              </button>
+            </div>
+          )}
+
+          {mode === "register" && !hasLocal && (
+            <div className="auth-form">
+              <div className="auth-input-group">
+                <label htmlFor="auth-username-reg">
+                  <span>Benutzername</span>
+                  <span className="auth-label-hint">2–32 Zeichen</span>
+                </label>
+                <input
+                  id="auth-username-reg"
+                  className="auth-input"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
+                  placeholder="cool_user123"
+                  required
+                />
+                {username.length > 0 && (
+                  <div className="auth-checks">
+                    <span>
+                      <CheckIcon
+                        valid={username.length >= 2 && username.length <= 32}
+                      />
+                      2–32 Zeichen
+                    </span>
+                    <span>
+                      <CheckIcon valid={/^[a-zA-Z0-9_-]+$/.test(username)} />
+                      Nur a–z, 0–9, _, -
+                    </span>
+                    <span>
+                      <CheckIcon valid={/^[a-zA-Z]/.test(username)} />
+                      Beginnt mit Buchstabe
+                    </span>
+                    <span>
+                      <CheckIcon valid={!/[_-]$/.test(username)} />
+                      Endet nicht mit _ oder -
+                    </span>
                   </div>
-                  <div className="auth-input-group mt-3">
-                    <label>Recovery-E-Mail optional</label>
+                )}
+              </div>
+              <div className="auth-input-group">
+                <label htmlFor="auth-password-reg">
+                  <span>Passwort</span>
+                  <span className="auth-label-hint">min. 10 Zeichen</span>
+                </label>
+                <input
+                  id="auth-password-reg"
+                  type="password"
+                  className="auth-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  minLength={10}
+                  required
+                />
+                {password.length > 0 && (
+                  <div className="auth-checks">
+                    <span>
+                      <CheckIcon valid={password.length >= 10} />
+                      Mindestens 10 Zeichen
+                    </span>
+                    <span>
+                      <CheckIcon
+                        valid={
+                          /[A-Z]/.test(password) && /[a-z]/.test(password)
+                        }
+                      />
+                      Groß- und Kleinbuchstaben
+                    </span>
+                    <span>
+                      <CheckIcon
+                        valid={
+                          /\d/.test(password) || /[^a-zA-Z0-9]/.test(password)
+                        }
+                      />
+                      Zahl oder Sonderzeichen
+                    </span>
+                  </div>
+                )}
+              </div>
+              {registrationMode !== "open" && (
+                <div className="auth-input-group">
+                  <label htmlFor="auth-invite">Einladungscode</label>
+                  <input
+                    id="auth-invite"
+                    type="password"
+                    className="auth-input"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    autoComplete="one-time-code"
+                    disabled={registrationMode === "closed"}
+                    required={registrationMode === "invite"}
+                  />
+                  <p className="auth-hint">
+                    {registrationMode === "closed"
+                      ? "Registrierung ist derzeit geschlossen."
+                      : "Dieser Server nimmt neue Konten nur mit Einladung an."}
+                  </p>
+                </div>
+              )}
+              <button
+                type="button"
+                className="auth-link"
+                onClick={() => setShowAdvancedAuth((v) => !v)}
+              >
+                {showAdvancedAuth
+                  ? "Erweiterte Optionen ausblenden"
+                  : "Recovery &amp; Plan optional einstellen"}
+              </button>
+              {showAdvancedAuth && (
+                <div className="auth-advanced">
+                  <div className="auth-input-group">
+                    <label htmlFor="auth-recovery">
+                      Recovery-E-Mail (optional)
+                    </label>
                     <input
+                      id="auth-recovery"
                       type="email"
                       className="auth-input"
                       value={recoveryEmail}
@@ -499,145 +477,149 @@ export function AuthPanel({
                       autoComplete="email"
                       placeholder="name@example.com"
                     />
-                    <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                      Hilft spaeter bei Support/Account-Nachweis. Fuer neue Geraete brauchst du trotzdem dein Backup.
+                    <p className="auth-hint">
+                      Server speichert nur HMAC-Hash. Backup bleibt für neue
+                      Geräte trotzdem nötig.
                     </p>
                   </div>
-                </div>
-                <div className="auth-choice-panel">
-                  <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                    Plan waehlen
-                  </p>
-                  <div className="auth-plan-grid mt-3">
+                  <div className="auth-plans">
                     {(productConfig?.plans ?? [
                       {
                         id: "personal" as const,
                         name: "Personal",
                         priceEurMonthly: 0,
                         audience: "Private Nutzung",
-                        highlights: ["E2E-Chats", "Gruppen", "Backups"],
+                        highlights: [],
                       },
                       {
                         id: "pro" as const,
                         name: "Pro",
                         priceEurMonthly: 5,
                         audience: "Power-User",
-                        highlights: ["mehr Geraete", "Priority Support"],
+                        highlights: [],
                       },
                       {
                         id: "team" as const,
                         name: "Team",
                         priceEurMonthly: 9,
                         audience: "Teams",
-                        highlights: ["Einladungen", "Admin-Policy"],
+                        highlights: [],
                       },
                     ]).map((plan) => (
                       <button
                         key={plan.id}
                         type="button"
-                        className={`auth-plan-card ${selectedPlan === plan.id ? "active" : ""}`}
+                        className={`auth-plan ${selectedPlan === plan.id ? "active" : ""}`}
                         onClick={() => setSelectedPlan(plan.id)}
                       >
-                        <span className="font-semibold">{plan.name}</span>
+                        <span className="auth-plan-name">{plan.name}</span>
                         <span className="auth-plan-price">
-                          {plan.priceEurMonthly === 0 ? "Free" : `${plan.priceEurMonthly} EUR/Monat`}
+                          {plan.priceEurMonthly === 0
+                            ? "Free"
+                            : `${plan.priceEurMonthly} €/Monat`}
                         </span>
-                        <span className="auth-plan-audience">{plan.audience}</span>
+                        <span className="auth-plan-audience">
+                          {plan.audience}
+                        </span>
                       </button>
                     ))}
                   </div>
-                  <p className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
-                    Payment ist noch nicht aktiv. Diese Auswahl bereitet Pricing, Limits und spaetere Abrechnung vor.
+                  <p className="auth-hint">
+                    Payment ist noch nicht aktiv — Auswahl bereitet Pricing
+                    und spätere Abrechnung vor.
                   </p>
                 </div>
-              </div>
-            )}
-            <button
-              type="button"
-              onClick={() => void handleRegister()}
-              disabled={
-                busy ||
-                registrationMode === "closed" ||
-                (registrationMode === "invite" && inviteCode.trim().length < 8) ||
-                !validateUsername(username).valid ||
-                password.length < 10
-              }
-              className="auth-button"
-            >
-              {busy ? "…" : "Konto erstellen"}
-            </button>
-          </div>
-        )}
-
-        {mode === "import" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p
-                className="text-sm font-semibold"
-                style={{ color: "var(--text)" }}
+              )}
+              <button
+                type="button"
+                onClick={() => void handleRegister()}
+                disabled={
+                  busy ||
+                  registrationMode === "closed" ||
+                  (registrationMode === "invite" &&
+                    inviteCode.trim().length < 8) ||
+                  !validateUsername(username).valid ||
+                  password.length < 10
+                }
+                className="auth-button"
               >
-                Backup-JSON
+                {busy ? "…" : "Konto erstellen"}
+              </button>
+            </div>
+          )}
+
+          {mode === "import" && (
+            <div className="auth-form">
+              <div className="flex items-center justify-between">
+                <p
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--text)" }}
+                >
+                  Backup-JSON
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setMode("login")}
+                  className="auth-link"
+                >
+                  Zurück
+                </button>
+              </div>
+              <textarea
+                className="auth-input auth-input-textarea"
+                value={importJson}
+                onChange={(e) => setImportJson(e.target.value)}
+                placeholder='{"userId":"…","username":"…",…}'
+              />
+              <p className="auth-hint">
+                Danach mit Benutzername und Passwort anmelden.
               </p>
               <button
                 type="button"
-                onClick={() => setMode("login")}
-                className="btn btn-ghost !px-2 !py-1 text-xs"
+                disabled={busy || !importJson.trim()}
+                onClick={() => void handleLogin()}
+                className="auth-button"
               >
-                Zurück
+                {busy ? "…" : "Importieren &amp; anmelden"}
               </button>
             </div>
-            <textarea
-              className="auth-input min-h-[140px] font-mono text-xs"
-              value={importJson}
-              onChange={(e) => setImportJson(e.target.value)}
-              placeholder='{"userId":"…","username":"…",…}'
-            />
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Danach meldest du dich mit Benutzername und Passwort an. Das
-              Backup stellt deinen lokalen Schlüssel wieder her.
-            </p>
-            <button
-              type="button"
-              disabled={busy || !importJson.trim()}
-              onClick={() => void handleLogin()}
-              className="auth-button"
-            >
-              {busy ? "…" : "Importieren & anmelden"}
-            </button>
-          </div>
-        )}
+          )}
 
-        {error && (
-          <div className="auth-error">
-            <IconAlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            <span>
-              {error.includes("Benutzername oder Passwort")
-                ? "Benutzername oder Passwort ist falsch."
-                : error}
-            </span>
-          </div>
-        )}
+          {error && (
+            <div className="auth-error">
+              <IconAlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{error}</span>
+            </div>
+          )}
+        </section>
 
-        <p className="auth-footer">
-          Transparenz: Browser-Clients brauchen Code-Integrität, Backups und ein klares
-          Bedrohungsmodell. Details stehen in THREAT_MODEL.md.
+        {/* Feature row — quiet, single line on desktop */}
+        <ul className="landing-feature-row" aria-label="Sicherheits-Eigenschaften">
+          <li>
+            <IconLock size={14} aria-hidden />
+            <span>Sealed Sender</span>
+          </li>
+          <li>
+            <IconShieldCheck size={14} aria-hidden />
+            <span>TOFU + Sicherheitsnummer</span>
+          </li>
+          <li>
+            <IconTimer size={14} aria-hidden />
+            <span>Auto-Lock</span>
+          </li>
+          <li>
+            <IconBookmark size={14} aria-hidden />
+            <span>Verschlüsseltes Backup</span>
+          </li>
+        </ul>
+      </main>
+
+      <footer className="landing-footer">
+        <p>
+          Web-Build. Kein auditierter Signal-Ersatz — siehe{" "}
+          <code>THREAT_MODEL.md</code>.
         </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Feature({ icon, title, desc }: { icon: ReactNode; title: string; desc: string }) {
-  return (
-    <div className="feature-item">
-      <div className="feature-icon" aria-hidden>
-        {icon}
-      </div>
-      <div className="feature-text">
-        <h3>{title}</h3>
-        <p>{desc}</p>
-      </div>
+      </footer>
     </div>
   );
 }
