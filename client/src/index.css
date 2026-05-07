@@ -935,6 +935,21 @@ select:focus-visible {
   gap: 0.4rem;
 }
 
+/* Keyboard shortcut <kbd> pill, used in the shortcuts help modal. */
+.shortcut-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg-sidebar);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
 /* Link-preview cards under text bubbles — privacy-friendly: no server
    fetch, just parsing the URL into host + path. */
 .link-preview-stack {

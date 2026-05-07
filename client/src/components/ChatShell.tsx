@@ -84,6 +84,7 @@ import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
 import { VaultChatLogo } from "./Logo";
 import { FoldersManageModal } from "./FoldersManageModal";
+import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 import { pushToast } from "../lib/toastBus";
 import {
   IconArrowDown,
@@ -367,6 +368,7 @@ export function ChatShell({
   const [folders, setFolders] = useState<ChatFolder[]>(() => loadFolders());
   const [foldersManageOpen, setFoldersManageOpen] = useState(false);
   const [folderEdit, setFolderEdit] = useState<ChatFolder | null>(null);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
 
   useEffect(() => subscribeFolders(setFolders), []);
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
@@ -520,8 +522,10 @@ export function ChatShell({
       setForwardPick(new Set());
       setMentionOpen(false);
       setShowAddContact(false);
+      setShortcutsHelpOpen(false);
     },
     onLock: () => onLock(),
+    onHelp: () => setShortcutsHelpOpen(true),
     onSend: () => {
       if (tab === "dm" && peer && text.trim()) {
         void sendDmText();
@@ -2819,6 +2823,9 @@ export function ChatShell({
             </button>
           </div>
         </div>
+      )}
+      {shortcutsHelpOpen && (
+        <ShortcutsHelpModal onClose={() => setShortcutsHelpOpen(false)} />
       )}
       {foldersManageOpen && (
         <FoldersManageModal
