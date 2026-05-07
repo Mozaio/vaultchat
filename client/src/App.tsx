@@ -357,7 +357,7 @@ function CodeIntegrityBanner({
   return (
     <div className="code-integrity-banner danger">
       <p className="font-semibold">
-        Build-Integritaet stimmt nicht mit dem verifizierten Wert ueberein.
+        Build-Integrität stimmt nicht mit dem verifizierten Wert überein.
       </p>
       <p className="font-mono">Aktuell: {check.hash}</p>
       <p className="font-mono">Gepinnt: {check.pinned}</p>
