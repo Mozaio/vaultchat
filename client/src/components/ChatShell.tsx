@@ -3121,11 +3121,24 @@ export function ChatShell({
               <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
                 VaultChat
               </p>
-              {pendingCount > 0 && (
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {pendingCount} ausstehend
-                </p>
-              )}
+              <div className="sidebar-status-row">
+                <span
+                  className={`sidebar-status-pill${connected ? " online" : " offline"}`}
+                  title={connected ? "Verbunden" : "Verbindung getrennt"}
+                  aria-label={connected ? "Online" : "Offline"}
+                >
+                  <span className="sidebar-status-dot" aria-hidden />
+                  {connected ? "Online" : "Offline"}
+                </span>
+                {pendingCount > 0 && (
+                  <span
+                    className="sidebar-status-pending"
+                    title={`${pendingCount} Nachricht${pendingCount === 1 ? "" : "en"} warten auf Zustellung`}
+                  >
+                    {pendingCount} ausstehend
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex gap-1.5">
