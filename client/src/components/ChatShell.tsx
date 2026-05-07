@@ -64,6 +64,13 @@ import { useVoiceRecorder } from "../lib/useVoiceRecorder";
 import { ThemeToggle } from "./ThemeToggle";
 import { useShortcuts } from "../lib/shortcuts";
 import { loadDefaultTtl } from "../lib/disappearingDefault";
+import {
+  loadFolders,
+  saveFolders,
+  subscribeFolders,
+  newFolderId,
+  type ChatFolder,
+} from "../lib/chatFolders";
 import { SearchPanel } from "./SearchPanel";
 import { AddContactModal } from "./AddContactModal";
 import {
@@ -76,6 +83,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
 import { VaultChatLogo } from "./Logo";
+import { FoldersManageModal } from "./FoldersManageModal";
 import { pushToast } from "../lib/toastBus";
 import {
   IconArrowDown,
@@ -110,7 +118,14 @@ import {
 } from "./Icons";
 
 type Tab = "dm" | "group";
-type SidebarFilter = "all" | "dm" | "group" | "fav" | "unread" | "star";
+type SidebarFilter =
+  | "all"
+  | "dm"
+  | "group"
+  | "fav"
+  | "unread"
+  | "star"
+  | `folder:${string}`;
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
 type SharedMediaItem = {
   id: string;
@@ -349,6 +364,11 @@ export function ChatShell({
   const [infoOpen, setInfoOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>("all");
+  const [folders, setFolders] = useState<ChatFolder[]>(() => loadFolders());
+  const [foldersManageOpen, setFoldersManageOpen] = useState(false);
+  const [folderEdit, setFolderEdit] = useState<ChatFolder | null>(null);
+
+  useEffect(() => subscribeFolders(setFolders), []);
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [groupEmojiOpen, setGroupEmojiOpen] = useState(false);
@@ -2556,6 +2576,13 @@ export function ChatShell({
     return out;
   }, [starredCids, groupMessages.length, groups.length]);
 
+  const activeFolder = useMemo<ChatFolder | null>(() => {
+    if (typeof sidebarFilter !== "string") return null;
+    if (!sidebarFilter.startsWith("folder:")) return null;
+    const id = sidebarFilter.slice("folder:".length);
+    return folders.find((f) => f.id === id) ?? null;
+  }, [sidebarFilter, folders]);
+
   const visibleUsers = useMemo(() => {
     let arr: api.ApiUser[];
     if (sidebarFilter === "group") return [];
@@ -2565,6 +2592,9 @@ export function ChatShell({
       arr = filteredUsers.filter((u) => (unreadByPeer[u.id] ?? 0) > 0);
     } else if (sidebarFilter === "star") {
       arr = filteredUsers.filter((u) => peersWithStars.has(u.id));
+    } else if (activeFolder) {
+      const keys = new Set(activeFolder.chatKeys);
+      arr = filteredUsers.filter((u) => keys.has(`dm:${u.id}`));
     } else {
       arr = filteredUsers;
     }
@@ -2585,6 +2615,7 @@ export function ChatShell({
     pinnedPeers,
     lastDmPreviewByPeer,
     peersWithStars,
+    activeFolder,
   ]);
 
   const visibleGroups = useMemo(() => {
@@ -2592,8 +2623,12 @@ export function ChatShell({
       return [];
     if (sidebarFilter === "star")
       return filteredGroups.filter((g) => groupsWithStars.has(g.id));
+    if (activeFolder) {
+      const keys = new Set(activeFolder.chatKeys);
+      return filteredGroups.filter((g) => keys.has(`group:${g.id}`));
+    }
     return filteredGroups;
-  }, [filteredGroups, sidebarFilter, groupsWithStars]);
+  }, [filteredGroups, sidebarFilter, groupsWithStars, activeFolder]);
 
   const sharedMediaItems = useMemo<SharedMediaItem[]>(() => {
     const rows =
@@ -2768,6 +2803,23 @@ export function ChatShell({
             </button>
           </div>
         </div>
+      )}
+      {foldersManageOpen && (
+        <FoldersManageModal
+          folders={folders}
+          users={users}
+          groups={groups}
+          onClose={() => {
+            setFoldersManageOpen(false);
+            setFolderEdit(null);
+          }}
+          onSave={(next) => {
+            setFolders(next);
+            saveFolders(next);
+          }}
+          editing={folderEdit}
+          setEditing={setFolderEdit}
+        />
       )}
       {searchOpen && (
         <SearchPanel
@@ -3072,12 +3124,40 @@ export function ChatShell({
               {label}
             </button>
           ))}
+          {folders.map((f) => {
+            const value: SidebarFilter = `folder:${f.id}`;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                className={`filter-chip ${sidebarFilter === value ? "active" : ""}`}
+                onClick={() => setSidebarFilter(value)}
+                title={f.name}
+              >
+                <span aria-hidden style={{ marginRight: "0.25rem" }}>
+                  {f.icon}
+                </span>
+                {f.name}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="filter-chip"
+            onClick={() => setFoldersManageOpen(true)}
+            title="Ordner verwalten"
+            aria-label="Ordner verwalten"
+            style={{ fontWeight: 500 }}
+          >
+            +
+          </button>
         </div>
 
         {(sidebarFilter === "all" ||
           sidebarFilter === "dm" ||
           sidebarFilter === "unread" ||
-          sidebarFilter === "star") && (
+          sidebarFilter === "star" ||
+          activeFolder !== null) && (
           <>
             <div className="flex items-center justify-end gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
               <button
@@ -3294,9 +3374,12 @@ export function ChatShell({
 
         {(sidebarFilter === "all" ||
           sidebarFilter === "group" ||
-          sidebarFilter === "star") && (
+          sidebarFilter === "star" ||
+          activeFolder !== null) && (
           <div className="flex-1 overflow-y-auto p-2">
-            {(sidebarFilter === "all" || sidebarFilter === "star") &&
+            {(sidebarFilter === "all" ||
+              sidebarFilter === "star" ||
+              activeFolder !== null) &&
               visibleGroups.length > 0 && (
               <p className="px-2 pb-1 pt-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
                 Gruppen
