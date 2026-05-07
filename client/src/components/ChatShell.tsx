@@ -81,6 +81,7 @@ import {
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ThreadPanel } from "./ThreadPanel";
 import { loadThreadSeen, type ThreadSeenMap } from "../lib/threadState";
+import { isPro, loadPlan, PLAN_LABELS } from "../lib/plan";
 import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
@@ -3541,11 +3542,16 @@ export function ChatShell({
           <button
             type="button"
             onClick={() => setSecurityOpen(true)}
-            className="min-w-0 flex-1 truncate text-left font-medium"
+            className="min-w-0 flex-1 truncate text-left font-medium inline-flex items-center gap-1.5"
             style={{ color: "var(--text)" }}
             title={myFp ? `Fingerprint: ${myFp}` : "Eigenes Profil"}
           >
-            {session.user.username}
+            <span className="truncate">{session.user.username}</span>
+            {isPro() && (
+              <span className="user-tile-pro-badge" title={`${PLAN_LABELS[loadPlan()]}-Plan aktiv`}>
+                {loadPlan() === "team" ? "Team" : "Pro"}
+              </span>
+            )}
           </button>
           <button
             type="button"

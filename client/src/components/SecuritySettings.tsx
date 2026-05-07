@@ -36,6 +36,14 @@ import {
   addCustomEmojiFromFile,
   type CustomEmoji,
 } from "../lib/customEmojis";
+import {
+  loadPlan,
+  setPlanLocal,
+  PLAN_LABELS,
+  PLAN_PRICES,
+  PLAN_FEATURES,
+  type PlanId,
+} from "../lib/plan";
 
 export type SecurityLevel = "normal" | "extreme";
 
@@ -66,13 +74,14 @@ export function saveSecurityLevel(level: SecurityLevel): void {
   }
 }
 
-type SettingsTabId = "general" | "privacy" | "security" | "emojis" | "about";
+type SettingsTabId = "general" | "privacy" | "security" | "emojis" | "plan" | "about";
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
   { id: "general", label: "Allgemein" },
   { id: "privacy", label: "Datenschutz" },
   { id: "security", label: "Sicherheit" },
   { id: "emojis", label: "Emojis" },
+  { id: "plan", label: "Plan & Abo" },
   { id: "about", label: "Über" },
 ];
 
@@ -815,6 +824,8 @@ export function SecuritySettings({
 
           {tab === "emojis" && <EmojiSettingsTab />}
 
+          {tab === "plan" && <PlanSettingsTab />}
+
           {tab === "about" && (
             <div className="space-y-4">
               <div>
@@ -978,6 +989,103 @@ function EmojiSettingsTab() {
         style={{ color: "var(--text-muted)" }}
       >
         Maximal 32 Emojis · Bilder werden auf 48×48 verkleinert (~2 KB)
+      </p>
+    </div>
+  );
+}
+
+function PlanSettingsTab() {
+  const [plan, setPlan] = useState<PlanId>(() => loadPlan());
+
+  function activate(next: PlanId) {
+    setPlanLocal(next);
+    setPlan(next);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
+          Plan & Abonnement
+        </p>
+        <p
+          className="mt-1 text-xs leading-relaxed"
+          style={{ color: "var(--text-muted)" }}
+        >
+          VaultChat ist privat — der Server sieht keine Inhalte. Pro-Plan
+          schaltet höhere Limits frei (mehr Emojis, längere Sprachnachrichten,
+          größere Gruppen). Bezahlung läuft über einen externen Anbieter
+          (Stripe), VaultChat selbst speichert keine Karten- oder
+          Rechnungsdaten.
+        </p>
+        <p
+          className="mt-2 text-xs"
+          style={{ color: "var(--accent)" }}
+        >
+          Aktuell: <strong>{PLAN_LABELS[plan]}</strong>
+        </p>
+      </div>
+
+      <div
+        className="grid gap-3"
+        style={{
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+        }}
+      >
+        {(["free", "pro", "team"] as PlanId[]).map((id) => {
+          const isCurrent = plan === id;
+          const price = PLAN_PRICES[id];
+          return (
+            <div
+              key={id}
+              className={`pricing-card${isCurrent ? " current" : ""}${id === "pro" ? " featured" : ""}`}
+            >
+              {id === "pro" && (
+                <span className="pricing-card-tag">Beliebt</span>
+              )}
+              <p className="pricing-card-name">{PLAN_LABELS[id]}</p>
+              <p className="pricing-card-price">
+                {price.eurMonthly === 0 ? (
+                  <span>Kostenlos</span>
+                ) : (
+                  <>
+                    <strong>{price.eurMonthly} €</strong>
+                    <span className="pricing-card-period"> / Monat</span>
+                  </>
+                )}
+              </p>
+              <p className="pricing-card-audience">{price.audience}</p>
+              <ul className="pricing-card-features">
+                {PLAN_FEATURES[id].map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                disabled={isCurrent}
+                onClick={() => activate(id)}
+                className="pricing-card-cta"
+              >
+                {isCurrent
+                  ? "Aktueller Plan"
+                  : id === "free"
+                    ? "Wechseln"
+                    : "Upgrade"}
+              </button>
+              {id !== "free" && (
+                <p className="pricing-card-note">
+                  Demo: lokale Aktivierung. Echte Bezahlung folgt mit
+                  Stripe-Integration.
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        Privacy-Hinweis: Server sieht nur den Subscription-Status (free / pro /
+        team), nicht Karten- oder Identitätsdaten.
       </p>
     </div>
   );

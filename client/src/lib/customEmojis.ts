@@ -15,8 +15,10 @@ export type CustomEmoji = {
   createdAt: number;
 };
 
+import { canAddCustomEmoji, getLimits } from "./plan";
+
 const STORAGE_KEY = "vaultchat.customEmojis.v1";
-const MAX_EMOJIS = 32;
+const MAX_EMOJIS = 200; // hard cap; per-plan soft cap enforced in UI
 const RESIZE_PX = 48;
 const JPEG_QUALITY = 0.85;
 const MAX_DATA_URL_BYTES = 8 * 1024;
@@ -83,6 +85,11 @@ export async function addCustomEmojiFromFile(
   if (!file.type.startsWith("image/")) {
     throw new Error("emoji_invalid_type");
   }
+  const existing = loadCustomEmojis();
+  if (!canAddCustomEmoji(existing.length)) {
+    const limit = getLimits().customEmojiMax;
+    throw new Error(`emoji_plan_limit:${limit}`);
+  }
   const dataUrl = await resizeImageToDataUrl(file, RESIZE_PX);
   if (dataUrl.length > MAX_DATA_URL_BYTES) {
     throw new Error("emoji_too_large");
@@ -96,9 +103,8 @@ export async function addCustomEmojiFromFile(
     dataUrl,
     createdAt: Date.now(),
   };
-  const all = loadCustomEmojis();
-  all.unshift(emoji);
-  saveCustomEmojis(all);
+  existing.unshift(emoji);
+  saveCustomEmojis(existing);
   return emoji;
 }
 

@@ -297,13 +297,20 @@ export function EmojiPicker({
       setCustomEmojis(loadCustomEmojis());
     } catch (err) {
       const code = err instanceof Error ? err.message : "emoji_failed";
-      setUploadError(
-        code === "emoji_invalid_type"
-          ? "Bitte ein Bild (PNG, JPEG, WebP) auswählen."
-          : code === "emoji_too_large"
-            ? "Bild zu groß — versuche ein kleineres Motiv."
-            : "Konnte den Emoji nicht hinzufügen."
-      );
+      if (code.startsWith("emoji_plan_limit:")) {
+        const limit = code.slice("emoji_plan_limit:".length);
+        setUploadError(
+          `Limit erreicht (${limit} eigene Emojis im aktuellen Plan). Upgrade auf Pro für mehr — siehe Einstellungen → Plan & Abo.`
+        );
+      } else {
+        setUploadError(
+          code === "emoji_invalid_type"
+            ? "Bitte ein Bild (PNG, JPEG, WebP) auswählen."
+            : code === "emoji_too_large"
+              ? "Bild zu groß — versuche ein kleineres Motiv."
+              : "Konnte den Emoji nicht hinzufügen."
+        );
+      }
     } finally {
       setUploading(false);
     }
