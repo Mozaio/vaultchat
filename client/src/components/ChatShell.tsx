@@ -96,6 +96,7 @@ import {
   IconBell,
   IconBookmark,
   IconCopy,
+  IconDownload,
   IconFileText,
   IconForward,
   IconImage,
