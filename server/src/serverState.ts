@@ -27,6 +27,22 @@ export type PersistedGroup = {
   updatedAt?: number;
 };
 
+export type PersistedGroupInvite = {
+  /** Url-safe random token, 24 raw bytes -> 32 base64url chars. */
+  token: string;
+  groupId: string;
+  /** UserId of the creator (must be the group's creator at issue time). */
+  createdByUserId: string;
+  /** ms-since-epoch the token was minted. */
+  createdAt: number;
+  /** ms-since-epoch the token expires. 0 = never expires. */
+  expiresAt: number;
+  /** Maximum total redemptions. 0 = unlimited. */
+  maxUses: number;
+  /** Number of successful redemptions so far. */
+  usedCount: number;
+};
+
 export type PersistedPreKeyBundle = {
   userId: string;
   identityKey: string;
@@ -50,6 +66,7 @@ type ServerState = {
   groups: PersistedGroup[];
   preKeyBundles: PersistedPreKeyBundle[];
   redeemedInviteCodeHashes: string[];
+  groupInvites?: PersistedGroupInvite[];
 };
 
 const emptyState = (): ServerState => ({
@@ -58,6 +75,7 @@ const emptyState = (): ServerState => ({
   groups: [],
   preKeyBundles: [],
   redeemedInviteCodeHashes: [],
+  groupInvites: [],
 });
 
 function stateFile(): string | null {
@@ -103,6 +121,7 @@ function readState(): ServerState {
       redeemedInviteCodeHashes: Array.isArray(parsed.redeemedInviteCodeHashes)
         ? parsed.redeemedInviteCodeHashes
         : [],
+      groupInvites: Array.isArray(parsed.groupInvites) ? parsed.groupInvites : [],
     };
   } catch {
     return emptyState();
@@ -159,5 +178,17 @@ export function persistRedeemedInviteCodeHashes(redeemedInviteCodeHashes: string
   writeState({
     ...current,
     redeemedInviteCodeHashes,
+  });
+}
+
+export function loadPersistedGroupInvites(): PersistedGroupInvite[] {
+  return readState().groupInvites ?? [];
+}
+
+export function persistGroupInvites(groupInvites: PersistedGroupInvite[]): void {
+  const current = readState();
+  writeState({
+    ...current,
+    groupInvites,
   });
 }

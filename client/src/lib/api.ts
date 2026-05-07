@@ -267,6 +267,50 @@ export async function leaveGroup(token: string, groupId: string) {
   });
 }
 
+export type GroupInvite = {
+  token: string;
+  groupId: string;
+  createdByUserId: string;
+  createdAt: number;
+  /** ms-since-epoch the token expires; 0 = never. */
+  expiresAt: number;
+  /** Max total redemptions; 0 = unlimited. */
+  maxUses: number;
+  usedCount: number;
+};
+
+export async function createGroupInvite(
+  token: string,
+  groupId: string,
+  body: { ttlMs?: number; maxUses?: number } = {}
+) {
+  return req<{ invite: GroupInvite }>(`/api/groups/${groupId}/invites`, {
+    method: "POST",
+    body: JSON.stringify(body),
+    token,
+  });
+}
+
+export async function listGroupInvites(token: string, groupId: string) {
+  return req<{ invites: GroupInvite[] }>(`/api/groups/${groupId}/invites`, {
+    token,
+  });
+}
+
+export async function revokeGroupInvite(token: string, inviteToken: string) {
+  return req<{ ok: true }>(`/api/groups/invites/${encodeURIComponent(inviteToken)}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export async function redeemGroupInvite(token: string, inviteToken: string) {
+  return req<{ ok: true; groupId: string; usedCount: number; maxUses: number }>(
+    `/api/invites/${encodeURIComponent(inviteToken)}/redeem`,
+    { method: "POST", token }
+  );
+}
+
 export type RtcConfig = {
   iceServers: RTCIceServer[];
   forceRelay: boolean;

@@ -332,6 +332,9 @@ export function ChatShell({
   const [groupEditAvatar, setGroupEditAvatar] = useState<string>("");
   const [groupEditAvatarRemoved, setGroupEditAvatarRemoved] = useState(false);
   const [groupEditBusy, setGroupEditBusy] = useState(false);
+  const [groupInvites, setGroupInvites] = useState<api.GroupInvite[]>([]);
+  const [groupInvitesLoading, setGroupInvitesLoading] = useState(false);
+  const [creatingInvite, setCreatingInvite] = useState(false);
   const [notifyPromptOpen, setNotifyPromptOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isMobile, setIsMobile] = useState(false);
@@ -432,6 +435,34 @@ export function ChatShell({
     setGroupEditAvatar("");
     setGroupEditAvatarRemoved(false);
   }, [group?.id, groupPanelOpen]);
+
+  // Load invites whenever the group panel opens for a group I created.
+  useEffect(() => {
+    if (
+      !group ||
+      !groupPanelOpen ||
+      group.createdByUserId !== session.user.id
+    ) {
+      setGroupInvites([]);
+      return;
+    }
+    let cancelled = false;
+    setGroupInvitesLoading(true);
+    void api
+      .listGroupInvites(session.token, group.id)
+      .then(({ invites }) => {
+        if (!cancelled) setGroupInvites(invites);
+      })
+      .catch(() => {
+        if (!cancelled) setGroupInvites([]);
+      })
+      .finally(() => {
+        if (!cancelled) setGroupInvitesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [group, groupPanelOpen, session.user.id, session.token]);
 
   useShortcuts({
     onSearch: () => setSearchOpen(true),
@@ -1177,6 +1208,34 @@ export function ChatShell({
             }
             return;
           }
+          if (data.type === "group_member_added" && typeof data.groupId === "string") {
+            const gid = data.groupId;
+            const newMemberId =
+              typeof data.memberId === "string" ? data.memberId : null;
+            // Refresh the group list so the new member appears.
+            const { groups: latest } = await api.listGroups(session.token);
+            setGroups(latest);
+            // If I created this group, rotate the group key and re-distribute
+            // it. The joiner is now in the server-side member list but does
+            // not yet have the symmetric key.
+            const updatedGroup = latest.find((x) => x.id === gid);
+            if (
+              updatedGroup &&
+              updatedGroup.createdByUserId === session.user.id
+            ) {
+              await rotateGroupKey(updatedGroup, updatedGroup.memberIds);
+              if (newMemberId) {
+                const memberLabel =
+                  usersRef.current.find((u) => u.id === newMemberId)?.username ??
+                  "Mitglied";
+                await sendGroupSystemMessage(
+                  updatedGroup,
+                  `${memberLabel} ist via Einladungslink beigetreten`
+                );
+              }
+            }
+            return;
+          }
           if (
             data.type === "dm" &&
             typeof data.id === "string" &&
@@ -1671,6 +1730,86 @@ export function ChatShell({
     await setGroupKey(g.id, key);
     await distributeGroupKey(g, newMembers, base64FromUint8(key));
   }
+
+  function buildInviteUrl(token: string): string {
+    return `${location.origin}/?invite=${encodeURIComponent(token)}`;
+  }
+
+  async function handleCreateInvite() {
+    if (!group) return;
+    setCreatingInvite(true);
+    try {
+      const { invite } = await api.createGroupInvite(session.token, group.id, {
+        ttlMs: 7 * 24 * 60 * 60 * 1000,
+      });
+      setGroupInvites((prev) => [...prev, invite]);
+      try {
+        await navigator.clipboard?.writeText(buildInviteUrl(invite.token));
+        pushToast("Einladungslink erstellt und kopiert.", "success");
+      } catch {
+        pushToast("Einladungslink erstellt.", "success");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "create_failed";
+      pushToast(`Erstellen fehlgeschlagen: ${msg}`, "danger");
+    } finally {
+      setCreatingInvite(false);
+    }
+  }
+
+  async function handleRevokeInvite(inviteToken: string) {
+    if (!group) return;
+    try {
+      await api.revokeGroupInvite(session.token, inviteToken);
+      setGroupInvites((prev) => prev.filter((i) => i.token !== inviteToken));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "revoke_failed";
+      pushToast(`Widerrufen fehlgeschlagen: ${msg}`, "danger");
+    }
+  }
+
+  // Redeem an invite token from the URL (?invite=…) once the session is
+  // active. Strip it from the URL afterwards so a refresh does not retry.
+  const inviteRedeemedRef = useRef(false);
+  useEffect(() => {
+    if (inviteRedeemedRef.current) return;
+    const url = new URL(location.href);
+    const token = url.searchParams.get("invite");
+    if (!token) return;
+    inviteRedeemedRef.current = true;
+    url.searchParams.delete("invite");
+    window.history.replaceState({}, "", url.toString());
+    void (async () => {
+      try {
+        const { groupId } = await api.redeemGroupInvite(session.token, token);
+        const { groups: latest } = await api.listGroups(session.token);
+        setGroups(latest);
+        const target = latest.find((g) => g.id === groupId);
+        if (target) {
+          setTab("group");
+          setPeer(null);
+          setGroup(target);
+          pushToast(
+            `Beigetreten zu „${target.name}". Warte einen Moment auf den Gruppenschlüssel.`,
+            "success"
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "join_failed";
+        const friendly =
+          msg === "expired"
+            ? "Der Einladungslink ist abgelaufen."
+            : msg === "exhausted"
+              ? "Der Einladungslink wurde bereits maximal oft verwendet."
+              : msg === "already_member"
+                ? "Du bist bereits Mitglied dieser Gruppe."
+                : msg === "unknown_token"
+                  ? "Der Einladungslink ist ungültig."
+                  : `Beitritt fehlgeschlagen: ${msg}`;
+        pushToast(friendly, "danger");
+      }
+    })();
+  }, [session.token]);
 
   async function sendGroupSystemMessage(g: api.ApiGroup, body: string) {
     try {
@@ -3757,6 +3896,99 @@ export function ChatShell({
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+                  {group.createdByUserId === session.user.id && (
+                    <div
+                      className="mb-2 border-b pb-2"
+                      style={{ borderColor: "var(--border)" }}
+                    >
+                      <p
+                        className="mb-1 text-[11px] font-semibold"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        Einladungslinks
+                      </p>
+                      {groupInvitesLoading ? (
+                        <p
+                          className="text-[10px]"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Lade…
+                        </p>
+                      ) : groupInvites.length === 0 ? (
+                        <p
+                          className="mb-1.5 text-[10px] italic"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Noch keine. Klick „Neuer Link" um einen zu erstellen.
+                        </p>
+                      ) : (
+                        <ul className="mb-1.5 space-y-1">
+                          {groupInvites.map((inv) => {
+                            const url = buildInviteUrl(inv.token);
+                            const expired =
+                              inv.expiresAt > 0 && Date.now() > inv.expiresAt;
+                            const exhausted =
+                              inv.maxUses > 0 && inv.usedCount >= inv.maxUses;
+                            return (
+                              <li
+                                key={inv.token}
+                                className="flex items-center gap-1.5 rounded px-1.5 py-1"
+                                style={{ background: "var(--bg-hover)" }}
+                              >
+                                <input
+                                  readOnly
+                                  value={url}
+                                  className="app-input flex-1 !py-0.5 !text-[10px] font-mono"
+                                  onFocus={(e) => e.currentTarget.select()}
+                                  aria-label="Einladungslink"
+                                />
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary !px-1.5 !py-0.5 !text-[10px]"
+                                  onClick={() =>
+                                    void navigator.clipboard?.writeText(url).then(
+                                      () =>
+                                        pushToast(
+                                          "Link kopiert.",
+                                          "success"
+                                        )
+                                    )
+                                  }
+                                  title="Kopieren"
+                                >
+                                  Kopieren
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-danger !px-1.5 !py-0.5 !text-[10px]"
+                                  onClick={() =>
+                                    void handleRevokeInvite(inv.token)
+                                  }
+                                  title={
+                                    expired
+                                      ? "abgelaufen"
+                                      : exhausted
+                                        ? "verbraucht"
+                                        : "Widerrufen"
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleCreateInvite()}
+                        disabled={creatingInvite}
+                        className="btn btn-secondary !px-2 !py-1 !text-[10px]"
+                      >
+                        {creatingInvite ? "…" : "Neuer Link (7 Tage)"}
+                      </button>
                     </div>
                   )}
                   <ul className="mb-2 space-y-1">

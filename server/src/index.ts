@@ -45,6 +45,12 @@ import {
 } from "./config.js";
 import { getStateStatus } from "./serverState.js";
 import { publicRegistrationConfig, redeemInviteCode, validateInviteCode } from "./registration.js";
+import {
+  createInvite,
+  listInvites,
+  redeemInvite,
+  revokeInvite,
+} from "./inviteStore.js";
 
 assertRuntimeConfig();
 
@@ -533,6 +539,95 @@ app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) =
     return;
   }
   res.json({ group: shapeGroup(g) });
+});
+
+const CreateInviteBody = z.object({
+  ttlMs: z.number().int().min(0).max(90 * 24 * 60 * 60 * 1000).optional(),
+  maxUses: z.number().int().min(0).max(10_000).optional(),
+});
+
+app.post("/api/groups/:id/invites", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = CreateInviteBody.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const result = createInvite(String(req.params.id), jwtUser.userId, {
+    ...(parsed.data.ttlMs !== undefined ? { ttlMs: parsed.data.ttlMs } : {}),
+    ...(parsed.data.maxUses !== undefined ? { maxUses: parsed.data.maxUses } : {}),
+  });
+  if ("error" in result) {
+    res.status(result.error === "forbidden" ? 403 : 404).json({ error: result.error });
+    return;
+  }
+  res.json({ invite: result });
+});
+
+app.get("/api/groups/:id/invites", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const result = listInvites(String(req.params.id), jwtUser.userId);
+  if (!Array.isArray(result)) {
+    res.status(result.error === "forbidden" ? 403 : 404).json({ error: result.error });
+    return;
+  }
+  res.json({ invites: result });
+});
+
+app.delete("/api/groups/invites/:token", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const result = revokeInvite(String(req.params.token), jwtUser.userId);
+  if ("error" in result) {
+    res.status(result.error === "forbidden" ? 403 : 404).json({ error: result.error });
+    return;
+  }
+  res.json({ ok: true });
+});
+
+app.post("/api/invites/:token/redeem", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const result = redeemInvite(String(req.params.token), jwtUser.userId);
+  if ("error" in result) {
+    const status = result.error === "unknown_token" ? 404 : 400;
+    res.status(status).json({ error: result.error });
+    return;
+  }
+  // Notify the rest of the group so a member (typically the creator) can
+  // rotate and re-distribute the group key — the joiner is now in the
+  // member list but does not yet have the group key.
+  const g = getGroup(result.groupId);
+  if (g) {
+    for (const memberId of g.memberIds) {
+      if (memberId === jwtUser.userId) continue;
+      sendToUser(memberId, {
+        type: "group_member_added",
+        groupId: result.groupId,
+        memberId: jwtUser.userId,
+        byInvite: true,
+      });
+    }
+  }
+  res.json(result);
 });
 
 app.post("/api/groups/:id/leave", async (req, res) => {
