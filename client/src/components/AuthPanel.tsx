@@ -216,18 +216,25 @@ export function AuthPanel({
 
   return (
     <div className="auth-stage">
-      {/* Tiny top-right action only — no full header bar */}
+      {/* Theme toggle floating top-right */}
       <div className="auth-stage-toggle">
         <ThemeToggle />
       </div>
 
       <main className="auth-stage-shell">
-        {/* The card carries the brand mark itself, no separate hero block */}
-        <section className="auth-card-v2" aria-labelledby="auth-card-title">
-          <div className="auth-card-v2-brand" aria-hidden>
-            <VaultChatLogo size={36} style={{ color: "var(--accent)" }} />
-            <span>VaultChat</span>
+        {/* Brand block ABOVE the card — large logo, wordmark, tagline */}
+        <div className="auth-stage-brand">
+          <div className="auth-stage-logo">
+            <VaultChatLogo size={56} style={{ color: "var(--accent)" }} />
           </div>
+          <h1 className="auth-stage-wordmark">VaultChat</h1>
+          <p className="auth-stage-tagline">
+            Privater Browser-Messenger. Verschlüsselt by default.
+          </p>
+        </div>
+
+        {/* Auth card — focused, no brand inside (brand sits above) */}
+        <section className="auth-card-v2" aria-labelledby="auth-card-title">
           <header className="auth-card-v2-head">
             <h2 id="auth-card-title">{cardTitle}</h2>
             <p>{cardSubtitle}</p>

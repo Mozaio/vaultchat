@@ -3669,11 +3669,11 @@ select:focus-visible {
    ============================================================ */
 
 /* ────────────────────────────────────────────────────────────
-   Auth stage — compact, centered, single card carries the brand.
+   Auth stage — premium centered layout (Vercel / Stripe / Linear).
 
-   The whole landing is one card that fits comfortably in the
-   viewport. Background uses a quiet dot pattern instead of a flat
-   color so the page feels intentional but not loud.
+   Brand mark sits above the card as a large visual anchor.
+   Background carries a soft accent gradient from the top so the
+   page has warmth without competing with the content.
    ──────────────────────────────────────────────────────────── */
 
 .auth-stage {
@@ -3683,10 +3683,8 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(var(--border) 1px, transparent 1px),
+    radial-gradient(ellipse 900px 520px at 50% -10%, var(--accent-soft), transparent 70%),
     var(--bg);
-  background-size: 24px 24px;
-  background-position: center top;
   overflow-y: auto;
 }
 
@@ -3703,51 +3701,80 @@ select:focus-visible {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
-  padding: 2rem 1rem;
+  gap: 1.5rem;
+  padding: 2.5rem 1rem 2rem;
   width: 100%;
 }
 
-/* The auth card — the only thing that matters on this page. */
+/* Brand block above the card */
+.auth-stage-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  text-align: center;
+  max-width: 28rem;
+}
+
+.auth-stage-logo {
+  width: 4rem;
+  height: 4rem;
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  margin-bottom: 0.4rem;
+}
+
+.auth-stage-wordmark {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  line-height: 1.1;
+  margin: 0;
+}
+
+.auth-stage-tagline {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 22rem;
+  margin: 0;
+}
+
+/* Auth card */
 .auth-card-v2 {
   width: 100%;
-  max-width: 26rem;
+  max-width: 24rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1.75rem 1.5rem 1.5rem;
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   box-shadow: var(--shadow-lg);
 }
 
-.auth-card-v2-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  font-size: 1rem;
-  color: var(--text);
-  margin-bottom: 0.1rem;
-}
-
 .auth-card-v2-head h2 {
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
-  line-height: 1.2;
+  line-height: 1.25;
 }
 
 .auth-card-v2-head p {
   margin-top: 0.25rem;
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   color: var(--text-muted);
   line-height: 1.45;
 }
 
+/* Quiet pill row directly under the card */
 .auth-stage-pills {
   list-style: none;
   margin: 0;
@@ -3767,7 +3794,7 @@ select:focus-visible {
   border-radius: 999px;
   font-size: 0.7rem;
   color: var(--text-muted);
-  background: var(--bg-elevated);
+  background: transparent;
   border: 1px solid var(--border);
 }
 
@@ -3781,7 +3808,7 @@ select:focus-visible {
   font-size: 0.7rem;
   color: var(--text-muted);
   max-width: 26rem;
-  margin-top: 0.25rem;
+  margin: 0;
 }
 
 .auth-stage-footer code {
