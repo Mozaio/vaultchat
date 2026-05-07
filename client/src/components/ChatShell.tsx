@@ -329,7 +329,9 @@ export function ChatShell({
   // Contact add modal
   const [showAddContact, setShowAddContact] = useState(false);
   // Notification settings per chat
-  const [mutedPeers, setMutedPeers] = useState<Set<string>>(new Set());
+  const [mutedPeers, setMutedPeers] = useState<Set<string>>(() =>
+    loadStringSet("vaultchat.muted.peers")
+  );
   const [mutedGroups, setMutedGroups] = useState<Set<string>>(() =>
     loadStringSet("vaultchat.muted.groups")
   );
@@ -3807,6 +3809,27 @@ export function ChatShell({
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setInfoOpen(true); }}>
                           <IconFileText size={16} /> Medien & Dateien
                         </button>
+                        {peer.id !== session.user.id && (
+                          <button
+                            type="button"
+                            className="chat-menu-item"
+                            onClick={() => {
+                              setMutedPeers((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(peer.id)) next.delete(peer.id);
+                                else next.add(peer.id);
+                                saveStringSet("vaultchat.muted.peers", next);
+                                return next;
+                              });
+                              setDmMenuOpen(false);
+                            }}
+                          >
+                            <IconVolumeMute size={16} />
+                            {mutedPeers.has(peer.id)
+                              ? "Stummschaltung aufheben"
+                              : "Stummschalten"}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="chat-menu-item"
