@@ -215,28 +215,19 @@ export function AuthPanel({
         : "Mit Benutzername und Passwort einloggen.";
 
   return (
-    <div className="landing-page">
-      {/* Top brand bar */}
-      <header className="landing-topbar">
-        <div className="landing-brand">
-          <VaultChatLogo size={28} style={{ color: "var(--accent)" }} />
-          <span>VaultChat</span>
-        </div>
+    <div className="auth-stage">
+      {/* Tiny top-right action only — no full header bar */}
+      <div className="auth-stage-toggle">
         <ThemeToggle />
-      </header>
+      </div>
 
-      <main className="landing-stage">
-        {/* Eyebrow above the auth card */}
-        <div className="landing-eyebrow">
-          <h1>Verschlüsselter Browser-Messenger.</h1>
-          <p>
-            Sealed Sender, Zero-Knowledge-Relay, ohne Telefonnummer oder
-            Pflicht-E-Mail.
-          </p>
-        </div>
-
-        {/* Auth card — the centerpiece */}
+      <main className="auth-stage-shell">
+        {/* The card carries the brand mark itself, no separate hero block */}
         <section className="auth-card-v2" aria-labelledby="auth-card-title">
+          <div className="auth-card-v2-brand" aria-hidden>
+            <VaultChatLogo size={36} style={{ color: "var(--accent)" }} />
+            <span>VaultChat</span>
+          </div>
           <header className="auth-card-v2-head">
             <h2 id="auth-card-title">{cardTitle}</h2>
             <p>{cardSubtitle}</p>
@@ -593,33 +584,31 @@ export function AuthPanel({
           )}
         </section>
 
-        {/* Feature row — quiet, single line on desktop */}
-        <ul className="landing-feature-row" aria-label="Sicherheits-Eigenschaften">
+        {/* Quiet pill row directly under the card */}
+        <ul className="auth-stage-pills" aria-label="Sicherheits-Eigenschaften">
           <li>
-            <IconLock size={14} aria-hidden />
+            <IconLock size={12} aria-hidden />
             <span>Sealed Sender</span>
           </li>
           <li>
-            <IconShieldCheck size={14} aria-hidden />
-            <span>TOFU + Sicherheitsnummer</span>
+            <IconShieldCheck size={12} aria-hidden />
+            <span>TOFU</span>
           </li>
           <li>
-            <IconTimer size={14} aria-hidden />
+            <IconTimer size={12} aria-hidden />
             <span>Auto-Lock</span>
           </li>
           <li>
-            <IconBookmark size={14} aria-hidden />
-            <span>Verschlüsseltes Backup</span>
+            <IconBookmark size={12} aria-hidden />
+            <span>E2E Backup</span>
           </li>
         </ul>
-      </main>
 
-      <footer className="landing-footer">
-        <p>
+        <p className="auth-stage-footer">
           Web-Build. Kein auditierter Signal-Ersatz — siehe{" "}
           <code>THREAT_MODEL.md</code>.
         </p>
-      </footer>
+      </main>
     </div>
   );
 }
