@@ -7,7 +7,7 @@ import {
   trustLabel,
   type PeerPin,
 } from "../lib/trust";
-import { IconCheck, IconX } from "./Icons";
+import { IconCheck, IconCopy, IconX } from "./Icons";
 import { QrCodeSvg } from "./QrCodeSvg";
 
 export function SafetyNumberDialog({
@@ -29,6 +29,16 @@ export function SafetyNumberDialog({
   const [emojiSeq, setEmojiSeq] = useState<string[]>([]);
   const [pin, setPin] = useState<PeerPin | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function copyNumber() {
+    const text = groups.join(" ").trim();
+    if (!text) return;
+    void navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  }
 
   useEffect(() => {
     void (async () => {
@@ -102,14 +112,35 @@ export function SafetyNumberDialog({
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Vergleiche diese Nummern persönlich oder über einen sicheren Kanal:
             </p>
-            <button
-              type="button"
-              onClick={() => setShowQr((v) => !v)}
-              className="safety-qr-toggle"
-              aria-pressed={showQr}
-            >
-              {showQr ? "Nummer anzeigen" : "QR-Code anzeigen"}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {!showQr && groups.length > 0 && (
+                <button
+                  type="button"
+                  onClick={copyNumber}
+                  className="safety-qr-toggle"
+                  title="Sicherheitsnummer kopieren"
+                  aria-label="Sicherheitsnummer kopieren"
+                >
+                  {copied ? (
+                    <>
+                      <IconCheck size={11} /> Kopiert
+                    </>
+                  ) : (
+                    <>
+                      <IconCopy size={11} /> Kopieren
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowQr((v) => !v)}
+                className="safety-qr-toggle"
+                aria-pressed={showQr}
+              >
+                {showQr ? "Nummer anzeigen" : "QR-Code anzeigen"}
+              </button>
+            </div>
           </div>
           {showQr ? (
             <div className="safety-qr-wrap">
