@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ApiUser, ApiGroup } from "../lib/api";
 import { type ChatFolder, newFolderId } from "../lib/chatFolders";
+import { canAddFolder, getLimits } from "../lib/plan";
 import { IconX, IconBookmark, IconUsers } from "./Icons";
 
 type Props = {
@@ -50,6 +51,13 @@ export function FoldersManageModal({
   }, [draft, onClose]);
 
   function startNewFolder() {
+    if (!canAddFolder(folders.length)) {
+      const limit = getLimits().folderMax;
+      window.alert(
+        `Limit erreicht: ${limit} Ordner im aktuellen Plan. Upgrade auf Pro für mehr — siehe Einstellungen → Plan & Abo.`
+      );
+      return;
+    }
     setDraft({
       id: newFolderId(),
       name: "",
