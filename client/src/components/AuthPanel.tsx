@@ -83,6 +83,14 @@ function humanError(err: unknown): string {
     return "Eingaben ungültig. Prüfe Benutzername und Passwort.";
   if (msg === "invalid_credentials")
     return "Benutzername oder Passwort falsch.";
+  if (msg === "not_found" || msg === "user_not_found")
+    return "Konto nicht gefunden. Der Server wurde evtl. neu gestartet (Render Free) — bitte neu registrieren oder das Backup importieren.";
+  if (msg === "session_missing")
+    return "Lokale Sitzung verloren. Bitte über „Anderes Konto“ einloggen.";
+  if (msg === "unauthorized" || msg === "token_expired")
+    return "Sitzung abgelaufen. Bitte erneut einloggen.";
+  if (msg === "rate_limited")
+    return "Zu viele Versuche. Bitte einen Moment warten.";
   return msg;
 }
 
