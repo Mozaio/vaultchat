@@ -857,6 +857,29 @@ select:focus-visible {
   .notify-prompt-actions { width: 100%; justify-content: flex-end; }
 }
 
+/* Inline markdown rendered inside text bubbles. */
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.32rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.message-bubble.sent .md-code {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.md-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
+  color: inherit;
+}
+.md-link:hover {
+  opacity: 0.85;
+}
+
 /* Floating emoji picker spawned from a reaction popover's "+" button. */
 .reaction-emoji-overlay {
   position: absolute;

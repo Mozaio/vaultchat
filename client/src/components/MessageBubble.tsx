@@ -28,6 +28,7 @@ import {
   IconX,
 } from "./Icons";
 import { EmojiPicker } from "./EmojiPicker";
+import { renderInlineMarkdown } from "../lib/inlineMarkdown";
 
 export type ChatMsg = {
   id: string;
@@ -426,7 +427,7 @@ export function MessageBubble({
               cid={msg.plain.cid}
             />
           ) : (
-            <p className="bubble-text">{body}</p>
+            <p className="bubble-text">{renderInlineMarkdown(body)}</p>
           )}
 
           <div className="bubble-meta">
