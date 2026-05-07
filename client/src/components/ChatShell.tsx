@@ -1154,17 +1154,34 @@ export function ChatShell({
   }, [refreshPendingCount]);
 
   useEffect(() => {
+    let disposed = false;
     const url = getWsUrl();
     const ws = new WebSocket(url);
     wsRef.current = ws;
     ws.onopen = () => {
+      if (disposed) {
+        try {
+          ws.close();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       const activeWs = wsRef.current;
       if (!activeWs || activeWs.readyState !== WebSocket.OPEN) return;
       activeWs.send(JSON.stringify({ type: "auth", token: tokenRef.current }));
       setHasEverConnected(true);
       setWsHadError(false);
       setConnected(true);
-      void flushOutbox();
+      void flushOutbox().catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("local_key_missing")) {
+          // ChatShell is being torn down (lock in flight); benign.
+          return;
+        }
+        // eslint-disable-next-line no-console
+        console.warn("[vaultchat] flushOutbox failed:", msg);
+      });
 
       // Starte Cover Traffic (Dummy-Envelopes bei Inaktivität)
       const peerList = usersRef.current.map((u) => ({
@@ -1185,11 +1202,13 @@ export function ChatShell({
         coverRef.current.stop();
         coverRef.current = null;
       }
+      if (disposed) return;
       // Auto-reconnect with exponential backoff (max 30 seconds)
       const attempts = reconnectAttempts.current;
       const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
       reconnectAttempts.current = attempts + 1;
       reconnectTimer.current = setTimeout(() => {
+        if (disposed) return;
         // Force effect remount by creating a new WebSocket
         const url = getWsUrl();
         const newWs = new WebSocket(url);
@@ -1497,7 +1516,16 @@ export function ChatShell({
       void flushOutbox();
     }, 15_000);
     return () => {
-      ws.close();
+      disposed = true;
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+      try {
+        ws.close();
+      } catch {
+        /* ignore */
+      }
       clearInterval(interval);
       if (typingTimer.current) clearTimeout(typingTimer.current);
       for (const t of groupTypingClearTimers.current.values()) clearTimeout(t);
