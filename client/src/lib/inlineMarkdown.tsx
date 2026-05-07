@@ -61,3 +61,34 @@ export function renderInlineMarkdown(text: string): ReactNode[] {
   if (lastIdx < text.length) out.push(text.slice(lastIdx));
   return out;
 }
+
+/** Pull every distinct http(s) URL out of a piece of text. Used by the
+ *  link-preview card under text bubbles. */
+const URL_RE = /https?:\/\/[^\s<>"']+/gi;
+
+export function extractLinks(text: string, max = 3): string[] {
+  if (!text) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of text.matchAll(URL_RE)) {
+    const url = m[0].replace(/[.,;:!?)\]]+$/, ""); // strip trailing punctuation
+    if (!seen.has(url) && /^https?:\/\//i.test(url)) {
+      seen.add(url);
+      out.push(url);
+      if (out.length >= max) break;
+    }
+  }
+  return out;
+}
+
+/** Pretty-print a URL for the link card: domain + first path segment. */
+export function shortenUrl(url: string): { host: string; path: string } {
+  try {
+    const u = new URL(url);
+    const host = u.host.replace(/^www\./, "");
+    const path = u.pathname === "/" ? "" : u.pathname;
+    return { host, path: path.length > 40 ? path.slice(0, 39) + "…" : path };
+  } catch {
+    return { host: url, path: "" };
+  }
+}

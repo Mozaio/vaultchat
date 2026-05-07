@@ -28,7 +28,11 @@ import {
   IconX,
 } from "./Icons";
 import { EmojiPicker } from "./EmojiPicker";
-import { renderInlineMarkdown } from "../lib/inlineMarkdown";
+import {
+  renderInlineMarkdown,
+  extractLinks,
+  shortenUrl,
+} from "../lib/inlineMarkdown";
 
 export type ChatMsg = {
   id: string;
@@ -480,7 +484,36 @@ export function MessageBubble({
               );
             })()
           ) : (
-            <p className="bubble-text">{renderInlineMarkdown(body)}</p>
+            <>
+              <p className="bubble-text">{renderInlineMarkdown(body)}</p>
+              {(() => {
+                if (msg.deleted || msg.plain.viewOnce) return null;
+                const links = extractLinks(body, 2);
+                if (links.length === 0) return null;
+                return (
+                  <div className="link-preview-stack">
+                    {links.map((url) => {
+                      const { host, path } = shortenUrl(url);
+                      return (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className="link-preview-card"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="link-preview-host">{host}</span>
+                          {path && (
+                            <span className="link-preview-path">{path}</span>
+                          )}
+                        </a>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </>
           )}
 
           <div className="bubble-meta">
