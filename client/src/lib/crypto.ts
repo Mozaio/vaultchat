@@ -137,6 +137,9 @@ export type PlainPayload = {
   receiptKind?: "delivered" | "read";
   /** Time-to-live nach Zustellung in ms (verschwindende Nachrichten). */
   ttlMs?: number;
+  /** Wenn true: Nachricht wird beim ersten Anschauen lokal gelöscht
+   *  (Snapchat/Signal-Style View-Once). Best-effort — kein Schutz vor Screenshot. */
+  viewOnce?: boolean;
   /** Nur bei kind === "group_key" */
   groupId?: string;
   keyB64?: string;

@@ -857,6 +857,30 @@ select:focus-visible {
   .notify-prompt-actions { width: 100%; justify-content: flex-end; }
 }
 
+/* View-once message cover — recipient sees this until they tap to reveal.
+   Once revealed, a 10s countdown shown in the bubble's meta row triggers
+   a local-only delete. */
+.view-once-cover {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius);
+  border: 1px dashed var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.view-once-cover:hover {
+  background: var(--bg-hover);
+}
+.view-once-cover:active {
+  transform: scale(0.98);
+}
+
 /* System message (centered neutral pill: "X hat Y hinzugefügt") */
 .system-message {
   display: flex;

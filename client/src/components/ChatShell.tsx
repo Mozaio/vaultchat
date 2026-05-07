@@ -322,6 +322,8 @@ export function ChatShell({
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
   const [ttlGroup, setTtlGroup] = useState<number>(0);
+  const [viewOnceDm, setViewOnceDm] = useState<boolean>(false);
+  const [viewOnceGroup, setViewOnceGroup] = useState<boolean>(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [peerPin, setPeerPin] = useState<PeerPin | null>(null);
   const [relayOnly, setRelayOnly] = useState(false);
@@ -1453,11 +1455,13 @@ export function ChatShell({
           }
         : {}),
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
+      ...(viewOnceDm ? { viewOnce: true } : {}),
     };
     await sendDmWire(peer, payload);
     setText("");
     resetTextarea(dmInputRef.current);
     setReplyDm(null);
+    setViewOnceDm(false);
   }
 
   async function sendDmFile(file: File) {
@@ -1489,8 +1493,10 @@ export function ChatShell({
       mime: file.type,
       fileSize: file.size,
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
+      ...(viewOnceDm ? { viewOnce: true } : {}),
     };
     await sendDmWire(peer, payload);
+    setViewOnceDm(false);
   }
 
   async function sendDmVoice() {
@@ -1506,8 +1512,10 @@ export function ChatShell({
         mime: rec.mime,
         durationMs: rec.durationMs,
         ...(ttlDm ? { ttlMs: ttlDm } : {}),
+        ...(viewOnceDm ? { viewOnce: true } : {}),
       };
       await sendDmWire(peer, payload);
+      setViewOnceDm(false);
     } else {
       const ok = await voice.start();
       if (!ok) setError("Mikrofon-Zugriff verweigert.");
@@ -1531,11 +1539,13 @@ export function ChatShell({
           }
         : {}),
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
+      ...(viewOnceGroup ? { viewOnce: true } : {}),
     };
     await sendGroupWire(group, payload);
     setGroupText("");
     resetTextarea(groupInputRef.current);
     setReplyGroup(null);
+    setViewOnceGroup(false);
   }
 
   async function sendGroupFile(file: File) {
@@ -1563,8 +1573,10 @@ export function ChatShell({
       mime: file.type,
       fileSize: file.size,
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
+      ...(viewOnceGroup ? { viewOnce: true } : {}),
     };
     await sendGroupWire(group, payload);
+    setViewOnceGroup(false);
   }
 
   async function sendGroupVoice() {
@@ -1580,8 +1592,10 @@ export function ChatShell({
         mime: rec.mime,
         durationMs: rec.durationMs,
         ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
+        ...(viewOnceGroup ? { viewOnce: true } : {}),
       };
       await sendGroupWire(group, payload);
+      setViewOnceGroup(false);
     } else {
       const ok = await groupVoice.start();
       if (!ok) setError("Mikrofon-Zugriff verweigert.");
@@ -1663,6 +1677,18 @@ export function ChatShell({
     rebuildDm(peer.id);
   }
 
+  /** Remove a DM message from local IDB and the rendered list without
+   *  emitting a delete frame. Used for view-once expiry on the recipient. */
+  async function localDeleteDm(m: ChatMsg) {
+    if (!peer) return;
+    await idbDeleteDm(m.id);
+    const arr = (rawDmRef.current.get(peer.id) ?? []).filter(
+      (x) => x.id !== m.id
+    );
+    rawDmRef.current.set(peer.id, arr);
+    rebuildDm(peer.id);
+  }
+
   async function deleteGroup(m: ChatMsg) {
     if (!group) return;
     const refCid = m.plain.cid;
@@ -1674,6 +1700,18 @@ export function ChatShell({
       refCid,
     };
     await sendGroupWire(group, payload);
+    await idbDeleteGroupMsg(m.id);
+    const arr = (rawGroupRef.current.get(group.id) ?? []).filter(
+      (x) => x.id !== m.id
+    );
+    rawGroupRef.current.set(group.id, arr);
+    rebuildGroup(group.id);
+  }
+
+  /** Remove a group message from local IDB and the rendered list without
+   *  emitting a delete frame. Used for view-once expiry on the recipient. */
+  async function localDeleteGroupMsg(m: ChatMsg) {
+    if (!group) return;
     await idbDeleteGroupMsg(m.id);
     const arr = (rawGroupRef.current.get(group.id) ?? []).filter(
       (x) => x.id !== m.id
@@ -3478,6 +3516,7 @@ export function ChatShell({
                     onReact={(x, e) => void reactDm(x, e)}
                     onEdit={(x, body) => void editDm(x, body)}
                     onDelete={(x) => void deleteDm(x)}
+                    onLocalDelete={(x) => void localDeleteDm(x)}
                     onCopy={copyText}
                     onForward={(x) => setForwardTarget(x)}
                     onJumpToCid={(cid) => jumpToCid(cid, dmScrollRef.current)}
@@ -3557,11 +3596,29 @@ export function ChatShell({
                     }}
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setViewOnceDm((v) => !v)}
+                  className={`chat-tool-button${viewOnceDm ? " active" : ""}`}
+                  title={
+                    viewOnceDm
+                      ? "Einmal anzeigen aktiviert (klicken zum Deaktivieren)"
+                      : "Nachricht nur einmal anzeigen lassen"
+                  }
+                  aria-label="Einmal anzeigen umschalten"
+                  aria-pressed={viewOnceDm}
+                >
+                  <IconLock size={18} />
+                </button>
                 <textarea
                   ref={dmInputRef}
                   className="chat-input-textarea"
                   placeholder={
-                    voice.recording ? "Aufnahme läuft…" : "Nachricht…"
+                    voice.recording
+                      ? "Aufnahme läuft…"
+                      : viewOnceDm
+                        ? "Einmal-Nachricht…"
+                        : "Nachricht…"
                   }
                   value={text}
                   disabled={voice.recording || peerPin?.state === "mismatch"}
@@ -4186,6 +4243,7 @@ export function ChatShell({
                   onReact={(x, e) => void reactGroup(x, e)}
                   onEdit={(x, body) => void editGroup(x, body)}
                   onDelete={(x) => void deleteGroup(x)}
+                  onLocalDelete={(x) => void localDeleteGroupMsg(x)}
                   onCopy={copyText}
                   onForward={(x) => setForwardTarget(x)}
                   onJumpToCid={(cid) => jumpToCid(cid, groupScrollRef.current)}
@@ -4261,11 +4319,29 @@ export function ChatShell({
                     }}
                   />
                 </label>
+                <button
+                  type="button"
+                  onClick={() => setViewOnceGroup((v) => !v)}
+                  className={`chat-tool-button${viewOnceGroup ? " active" : ""}`}
+                  title={
+                    viewOnceGroup
+                      ? "Einmal anzeigen aktiviert (klicken zum Deaktivieren)"
+                      : "Nachricht nur einmal anzeigen lassen"
+                  }
+                  aria-label="Einmal anzeigen umschalten"
+                  aria-pressed={viewOnceGroup}
+                >
+                  <IconLock size={18} />
+                </button>
                 <textarea
                   ref={groupInputRef}
                   className="chat-input-textarea"
                   placeholder={
-                    groupVoice.recording ? "Aufnahme läuft…" : "Gruppennachricht…"
+                    groupVoice.recording
+                      ? "Aufnahme läuft…"
+                      : viewOnceGroup
+                        ? "Einmal-Nachricht…"
+                        : "Gruppennachricht…"
                   }
                   value={groupText}
                   disabled={groupVoice.recording}

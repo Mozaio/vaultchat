@@ -26,6 +26,12 @@ export function isImagePayload(p: PlainPayload): boolean {
 }
 
 export function previewForPayload(p: PlainPayload): string {
+  // Never leak the body of a view-once message via list previews,
+  // notifications, reply quotes, etc. — the whole point is that the
+  // recipient sees the content exactly once, deliberately.
+  if (p.viewOnce && (p.kind === "text" || p.kind === "file" || p.kind === "voice")) {
+    return "🔒 Einmal-Nachricht";
+  }
   switch (p.kind) {
     case "text":
       return truncate(p.body ?? "");

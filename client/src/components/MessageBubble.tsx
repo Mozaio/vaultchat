@@ -16,6 +16,7 @@ import {
   IconFileText,
   IconForward,
   IconImage,
+  IconLock,
   IconPause,
   IconPin,
   IconPlay,
@@ -136,6 +137,10 @@ function VoiceCard({
   );
 }
 
+/** How long the recipient can look at a view-once message before it
+ *  is removed from local storage. */
+const VIEW_ONCE_REVEAL_MS = 10_000;
+
 export function MessageBubble({
   msg,
   peerLabel,
@@ -154,6 +159,7 @@ export function MessageBubble({
   onJumpToCid,
   onToggleStar,
   onTogglePin,
+  onLocalDelete,
 }: {
   msg: ChatMsg;
   peerLabel: string;
@@ -172,6 +178,8 @@ export function MessageBubble({
   onJumpToCid?: (cid: string) => void;
   onToggleStar?: (m: ChatMsg) => void;
   onTogglePin?: (m: ChatMsg) => void;
+  /** Local-only delete (no network frame). Used for view-once reveal expiry. */
+  onLocalDelete?: (m: ChatMsg) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
@@ -181,6 +189,8 @@ export function MessageBubble({
     computeTtlLeft(msg.expiresAt)
   );
   const [imageOpen, setImageOpen] = useState(false);
+  const [revealed, setRevealed] = useState(false);
+  const [viewOnceLeftMs, setViewOnceLeftMs] = useState<number | null>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -192,21 +202,24 @@ export function MessageBubble({
     return () => clearInterval(h);
   }, [msg.expiresAt]);
 
-  const body = msg.plain.body ?? "";
-  const reacts = msg.reactions ?? {};
-  const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
-  const isImage = isImagePayload(msg.plain);
-  const isSystem = msg.plain.kind === "system";
-
-  // System messages render as a centered, neutral notice — no avatar,
-  // no reactions, no actions.
-  if (isSystem) {
-    return (
-      <div className="system-message" data-cid={msg.plain.cid}>
-        <span>{body}</span>
-      </div>
-    );
-  }
+  // View-once countdown: once revealed, count down VIEW_ONCE_REVEAL_MS and
+  // then trigger a local-only delete. Only runs for non-sender (recipient).
+  useEffect(() => {
+    if (!revealed || msg.fromMe || !msg.plain.viewOnce) return;
+    const start = Date.now();
+    setViewOnceLeftMs(VIEW_ONCE_REVEAL_MS);
+    const tick = window.setInterval(() => {
+      const left = VIEW_ONCE_REVEAL_MS - (Date.now() - start);
+      if (left <= 0) {
+        window.clearInterval(tick);
+        setViewOnceLeftMs(0);
+        onLocalDelete?.(msg);
+      } else {
+        setViewOnceLeftMs(left);
+      }
+    }, 250);
+    return () => window.clearInterval(tick);
+  }, [revealed, msg, onLocalDelete]);
 
   useEffect(() => {
     if (!menuOpen && !reactOpen) return;
@@ -218,6 +231,45 @@ export function MessageBubble({
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
   }, [menuOpen, reactOpen]);
+
+  const body = msg.plain.body ?? "";
+  const reacts = msg.reactions ?? {};
+  const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
+  const isImage = isImagePayload(msg.plain);
+  const isSystem = msg.plain.kind === "system";
+  const isViewOnce = !!msg.plain.viewOnce && !msg.deleted;
+  const showCover = isViewOnce && !msg.fromMe && !revealed;
+
+  // System messages render as a centered, neutral notice — no avatar,
+  // no reactions, no actions.
+  if (isSystem) {
+    return (
+      <div className="system-message" data-cid={msg.plain.cid}>
+        <span>{body}</span>
+      </div>
+    );
+  }
+
+  // Recipient view of a still-covered view-once message: just a tap target.
+  if (showCover) {
+    return (
+      <div
+        ref={bubbleRef}
+        data-cid={msg.plain.cid}
+        className={`message-wrapper group ${msg.fromMe ? "sent" : "received"}`}
+      >
+        <button
+          type="button"
+          className="view-once-cover"
+          onClick={() => setRevealed(true)}
+          aria-label="Einmal-Nachricht öffnen — verschwindet nach dem Anschauen"
+        >
+          <IconLock size={14} />
+          <span>Einmal anzeigen — tippen zum Öffnen</span>
+        </button>
+      </div>
+    );
+  }
 
   function toggleReaction(emoji: string) {
     onReact(msg, msg.myReaction === emoji ? "" : emoji);
@@ -381,6 +433,23 @@ export function MessageBubble({
                 <IconBookmark size={11} />
               </span>
             )}
+            {isViewOnce && (
+              <span
+                className="disappearing-timer"
+                title={
+                  msg.fromMe
+                    ? "Einmal-Nachricht — Empfänger sieht sie nur einmal"
+                    : viewOnceLeftMs !== null
+                      ? "Verschwindet beim Schließen"
+                      : "Einmal anzeigen"
+                }
+              >
+                <IconLock size={10} />
+                {viewOnceLeftMs !== null
+                  ? `${Math.max(0, Math.ceil(viewOnceLeftMs / 1000))}s`
+                  : "1×"}
+              </span>
+            )}
             {ttlLeft && (
               <span className="disappearing-timer" title="Verschwindet bald">
                 <IconTimer size={10} />
@@ -418,7 +487,7 @@ export function MessageBubble({
             )}
           </div>
 
-          {!msg.deleted && (
+          {!msg.deleted && !isViewOnce && (
             <div
               className={`message-actions ${
                 msg.fromMe ? "from-me" : "from-peer"
