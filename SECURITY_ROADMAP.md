@@ -29,14 +29,3 @@ until the release pipeline changes.
 - WebSocket tokens are sent in the first auth frame, not in URLs that can land
   in proxy/browser logs.
 - Relay-only calls suppress STUN fallback and non-relay candidates when forced.
-
-## Claims Boundary
-
-Do not market VaultChat as "better than Signal" without:
-
-- independent cryptographic audit,
-- independent implementation audit,
-- reproducible native builds,
-- signed update pipeline,
-- published release hashes,
-- reviewed operational runbook for server and TURN infrastructure.
