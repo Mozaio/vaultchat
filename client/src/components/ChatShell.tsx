@@ -3049,8 +3049,8 @@ export function ChatShell({
           <button
             type="button"
             className="!text-[var(--text-muted)] hover:!text-[var(--text)]"
-            title="Später erinnern"
-            aria-label="Erinnerung ausblenden"
+            title="Erinnerung dauerhaft ausblenden"
+            aria-label="Erinnerung dauerhaft ausblenden"
             onClick={() => {
               try {
                 localStorage.setItem("vaultchat.backupReminder.dismissed", "1");
