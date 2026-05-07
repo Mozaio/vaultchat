@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type VoiceRecording = {
   dataUrl: string;
@@ -8,10 +8,33 @@ export type VoiceRecording = {
 
 export function useVoiceRecorder() {
   const [recording, setRecording] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
+  const tickRef = useRef<number | null>(null);
+
+  // Tick a 250ms timer while recording so the UI can show elapsed time.
+  useEffect(() => {
+    if (!recording) {
+      if (tickRef.current !== null) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+      setElapsedMs(0);
+      return;
+    }
+    tickRef.current = window.setInterval(() => {
+      setElapsedMs(Date.now() - startRef.current);
+    }, 250);
+    return () => {
+      if (tickRef.current !== null) {
+        window.clearInterval(tickRef.current);
+        tickRef.current = null;
+      }
+    };
+  }, [recording]);
 
   const start = useCallback(async (): Promise<boolean> => {
     try {
@@ -78,5 +101,5 @@ export function useVoiceRecorder() {
     setRecording(false);
   }, []);
 
-  return { recording, start, stop, cancel };
+  return { recording, elapsedMs, start, stop, cancel };
 }

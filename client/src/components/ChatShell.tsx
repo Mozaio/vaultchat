@@ -185,6 +185,14 @@ function newCid(): string {
   );
 }
 
+/** mm:ss for voice-recording elapsed time. */
+function formatElapsedMs(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 /** Weiterleitung als neuer DM-Frame (nur Text/Datei). */
 function buildForwardPayloadForSend(
   m: ChatMsg,
@@ -4232,7 +4240,7 @@ export function ChatShell({
                   className="chat-input-textarea"
                   placeholder={
                     voice.recording
-                      ? "Aufnahme läuft…"
+                      ? `Aufnahme läuft … ${formatElapsedMs(voice.elapsedMs)}`
                       : viewOnceDm
                         ? "Einmal-Nachricht…"
                         : peer && peer.id !== session.user.id
@@ -5085,7 +5093,7 @@ export function ChatShell({
                   className="chat-input-textarea"
                   placeholder={
                     groupVoice.recording
-                      ? "Aufnahme läuft…"
+                      ? `Aufnahme läuft … ${formatElapsedMs(groupVoice.elapsedMs)}`
                       : viewOnceGroup
                         ? "Einmal-Nachricht…"
                         : group
