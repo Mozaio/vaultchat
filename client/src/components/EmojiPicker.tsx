@@ -232,6 +232,7 @@ export function EmojiPicker({
   );
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -384,7 +385,21 @@ export function EmojiPicker({
       )}
 
       {active === CUSTOM_TAB_ID && query.trim().length === 0 && (
-        <div className="emoji-picker-custom-bar">
+        <div
+          className={`emoji-picker-custom-bar${dragOver ? " drag-over" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const file = e.dataTransfer.files?.[0];
+            if (file) void handleUpload(file);
+          }}
+        >
           <button
             type="button"
             className="emoji-picker-upload"
@@ -392,7 +407,13 @@ export function EmojiPicker({
             disabled={uploading}
           >
             <IconPlus size={14} />
-            <span>{uploading ? "Lade …" : "Eigenes Emoji hinzufügen"}</span>
+            <span>
+              {uploading
+                ? "Lade …"
+                : dragOver
+                  ? "Bild hier ablegen"
+                  : "Eigenes Emoji hinzufügen oder hierher ziehen"}
+            </span>
           </button>
           <input
             ref={fileInputRef}

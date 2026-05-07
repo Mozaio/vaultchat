@@ -2112,6 +2112,19 @@ select:focus-visible {
   flex-direction: column;
   gap: 0.4rem;
   padding: 0 0.6rem 0.5rem;
+  transition: background 0.15s ease;
+  border-radius: var(--radius);
+}
+
+.emoji-picker-custom-bar.drag-over {
+  background: var(--accent-soft);
+}
+
+.emoji-picker-custom-bar.drag-over .emoji-picker-upload {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
 }
 
 .emoji-picker-upload {
