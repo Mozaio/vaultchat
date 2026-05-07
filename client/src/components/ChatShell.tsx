@@ -185,12 +185,13 @@ function newCid(): string {
   );
 }
 
-/** mm:ss for voice-recording elapsed time. */
+/** mm:ss for voice-recording elapsed time. Adds 🔴 prefix beyond 1 min. */
 function formatElapsedMs(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  const prefix = m >= 1 ? "🔴 " : "";
+  return `${prefix}${m}:${s.toString().padStart(2, "0")}`;
 }
 
 /** Weiterleitung als neuer DM-Frame (nur Text/Datei). */
