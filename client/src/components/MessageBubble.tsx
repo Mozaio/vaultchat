@@ -720,20 +720,23 @@ export function MessageBubble({
               className={`reaction-popover ${msg.fromMe ? "right" : "left"}`}
               onClick={(e) => e.stopPropagation()}
             >
-              {QUICK_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  className={`reaction-popover-btn${
-                    msg.myReaction === e ? " active" : ""
-                  }`}
-                  onClick={() => toggleReaction(e)}
-                  aria-label={`Mit ${e} reagieren`}
-                  aria-pressed={msg.myReaction === e}
-                >
-                  {e}
-                </button>
-              ))}
+              {QUICK_EMOJIS.map((e) => {
+                const isCustom = typeof e === "string" && e.startsWith("data:image/");
+                return (
+                  <button
+                    key={e}
+                    type="button"
+                    className={`reaction-popover-btn${
+                      msg.myReaction === e ? " active" : ""
+                    }${isCustom ? " has-custom" : ""}`}
+                    onClick={() => toggleReaction(e)}
+                    aria-label="Reagieren"
+                    aria-pressed={msg.myReaction === e}
+                  >
+                    {isCustom ? <img src={e} alt="" /> : e}
+                  </button>
+                );
+              })}
               <button
                 type="button"
                 className="reaction-popover-btn"
@@ -763,20 +766,28 @@ export function MessageBubble({
 
         {reactEntries.length > 0 && (
           <div className={`reactions-row ${msg.fromMe ? "end" : "start"}`}>
-            {reactEntries.map(([e, n]) => (
-              <button
-                key={e}
-                type="button"
-                onClick={() => toggleReaction(e)}
-                className={`reaction-chip${
-                  msg.myReaction === e ? " mine" : ""
-                }`}
-                title={peerLabel}
-                aria-pressed={msg.myReaction === e}
-              >
-                {e} <span>{n}</span>
-              </button>
-            ))}
+            {reactEntries.map(([e, n]) => {
+              const isCustom = typeof e === "string" && e.startsWith("data:image/");
+              return (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => toggleReaction(e)}
+                  className={`reaction-chip${
+                    msg.myReaction === e ? " mine" : ""
+                  }${isCustom ? " has-custom" : ""}`}
+                  title={peerLabel}
+                  aria-pressed={msg.myReaction === e}
+                >
+                  {isCustom ? (
+                    <img src={e} alt="" className="reaction-chip-img" />
+                  ) : (
+                    <span>{e}</span>
+                  )}{" "}
+                  <span>{n}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

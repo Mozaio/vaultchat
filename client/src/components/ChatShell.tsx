@@ -4041,6 +4041,7 @@ export function ChatShell({
                 {emojiOpen && (
                   <div className="emoji-picker-anchor">
                     <EmojiPicker
+                      excludeCustom
                       onPick={(e) => {
                         setText((current) => {
                           const next = current ? `${current}${e}` : e;
@@ -4865,6 +4866,7 @@ export function ChatShell({
                 {groupEmojiOpen && (
                   <div className="emoji-picker-anchor">
                     <EmojiPicker
+                      excludeCustom
                       onPick={(e) => {
                         setGroupText((current) => {
                           const next = current ? `${current}${e}` : e;
