@@ -3580,6 +3580,7 @@ export function ChatShell({
               setTab("group");
               setSidebarFilter("group");
             }}
+            onCreateFolder={() => setFoldersManageOpen(true)}
             onSaveBackup={() => setSecurityOpen(true)}
           />
         )}
@@ -4218,6 +4219,7 @@ export function ChatShell({
           <ChatEmptyState
             hasChats={users.length > 0 || groups.length > 0}
             onAddContact={() => setShowAddContact(true)}
+            onCreateFolder={() => setFoldersManageOpen(true)}
             onSaveBackup={() => setSecurityOpen(true)}
           />
         )}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   IconDownload,
+  IconFolderPlus,
   IconMessageSquare,
   IconShieldCheck,
   IconUsers,
@@ -10,15 +11,18 @@ export function ChatEmptyState({
   hasChats,
   onAddContact,
   onCreateGroup,
+  onCreateFolder,
   onSaveBackup,
 }: {
   hasChats?: boolean;
   onAddContact?: () => void;
   onCreateGroup?: () => void;
+  onCreateFolder?: () => void;
   onSaveBackup?: () => void;
 }) {
   const showQuickActions =
-    !hasChats && (onAddContact || onCreateGroup || onSaveBackup);
+    !hasChats &&
+    (onAddContact || onCreateGroup || onCreateFolder || onSaveBackup);
 
   return (
     <div className="chat-empty-state">
@@ -49,6 +53,14 @@ export function ChatEmptyState({
               title="Gruppe erstellen"
               description="Mehrere Personen auf einmal"
               onClick={onCreateGroup}
+            />
+          )}
+          {onCreateFolder && (
+            <QuickAction
+              icon={<IconFolderPlus size={20} />}
+              title="Ordner erstellen"
+              description="Chats nach Themen gruppieren"
+              onClick={onCreateFolder}
             />
           )}
           {onSaveBackup && (
