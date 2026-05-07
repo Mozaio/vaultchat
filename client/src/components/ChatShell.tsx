@@ -102,6 +102,7 @@ import {
   IconMoreVertical,
   IconPaperclip,
   IconPin,
+  IconPlus,
   IconPhone,
   IconRefreshCw,
   IconSearch,
@@ -2832,6 +2833,7 @@ export function ChatShell({
           folders={folders}
           users={users}
           groups={groups}
+          selfUserId={session.user.id}
           onClose={() => {
             setFoldersManageOpen(false);
             setFolderEdit(null);
@@ -3166,13 +3168,13 @@ export function ChatShell({
           })}
           <button
             type="button"
-            className="filter-chip"
+            className="filter-chip filter-chip-add"
             onClick={() => setFoldersManageOpen(true)}
             title="Ordner verwalten"
             aria-label="Ordner verwalten"
-            style={{ fontWeight: 500 }}
           >
-            +
+            <IconPlus size={12} />
+            <span>Ordner</span>
           </button>
         </div>
 

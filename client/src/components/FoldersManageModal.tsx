@@ -7,6 +7,8 @@ type Props = {
   folders: ChatFolder[];
   users: ApiUser[];
   groups: ApiGroup[];
+  /** Own userId — used to render Saved Messages as a selectable chat. */
+  selfUserId: string;
   onClose: () => void;
   onSave: (next: ChatFolder[]) => void;
   editing: ChatFolder | null;
@@ -19,6 +21,7 @@ export function FoldersManageModal({
   folders,
   users,
   groups,
+  selfUserId,
   onClose,
   onSave,
   editing,
@@ -231,12 +234,31 @@ export function FoldersManageModal({
                 className="flex-1 space-y-0.5 overflow-y-auto rounded-lg border p-1"
                 style={{ borderColor: "var(--border)" }}
               >
+                {(() => {
+                  const selfKey = `dm:${selfUserId}`;
+                  const selfChecked = draft.chatKeys.includes(selfKey);
+                  return (
+                    <label
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[var(--bg-hover)]"
+                      style={{ color: "var(--text)" }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selfChecked}
+                        onChange={() => toggleChat(selfKey)}
+                      />
+                      <IconBookmark size={14} />
+                      <span className="truncate">Saved Messages</span>
+                    </label>
+                  );
+                })()}
                 {users.length === 0 && groups.length === 0 ? (
                   <p
                     className="py-3 text-center text-xs"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Noch keine Chats. Füge zuerst Kontakte oder Gruppen hinzu.
+                    Saved Messages ist immer verfügbar. Füge Kontakte oder
+                    Gruppen hinzu, um sie hier auszuwählen.
                   </p>
                 ) : (
                   <>

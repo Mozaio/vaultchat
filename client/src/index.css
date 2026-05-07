@@ -3455,6 +3455,17 @@ select:focus-visible {
   padding-bottom: 0.25rem;
 }
 
+/* On narrow viewports the chip row gets tall fast as folders pile up.
+   Switch to a single horizontal scroll line so the sidebar stays
+   compact and the chips stay reachable with one swipe. */
+@media (max-width: 540px) {
+  .filter-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+}
+
 .filter-chips::-webkit-scrollbar {
   display: none;
 }
@@ -3484,6 +3495,23 @@ select:focus-visible {
   border-color: var(--border-strong);
   color: var(--text);
   font-weight: 600;
+}
+
+/* "+ Ordner" chip — visually distinct from folder chips so the user
+   reads it as an action, not as another (empty) folder. */
+.filter-chip.filter-chip-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.filter-chip.filter-chip-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 /* Contact items */
