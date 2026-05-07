@@ -699,6 +699,22 @@ export function ChatShell({
     void refreshPendingCount();
   }, [loadContacts, loadGroups, refreshPendingCount]);
 
+  /** Title-bar badge: shows total unread count when the tab is in the
+   *  background, e.g. "(3) VaultChat". Reverts to plain "VaultChat"
+   *  on unmount or when there is nothing unread. */
+  useEffect(() => {
+    const total = Object.values(unreadByPeer).reduce(
+      (s, n) => s + (n || 0),
+      0
+    );
+    const base = "VaultChat";
+    document.title =
+      total > 0 ? `(${total > 99 ? "99+" : total}) ${base}` : base;
+    return () => {
+      document.title = base;
+    };
+  }, [unreadByPeer]);
+
   /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
   useEffect(() => {
     void (async () => {
@@ -3231,6 +3247,24 @@ export function ChatShell({
                   >
                     Keine DMs mit Markierungen. Unten: Gruppen mit Sternen.
                   </p>
+                )}
+              {activeFolder !== null &&
+                visibleUsers.length === 0 &&
+                visibleGroups.length === 0 && (
+                  <div
+                    className="flex flex-col items-center gap-2 px-4 py-8 text-center"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    <span aria-hidden style={{ fontSize: "1.6rem" }}>
+                      {activeFolder.icon}
+                    </span>
+                    <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+                      Ordner „{activeFolder.name}" ist leer
+                    </p>
+                    <p className="text-xs">
+                      Klick auf das + neben den Filtern, um Chats hinzuzufügen.
+                    </p>
+                  </div>
                 )}
             </div>
           </>
