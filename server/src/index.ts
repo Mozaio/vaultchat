@@ -194,15 +194,27 @@ const LoginBody = z.object({
   password: z.string().min(1),
 });
 
+/** Roughly 100 KB of base64 — enough for a 256x256 PNG/JPEG avatar. */
+const MAX_GROUP_AVATAR_LENGTH = 100_000;
+const AvatarString = z
+  .string()
+  .max(MAX_GROUP_AVATAR_LENGTH)
+  .refine(
+    (v) => v === "" || /^data:image\/(png|jpeg|webp);base64,/.test(v),
+    { message: "avatar_must_be_data_image" }
+  );
+
 const CreateGroupBody = z.object({
   name: z.string().min(1).max(64),
   memberIds: z.array(z.string().uuid()).min(1),
   description: z.string().max(280).optional(),
+  avatar: AvatarString.optional(),
 });
 
 const UpdateGroupBody = z.object({
   name: z.string().min(1).max(64).optional(),
   description: z.string().max(280).optional(),
+  avatar: AvatarString.optional(),
 });
 
 type GroupResponse = {
@@ -212,6 +224,7 @@ type GroupResponse = {
   createdByUserId: string;
   createdAt: number;
   description?: string;
+  avatar?: string;
   updatedAt?: number;
 };
 
@@ -222,6 +235,7 @@ function shapeGroup(g: {
   createdByUserId: string;
   createdAt: number;
   description?: string;
+  avatar?: string;
   updatedAt?: number;
 }): GroupResponse {
   const out: GroupResponse = {
@@ -232,6 +246,7 @@ function shapeGroup(g: {
     createdAt: g.createdAt,
   };
   if (g.description) out.description = g.description;
+  if (g.avatar) out.avatar = g.avatar;
   if (g.updatedAt) out.updatedAt = g.updatedAt;
   return out;
 }
@@ -443,6 +458,7 @@ app.post("/api/groups", groupLimiter, async (req, res) => {
     memberIds,
     createdByUserId: jwtUser.userId,
     ...(parsed.data.description ? { description: parsed.data.description } : {}),
+    ...(parsed.data.avatar ? { avatar: parsed.data.avatar } : {}),
   });
   res.json({ group: shapeGroup(g) });
 });

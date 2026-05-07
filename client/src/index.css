@@ -783,6 +783,36 @@ select:focus-visible {
   }
 }
 
+/* Group avatar editor: round 48px slot that doubles as a file picker
+   trigger. Shows a "+" placeholder until an image is chosen. */
+.group-avatar-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: 1.5px dashed var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.group-avatar-edit:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.group-avatar-edit > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.group-avatar-edit > span {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
 /* Notification permission opt-in banner — friendlier than the native
    browser permission prompt fired without context. */
 .notify-prompt-banner {

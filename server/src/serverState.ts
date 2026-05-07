@@ -21,7 +21,9 @@ export type PersistedGroup = {
   createdByUserId?: string;
   /** Optional, frei vom Creator gesetzt. Server speichert Klartext (nicht E2EE). */
   description?: string;
-  /** Letzte Änderung an Profil (Name/Beschreibung). Erleichtert Cache-Validation. */
+  /** data:image/...;base64,... Avatar. Server speichert klartext. Max ~80 KB. */
+  avatar?: string;
+  /** Letzte Änderung an Profil (Name/Beschreibung/Avatar). */
   updatedAt?: number;
 };
 

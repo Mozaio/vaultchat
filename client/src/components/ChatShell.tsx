@@ -223,6 +223,42 @@ function fmtDateLabel(at: number): string {
   });
 }
 
+/**
+ * Liest ein Bild und gibt ein quadratisch zugeschnittenes, JPEG-komprimiertes
+ * data-URL zurück. Ziel: ~50 KB für 256x256 — passt in das 100 KB
+ * Server-Limit für Gruppen-Avatare.
+ */
+async function resizeImageToDataUrl(
+  file: File,
+  size = 256,
+  quality = 0.85
+): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("file_read_failed"));
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const i = new Image();
+    i.onerror = () => reject(new Error("image_decode_failed"));
+    i.onload = () => resolve(i);
+    i.src = dataUrl;
+  });
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const minSide = Math.min(w, h);
+  const sx = (w - minSide) / 2;
+  const sy = (h - minSide) / 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas_unavailable");
+  ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 export function ChatShell({
   session,
   onLogout,
@@ -259,6 +295,7 @@ export function ChatShell({
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
   const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [newGroupAvatar, setNewGroupAvatar] = useState<string>("");
   const [incomingOffer, setIncomingOffer] = useState<{
     from: api.ApiUser;
     sdp: string;
@@ -292,6 +329,8 @@ export function ChatShell({
   const [groupEditMode, setGroupEditMode] = useState(false);
   const [groupEditName, setGroupEditName] = useState("");
   const [groupEditDescription, setGroupEditDescription] = useState("");
+  const [groupEditAvatar, setGroupEditAvatar] = useState<string>("");
+  const [groupEditAvatarRemoved, setGroupEditAvatarRemoved] = useState(false);
   const [groupEditBusy, setGroupEditBusy] = useState(false);
   const [notifyPromptOpen, setNotifyPromptOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -390,6 +429,8 @@ export function ChatShell({
   // Reset group edit form when switching groups or closing the panel.
   useEffect(() => {
     setGroupEditMode(false);
+    setGroupEditAvatar("");
+    setGroupEditAvatarRemoved(false);
   }, [group?.id, groupPanelOpen]);
 
   useShortcuts({
@@ -1609,6 +1650,7 @@ export function ChatShell({
       name: newGroupName.trim(),
       memberIds,
       ...(description ? { description } : {}),
+      ...(newGroupAvatar ? { avatar: newGroupAvatar } : {}),
     });
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
@@ -1617,6 +1659,7 @@ export function ChatShell({
     setNewGroupName("");
     setNewGroupMembers([]);
     setNewGroupDescription("");
+    setNewGroupAvatar("");
     setGroup(g);
     setTab("group");
     // Refresh group list immediately
@@ -1655,17 +1698,24 @@ export function ChatShell({
     try {
       const previousName = group.name;
       const previousDesc = group.description ?? "";
+      const previousAvatar = !!group.avatar;
+      const avatarUpdate = groupEditAvatarRemoved
+        ? ""
+        : groupEditAvatar || undefined;
       const { group: updated } = await api.updateGroupProfile(
         session.token,
         group.id,
         {
           name: trimmedName,
           description: trimmedDesc,
+          ...(avatarUpdate !== undefined ? { avatar: avatarUpdate } : {}),
         }
       );
       setGroup((prev) => (prev && prev.id === updated.id ? updated : prev));
       await loadGroups();
       setGroupEditMode(false);
+      setGroupEditAvatar("");
+      setGroupEditAvatarRemoved(false);
       pushToast("Gruppe aktualisiert.", "success");
       const changes: string[] = [];
       if (previousName !== trimmedName) {
@@ -1673,6 +1723,14 @@ export function ChatShell({
       }
       if (previousDesc !== trimmedDesc) {
         changes.push(trimmedDesc ? "Beschreibung" : "Beschreibung entfernt");
+      }
+      if (avatarUpdate !== undefined) {
+        const newAvatarPresent = avatarUpdate !== "";
+        if (previousAvatar !== newAvatarPresent) {
+          changes.push(newAvatarPresent ? "Bild" : "Bild entfernt");
+        } else if (newAvatarPresent) {
+          changes.push("Bild");
+        }
       }
       if (changes.length > 0) {
         await sendGroupSystemMessage(
@@ -2257,9 +2315,17 @@ export function ChatShell({
                 : ""
             }`}
           >
-            <div className="contact-avatar !h-9 !w-9 !text-sm">
-              {g.name.slice(0, 1).toUpperCase()}
-            </div>
+            {g.avatar ? (
+              <img
+                src={g.avatar}
+                alt={`${g.name} Avatar`}
+                className="contact-avatar !h-9 !w-9 object-cover"
+              />
+            ) : (
+              <div className="contact-avatar !h-9 !w-9 !text-sm">
+                {g.name.slice(0, 1).toUpperCase()}
+              </div>
+            )}
             <div className="contact-info min-w-0">
               <span className="contact-name">{g.name}</span>
               <p
@@ -2680,13 +2746,51 @@ export function ChatShell({
         {sidebarFilter === "group" && (
           <>
             <div className="space-y-2 border-b p-3" style={{ borderColor: 'var(--border)' }}>
-              <input
-                className="app-input w-full !py-2 text-sm"
-                placeholder="Gruppenname"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                aria-label="Gruppenname"
-              />
+              <div className="flex items-center gap-3">
+                <label
+                  className="group-avatar-edit cursor-pointer"
+                  title="Gruppenbild auswählen"
+                >
+                  {newGroupAvatar ? (
+                    <img src={newGroupAvatar} alt="Vorschau" />
+                  ) : (
+                    <span aria-hidden>＋</span>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (!f) return;
+                      try {
+                        const url = await resizeImageToDataUrl(f);
+                        setNewGroupAvatar(url);
+                      } catch {
+                        pushToast("Bild konnte nicht gelesen werden.", "danger");
+                      }
+                    }}
+                  />
+                </label>
+                <input
+                  className="app-input flex-1 !py-2 text-sm"
+                  placeholder="Gruppenname"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  aria-label="Gruppenname"
+                />
+              </div>
+              {newGroupAvatar && (
+                <button
+                  type="button"
+                  className="text-xs underline"
+                  style={{ color: "var(--text-muted)" }}
+                  onClick={() => setNewGroupAvatar("")}
+                >
+                  Bild entfernen
+                </button>
+              )}
               <textarea
                 className="app-input w-full !py-2 text-xs"
                 placeholder="Beschreibung (optional, max. 280 Zeichen)"
@@ -3436,9 +3540,17 @@ export function ChatShell({
                       ←
                     </button>
                   )}
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow" style={{ background: "linear-gradient(135deg, var(--accent-hover), var(--accent))" }}>
-                    {group.name.slice(0, 1).toUpperCase()}
-                  </div>
+                  {group.avatar ? (
+                    <img
+                      src={group.avatar}
+                      alt={`${group.name} Avatar`}
+                      className="h-9 w-9 shrink-0 rounded-full object-cover shadow"
+                    />
+                  ) : (
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow" style={{ background: "linear-gradient(135deg, var(--accent-hover), var(--accent))" }}>
+                      {group.name.slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
                   <div>
                   <p className="font-medium" style={{ color: "var(--text)" }}>{group.name}</p>
                   {(() => {
@@ -3528,6 +3640,53 @@ export function ChatShell({
                     >
                       {groupEditMode ? (
                         <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <label
+                              className="group-avatar-edit cursor-pointer"
+                              title="Gruppenbild auswählen"
+                            >
+                              {(() => {
+                                const showAvatar = groupEditAvatarRemoved
+                                  ? null
+                                  : groupEditAvatar || group.avatar;
+                                return showAvatar ? (
+                                  <img src={showAvatar} alt="Vorschau" />
+                                ) : (
+                                  <span aria-hidden>＋</span>
+                                );
+                              })()}
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const f = e.target.files?.[0];
+                                  e.target.value = "";
+                                  if (!f) return;
+                                  try {
+                                    const url = await resizeImageToDataUrl(f);
+                                    setGroupEditAvatar(url);
+                                    setGroupEditAvatarRemoved(false);
+                                  } catch {
+                                    pushToast("Bild konnte nicht gelesen werden.", "danger");
+                                  }
+                                }}
+                              />
+                            </label>
+                            {(groupEditAvatar || (group.avatar && !groupEditAvatarRemoved)) && (
+                              <button
+                                type="button"
+                                className="text-[10px] underline"
+                                style={{ color: "var(--text-muted)" }}
+                                onClick={() => {
+                                  setGroupEditAvatar("");
+                                  setGroupEditAvatarRemoved(true);
+                                }}
+                              >
+                                Bild entfernen
+                              </button>
+                            )}
+                          </div>
                           <input
                             className="app-input w-full !py-1 !text-xs"
                             value={groupEditName}
@@ -4460,9 +4619,18 @@ function InfoPanel({
       {/* Profile Avatar */}
       <div className="flex flex-col items-center">
         <div className="relative">
-          <div className="info-avatar-large">
-            {initials}
-          </div>
+          {mode === "group" && group?.avatar ? (
+            <img
+              src={group.avatar}
+              alt={`${group.name} Avatar`}
+              className="info-avatar-large"
+              style={{ objectFit: "cover" }}
+            />
+          ) : (
+            <div className="info-avatar-large">
+              {initials}
+            </div>
+          )}
           {mode === "dm" && <span className="online-dot" />}
         </div>
         <p className="text-center text-lg font-bold" style={{ color: "var(--text)" }}>

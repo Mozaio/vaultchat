@@ -28,7 +28,9 @@ export type StoredGroup = {
   createdAt: number;
   /** Optional, klartext beim Server. Soll lediglich UX, nicht Sicherheit, leisten. */
   description?: string;
-  /** Wann zuletzt Name/Beschreibung geändert (für UI-Cache). */
+  /** data:image/...;base64,... Avatar. Klartext beim Server. */
+  avatar?: string;
+  /** Wann zuletzt Name/Beschreibung/Avatar geändert (für UI-Cache). */
   updatedAt?: number;
 };
 
@@ -53,6 +55,7 @@ function persistedGroupToStored(group: PersistedGroup): StoredGroup {
     createdAt: group.createdAt,
     createdByUserId: group.createdByUserId ?? group.memberIds[0] ?? "",
     ...(group.description ? { description: group.description } : {}),
+    ...(group.avatar ? { avatar: group.avatar } : {}),
     ...(group.updatedAt ? { updatedAt: group.updatedAt } : {}),
   };
 }
@@ -120,6 +123,7 @@ export function createGroup(input: {
   memberIds: string[];
   createdByUserId: string;
   description?: string;
+  avatar?: string;
 }): StoredGroup {
   const now = Date.now();
   const g: StoredGroup = {
@@ -128,7 +132,9 @@ export function createGroup(input: {
     memberIds: [...new Set(input.memberIds)],
     createdByUserId: input.createdByUserId,
     createdAt: now,
-    ...(input.description ? { description: input.description, updatedAt: now } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.avatar ? { avatar: input.avatar } : {}),
+    ...(input.description || input.avatar ? { updatedAt: now } : {}),
   };
   groups.set(g.id, g);
   persistDirectory();
@@ -136,13 +142,15 @@ export function createGroup(input: {
 }
 
 /**
- * Aktualisiert Name oder Beschreibung. Nur der creator darf das aktuell;
+ * Aktualisiert Name, Beschreibung oder Avatar. Nur der creator darf das aktuell;
  * spätere Erweiterungen (admin role list) bleiben kompatibel.
+ *
+ * Avatar = "" entfernt das Avatar; Avatar = undefined lässt es unverändert.
  */
 export function updateGroupProfile(
   groupId: string,
   actorId: string,
-  updates: { name?: string; description?: string }
+  updates: { name?: string; description?: string; avatar?: string }
 ): StoredGroup | null {
   const g = groups.get(groupId);
   if (!g) return null;
@@ -155,6 +163,10 @@ export function updateGroupProfile(
     const trimmed = updates.description.trim();
     if (trimmed) g.description = trimmed;
     else delete g.description;
+  }
+  if (typeof updates.avatar === "string") {
+    if (updates.avatar) g.avatar = updates.avatar;
+    else delete g.avatar;
   }
   g.updatedAt = Date.now();
   persistDirectory();

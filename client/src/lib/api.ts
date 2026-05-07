@@ -43,7 +43,9 @@ export type ApiGroup = {
   createdAt: number;
   /** Optional, vom Creator gesetzt. Server speichert klartext (nicht E2EE). */
   description?: string;
-  /** Letzte Änderung an Profil (Name/Beschreibung). */
+  /** data:image/...;base64,... — server speichert klartext. */
+  avatar?: string;
+  /** Letzte Änderung an Profil (Name/Beschreibung/Avatar). */
   updatedAt?: number;
 };
 
@@ -199,7 +201,7 @@ export async function searchUsers(token: string, query: string) {
 
 export async function createGroup(
   token: string,
-  body: { name: string; memberIds: string[]; description?: string }
+  body: { name: string; memberIds: string[]; description?: string; avatar?: string }
 ) {
   return req<{ group: ApiGroup }>("/api/groups", {
     method: "POST",
@@ -211,7 +213,7 @@ export async function createGroup(
 export async function updateGroupProfile(
   token: string,
   groupId: string,
-  updates: { name?: string; description?: string }
+  updates: { name?: string; description?: string; avatar?: string }
 ) {
   return req<{ group: ApiGroup }>(`/api/groups/${groupId}`, {
     method: "PATCH",
