@@ -8,6 +8,7 @@ import {
   type PeerPin,
 } from "../lib/trust";
 import { IconCheck, IconX } from "./Icons";
+import { QrCodeSvg } from "./QrCodeSvg";
 
 export function SafetyNumberDialog({
   peerId,
@@ -27,6 +28,7 @@ export function SafetyNumberDialog({
   const [groups, setGroups] = useState<string[]>([]);
   const [emojiSeq, setEmojiSeq] = useState<string[]>([]);
   const [pin, setPin] = useState<PeerPin | null>(null);
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -96,16 +98,38 @@ export function SafetyNumberDialog({
 
         {/* Number blocks - 5 per row */}
         <div className="mb-4">
-          <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Vergleiche diese Nummern persönlich oder über einen sicheren Kanal:
-          </p>
-          {chunkedGroups.map((chunk, chunkIdx) => (
-            <div key={chunkIdx} className="number-blocks">
-              {chunk.map((num, idx) => (
-                <span key={idx} className="number-block">{num}</span>
-              ))}
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Vergleiche diese Nummern persönlich oder über einen sicheren Kanal:
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowQr((v) => !v)}
+              className="safety-qr-toggle"
+              aria-pressed={showQr}
+            >
+              {showQr ? "Nummer anzeigen" : "QR-Code anzeigen"}
+            </button>
+          </div>
+          {showQr ? (
+            <div className="safety-qr-wrap">
+              <QrCodeSvg digits={groups.join("")} size={232} />
+              <p className="safety-qr-hint">
+                Scanne diesen Code im VaultChat des Gegenübers — die Nummer
+                stimmt überein, wenn beide Seiten denselben Code anzeigen.
+              </p>
             </div>
-          ))}
+          ) : (
+            <>
+              {chunkedGroups.map((chunk, chunkIdx) => (
+                <div key={chunkIdx} className="number-blocks">
+                  {chunk.map((num, idx) => (
+                    <span key={idx} className="number-block">{num}</span>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {/* Emoji grid - 4x2 */}
