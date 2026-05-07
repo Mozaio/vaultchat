@@ -3599,6 +3599,20 @@ export function ChatShell({
           </button>
           {userMenuOpen && (
             <div className="user-menu">
+              {!isPro() && (
+                <button
+                  type="button"
+                  className="chat-menu-item user-menu-upgrade"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    setSecurityOpen(true);
+                    // SecuritySettings will land on the last-active tab;
+                    // user can click Plan & Abo from the tab list.
+                  }}
+                >
+                  ✨ Pro werden — mehr Limits
+                </button>
+              )}
               <button
                 type="button"
                 className="chat-menu-item"

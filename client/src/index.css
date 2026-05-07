@@ -2161,6 +2161,15 @@ select:focus-visible {
   margin: 0;
 }
 
+.user-menu-upgrade {
+  font-weight: 600 !important;
+  color: var(--accent) !important;
+}
+
+.user-menu-upgrade:hover {
+  background: var(--accent-soft) !important;
+}
+
 .user-tile-pro-badge {
   display: inline-flex;
   align-items: center;
