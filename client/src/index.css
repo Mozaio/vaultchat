@@ -1070,43 +1070,43 @@ select:focus-visible {
   }
 }
 
-/* ── Message Bubble (WhatsApp/Telegram inspired) ── */
+/* ── Message Bubble ── */
 .message-bubble {
   width: fit-content;
   max-width: 100%;
   min-width: 3.4rem;
-  padding: 0.65rem 0.8rem 0.48rem;
+  padding: 0.55rem 0.75rem 0.4rem;
   border-radius: 14px;
-  font-size: 0.9375rem;
+  font-size: 0.92rem;
   line-height: 1.45;
   overflow-wrap: anywhere;
   position: relative;
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.message-bubble:hover {
-  box-shadow: var(--shadow-md);
-}
-
-/* Better text readability */
 .message-bubble p {
   margin: 0;
   line-height: 1.45;
 }
 
 .message-bubble.received {
-  background: var(--bubble-them-bg);
-  color: var(--bubble-them-fg);
-  border: 1px solid var(--bubble-them-border);
-  box-shadow: var(--bubble-peer-shadow);
-  border-top-left-radius: 6px;
+  background: var(--bubble-peer);
+  color: var(--bubble-peer-text);
+  border: 1px solid var(--bubble-peer-border);
 }
 
 .message-bubble.sent {
   background: var(--bubble-me);
   color: var(--bubble-me-text);
   border: none;
-  border-top-right-radius: 6px;
+}
+
+/* Tail shaping — last bubble in a sender-grouped run gets a smaller
+   corner on its sender side, all others stay symmetrical. */
+.message-bubble.received.tail {
+  border-bottom-left-radius: 6px;
+}
+.message-bubble.sent.tail {
+  border-bottom-right-radius: 6px;
 }
 
 .bubble-meta {
@@ -1134,14 +1134,16 @@ select:focus-visible {
   gap: 0.2rem;
   max-width: 5.5rem;
   border-radius: var(--radius-full);
-  padding: 0.15rem 0.4rem;
-  background: rgba(255, 255, 255, 0.16);
+  padding: 0.1rem 0.4rem;
+  background: rgba(255, 255, 255, 0.18);
   color: inherit;
+  font-size: 0.66rem;
 }
 
 .message-bubble.received .disappearing-timer {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
 }
 
 .status-icon {
@@ -1715,12 +1717,16 @@ select:focus-visible {
   background: var(--accent-soft);
 }
 
-/* Aggregated reactions row below bubble */
+/* Aggregated reactions row below bubble — pulled up so the chip
+   visually overlaps the bottom of the bubble (Telegram pattern). */
 .reactions-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.25rem;
-  margin-top: 0.25rem;
+  gap: 0.2rem;
+  margin-top: -0.4rem;
+  position: relative;
+  z-index: 2;
+  padding: 0 0.3rem;
 }
 
 .reactions-row.start { justify-content: flex-start; }
@@ -1730,14 +1736,15 @@ select:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
-  padding: 0.1rem 0.5rem;
+  padding: 0.05rem 0.45rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
+  line-height: 1.4;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
 
 .reaction-chip span {
