@@ -40,6 +40,8 @@ export function previewForPayload(p: PlainPayload): string {
       return `📎 ${p.fileName ?? "Datei"}`;
     case "voice":
       return `🎤 Sprachnachricht ${fmtDuration(p.durationMs)}`;
+    case "poll":
+      return `📊 Umfrage${p.pollQuestion ? `: ${truncate(p.pollQuestion, 48)}` : ""}`;
     default:
       return "";
   }

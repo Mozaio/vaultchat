@@ -114,7 +114,9 @@ export type PlainPayload = {
     | "edit"
     | "delete"
     | "receipt"
-    | "system";
+    | "system"
+    | "poll"
+    | "poll-vote";
   /** Text-Body bzw. Data-URL für Datei/Voice. Leer für Meta-Frames. */
   body?: string;
   fileName?: string;
@@ -140,6 +142,11 @@ export type PlainPayload = {
   /** Wenn true: Nachricht wird beim ersten Anschauen lokal gelöscht
    *  (Snapchat/Signal-Style View-Once). Best-effort — kein Schutz vor Screenshot. */
   viewOnce?: boolean;
+  /** Nur bei kind === "poll". */
+  pollQuestion?: string;
+  pollOptions?: string[];
+  /** Nur bei kind === "poll-vote". refCid zeigt auf die poll. */
+  pollVoteIndex?: number;
   /** Nur bei kind === "group_key" */
   groupId?: string;
   keyB64?: string;

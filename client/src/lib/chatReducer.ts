@@ -22,6 +22,7 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
     string,
     ChatMsg & {
       _reactByUser: Map<string, string>;
+      _pollVoteByUser: Map<string, number>;
     }
   >();
 
@@ -39,11 +40,15 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
       p.kind === "text" ||
       p.kind === "file" ||
       p.kind === "voice" ||
-      p.kind === "system"
+      p.kind === "system" ||
+      p.kind === "poll"
     ) {
       if (!p.cid) continue;
       const prev = byCid.get(p.cid);
-      const next: ChatMsg & { _reactByUser: Map<string, string> } = {
+      const next: ChatMsg & {
+        _reactByUser: Map<string, string>;
+        _pollVoteByUser: Map<string, number>;
+      } = {
         id: r.id,
         fromMe: r.fromMe,
         fromUserId: r.fromUserId,
@@ -56,9 +61,32 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
         edited: prev?.edited ?? false,
         readByPeer: prev?.readByPeer,
         deliveredToPeer: prev?.deliveredToPeer,
+        pollVotes: prev?.pollVotes,
+        myPollVote: prev?.myPollVote,
         _reactByUser: prev?._reactByUser ?? new Map(),
+        _pollVoteByUser: prev?._pollVoteByUser ?? new Map(),
       };
       byCid.set(p.cid, next);
+      continue;
+    }
+
+    if (p.kind === "poll-vote" && p.refCid && typeof p.pollVoteIndex === "number") {
+      const prev = byCid.get(p.refCid);
+      if (!prev) continue;
+      const idx = p.pollVoteIndex;
+      const optCount = prev.plain.pollOptions?.length ?? 0;
+      if (idx < 0 || idx >= optCount) continue;
+      const oldIdx = prev._pollVoteByUser.get(authorKey);
+      const counts = (prev.pollVotes
+        ? [...prev.pollVotes]
+        : new Array<number>(optCount).fill(0));
+      if (typeof oldIdx === "number") {
+        counts[oldIdx] = Math.max(0, (counts[oldIdx] ?? 1) - 1);
+      }
+      counts[idx] = (counts[idx] ?? 0) + 1;
+      prev._pollVoteByUser.set(authorKey, idx);
+      prev.pollVotes = counts;
+      if (r.fromMe) prev.myPollVote = idx;
       continue;
     }
 
@@ -124,8 +152,9 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
         m.plain = { ...m.plain, replyPreview: undefined };
       }
     }
-    const { _reactByUser, ...rest } = m;
+    const { _reactByUser, _pollVoteByUser, ...rest } = m;
     void _reactByUser;
+    void _pollVoteByUser;
     return rest;
   });
   return out.sort((a, b) => a.at - b.at);

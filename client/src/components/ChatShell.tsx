@@ -79,6 +79,7 @@ import { pushToast } from "../lib/toastBus";
 import {
   IconArrowDown,
   IconBan,
+  IconBarChart,
   IconBell,
   IconBookmark,
   IconCopy,
@@ -324,6 +325,9 @@ export function ChatShell({
   const [ttlGroup, setTtlGroup] = useState<number>(0);
   const [viewOnceDm, setViewOnceDm] = useState<boolean>(false);
   const [viewOnceGroup, setViewOnceGroup] = useState<boolean>(false);
+  type PollDraft = { question: string; options: string[] };
+  const [pollDm, setPollDm] = useState<PollDraft | null>(null);
+  const [pollGroup, setPollGroup] = useState<PollDraft | null>(null);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [peerPin, setPeerPin] = useState<PeerPin | null>(null);
   const [relayOnly, setRelayOnly] = useState(false);
@@ -1819,6 +1823,78 @@ export function ChatShell({
     setTab("group");
     // Refresh group list immediately
     await loadGroups();
+  }
+
+  async function sendDmPoll() {
+    if (!peer || !pollDm) return;
+    const question = pollDm.question.trim();
+    const options = pollDm.options.map((o) => o.trim()).filter(Boolean);
+    if (!question || options.length < 2) {
+      setError("Bitte Frage und mindestens zwei Optionen angeben.");
+      return;
+    }
+    const payload: PlainPayload = {
+      v: 2,
+      cid: newCid(),
+      kind: "poll",
+      pollQuestion: question,
+      pollOptions: options.slice(0, 12),
+      ...(ttlDm ? { ttlMs: ttlDm } : {}),
+    };
+    if (peer.id === session.user.id) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
+    setPollDm(null);
+  }
+
+  async function sendGroupPoll() {
+    if (!group || !pollGroup) return;
+    const question = pollGroup.question.trim();
+    const options = pollGroup.options.map((o) => o.trim()).filter(Boolean);
+    if (!question || options.length < 2) {
+      setError("Bitte Frage und mindestens zwei Optionen angeben.");
+      return;
+    }
+    const payload: PlainPayload = {
+      v: 2,
+      cid: newCid(),
+      kind: "poll",
+      pollQuestion: question,
+      pollOptions: options.slice(0, 12),
+      ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
+    };
+    await sendGroupWire(group, payload);
+    setPollGroup(null);
+  }
+
+  async function votePollDm(m: ChatMsg, optionIndex: number) {
+    if (!peer || !m.plain.cid) return;
+    const payload: PlainPayload = {
+      v: 2,
+      cid: newCid(),
+      kind: "poll-vote",
+      refCid: m.plain.cid,
+      pollVoteIndex: optionIndex,
+    };
+    if (peer.id === session.user.id) {
+      await appendSelfMessage(payload);
+    } else {
+      await sendDmWire(peer, payload);
+    }
+  }
+
+  async function votePollGroup(m: ChatMsg, optionIndex: number) {
+    if (!group || !m.plain.cid) return;
+    const payload: PlainPayload = {
+      v: 2,
+      cid: newCid(),
+      kind: "poll-vote",
+      refCid: m.plain.cid,
+      pollVoteIndex: optionIndex,
+    };
+    await sendGroupWire(group, payload);
   }
 
   /**
@@ -3695,6 +3771,7 @@ export function ChatShell({
                     onEdit={(x, body) => void editDm(x, body)}
                     onDelete={(x) => void deleteDm(x)}
                     onLocalDelete={(x) => void localDeleteDm(x)}
+                    onPollVote={(x, idx) => void votePollDm(x, idx)}
                     onCopy={copyText}
                     onForward={(x) => setForwardTarget(x)}
                     onJumpToCid={(cid) => jumpToCid(cid, dmScrollRef.current)}
@@ -3709,6 +3786,83 @@ export function ChatShell({
 
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {pollDm && (
+                <div className="poll-composer">
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
+                    Umfrage erstellen
+                  </p>
+                  <input
+                    className="app-input !py-1.5 text-sm"
+                    placeholder="Frage"
+                    maxLength={200}
+                    value={pollDm.question}
+                    onChange={(e) =>
+                      setPollDm({ ...pollDm, question: e.target.value })
+                    }
+                  />
+                  {pollDm.options.map((opt, i) => (
+                    <div key={i} className="poll-composer-row">
+                      <input
+                        className="app-input !py-1.5 text-sm"
+                        placeholder={`Option ${i + 1}`}
+                        maxLength={120}
+                        value={opt}
+                        onChange={(e) => {
+                          const next = [...pollDm.options];
+                          next[i] = e.target.value;
+                          setPollDm({ ...pollDm, options: next });
+                        }}
+                      />
+                      {pollDm.options.length > 2 && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary !px-2 !py-1 !text-xs"
+                          onClick={() =>
+                            setPollDm({
+                              ...pollDm,
+                              options: pollDm.options.filter((_, j) => j !== i),
+                            })
+                          }
+                          aria-label={`Option ${i + 1} entfernen`}
+                        >
+                          <IconX size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="poll-composer-actions">
+                    {pollDm.options.length < 12 && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary !px-2 !py-1 !text-xs"
+                        onClick={() =>
+                          setPollDm({ ...pollDm, options: [...pollDm.options, ""] })
+                        }
+                      >
+                        + Option
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-secondary !px-2 !py-1 !text-xs"
+                      onClick={() => setPollDm(null)}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary !px-3 !py-1 !text-xs"
+                      onClick={() => void sendDmPoll()}
+                      disabled={
+                        !pollDm.question.trim() ||
+                        pollDm.options.filter((o) => o.trim()).length < 2
+                      }
+                    >
+                      Senden
+                    </button>
+                  </div>
+                </div>
+              )}
               {replyDm && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
@@ -3787,6 +3941,20 @@ export function ChatShell({
                   aria-pressed={viewOnceDm}
                 >
                   <IconLock size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPollDm((cur) =>
+                      cur ? null : { question: "", options: ["", ""] }
+                    )
+                  }
+                  className={`chat-tool-button${pollDm ? " active" : ""}`}
+                  title={pollDm ? "Umfrage abbrechen" : "Umfrage erstellen"}
+                  aria-label="Umfrage erstellen"
+                  aria-pressed={!!pollDm}
+                >
+                  <IconBarChart size={18} />
                 </button>
                 <textarea
                   ref={dmInputRef}
@@ -4427,6 +4595,7 @@ export function ChatShell({
                   onEdit={(x, body) => void editGroup(x, body)}
                   onDelete={(x) => void deleteGroup(x)}
                   onLocalDelete={(x) => void localDeleteGroupMsg(x)}
+                  onPollVote={(x, idx) => void votePollGroup(x, idx)}
                   onCopy={copyText}
                   onForward={(x) => setForwardTarget(x)}
                   onJumpToCid={(cid) => jumpToCid(cid, groupScrollRef.current)}
@@ -4437,6 +4606,86 @@ export function ChatShell({
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {pollGroup && (
+                <div className="poll-composer">
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
+                    Umfrage erstellen
+                  </p>
+                  <input
+                    className="app-input !py-1.5 text-sm"
+                    placeholder="Frage"
+                    maxLength={200}
+                    value={pollGroup.question}
+                    onChange={(e) =>
+                      setPollGroup({ ...pollGroup, question: e.target.value })
+                    }
+                  />
+                  {pollGroup.options.map((opt, i) => (
+                    <div key={i} className="poll-composer-row">
+                      <input
+                        className="app-input !py-1.5 text-sm"
+                        placeholder={`Option ${i + 1}`}
+                        maxLength={120}
+                        value={opt}
+                        onChange={(e) => {
+                          const next = [...pollGroup.options];
+                          next[i] = e.target.value;
+                          setPollGroup({ ...pollGroup, options: next });
+                        }}
+                      />
+                      {pollGroup.options.length > 2 && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary !px-2 !py-1 !text-xs"
+                          onClick={() =>
+                            setPollGroup({
+                              ...pollGroup,
+                              options: pollGroup.options.filter((_, j) => j !== i),
+                            })
+                          }
+                          aria-label={`Option ${i + 1} entfernen`}
+                        >
+                          <IconX size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="poll-composer-actions">
+                    {pollGroup.options.length < 12 && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary !px-2 !py-1 !text-xs"
+                        onClick={() =>
+                          setPollGroup({
+                            ...pollGroup,
+                            options: [...pollGroup.options, ""],
+                          })
+                        }
+                      >
+                        + Option
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-secondary !px-2 !py-1 !text-xs"
+                      onClick={() => setPollGroup(null)}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary !px-3 !py-1 !text-xs"
+                      onClick={() => void sendGroupPoll()}
+                      disabled={
+                        !pollGroup.question.trim() ||
+                        pollGroup.options.filter((o) => o.trim()).length < 2
+                      }
+                    >
+                      Senden
+                    </button>
+                  </div>
+                </div>
+              )}
               {replyGroup && (
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
@@ -4515,6 +4764,20 @@ export function ChatShell({
                   aria-pressed={viewOnceGroup}
                 >
                   <IconLock size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPollGroup((cur) =>
+                      cur ? null : { question: "", options: ["", ""] }
+                    )
+                  }
+                  className={`chat-tool-button${pollGroup ? " active" : ""}`}
+                  title={pollGroup ? "Umfrage abbrechen" : "Umfrage erstellen"}
+                  aria-label="Umfrage erstellen"
+                  aria-pressed={!!pollGroup}
+                >
+                  <IconBarChart size={18} />
                 </button>
                 <textarea
                   ref={groupInputRef}

@@ -44,6 +44,11 @@ export type ChatMsg = {
   edited?: boolean;
   readByPeer?: boolean;
   deliveredToPeer?: boolean;
+  /** Nur bei kind === "poll": votes pro Option-Index, gesammelt aus
+   *  poll-vote frames. Letzter vote pro voter gewinnt. */
+  pollVotes?: number[];
+  /** Mein eigener Vote-Index, falls ich abgestimmt habe. */
+  myPollVote?: number;
 };
 
 export const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
@@ -162,6 +167,7 @@ export function MessageBubble({
   onToggleStar,
   onTogglePin,
   onLocalDelete,
+  onPollVote,
 }: {
   msg: ChatMsg;
   peerLabel: string;
@@ -182,6 +188,8 @@ export function MessageBubble({
   onTogglePin?: (m: ChatMsg) => void;
   /** Local-only delete (no network frame). Used for view-once reveal expiry. */
   onLocalDelete?: (m: ChatMsg) => void;
+  /** Cast a vote on a poll message at the given option index. */
+  onPollVote?: (m: ChatMsg, optionIndex: number) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
@@ -426,6 +434,51 @@ export function MessageBubble({
               durationMs={msg.plain.durationMs}
               cid={msg.plain.cid}
             />
+          ) : msg.plain.kind === "poll" && msg.plain.pollOptions ? (
+            (() => {
+              const options = msg.plain.pollOptions;
+              const counts = msg.pollVotes ?? new Array(options.length).fill(0);
+              const total = counts.reduce((a, b) => a + b, 0);
+              return (
+                <div className="poll-card">
+                  <p className="poll-question">
+                    {msg.plain.pollQuestion ?? ""}
+                  </p>
+                  <div className="poll-options">
+                    {options.map((opt, i) => {
+                      const c = counts[i] ?? 0;
+                      const pct = total > 0 ? Math.round((c / total) * 100) : 0;
+                      const mine = msg.myPollVote === i;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`poll-option${mine ? " mine" : ""}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onPollVote?.(msg, i);
+                          }}
+                          aria-pressed={mine}
+                        >
+                          <span className="poll-option-fill" style={{ width: `${pct}%` }} />
+                          <span className="poll-option-label">
+                            <span>{opt}</span>
+                            <span className="poll-option-count">
+                              {pct}% · {c}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="poll-total">
+                    {total === 1
+                      ? "1 Stimme"
+                      : `${total} Stimmen`}
+                  </p>
+                </div>
+              );
+            })()
           ) : (
             <p className="bubble-text">{renderInlineMarkdown(body)}</p>
           )}

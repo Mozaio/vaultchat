@@ -857,6 +857,100 @@ select:focus-visible {
   .notify-prompt-actions { width: 100%; justify-content: flex-end; }
 }
 
+/* Poll card inside a message bubble. */
+.poll-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: min(20rem, 80vw);
+}
+.poll-question {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.poll-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.poll-option {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.poll-option:hover {
+  border-color: var(--accent);
+}
+.poll-option.mine {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.poll-option-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-soft);
+  transition: width 0.25s ease;
+  pointer-events: none;
+}
+.poll-option.mine .poll-option-fill {
+  background: rgba(16, 185, 129, 0.28);
+}
+.poll-option-label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+.poll-option-count {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.poll-total {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* Compose-poll dialog (inline above the chat composer). */
+.poll-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+}
+.poll-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.poll-composer-row .app-input {
+  flex: 1;
+}
+.poll-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
 /* Inline markdown rendered inside text bubbles. */
 .md-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
