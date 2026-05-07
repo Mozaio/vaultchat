@@ -81,7 +81,7 @@ import {
 import { ChatEmptyState } from "./ChatEmptyState";
 import { ThreadPanel } from "./ThreadPanel";
 import { loadThreadSeen, type ThreadSeenMap } from "../lib/threadState";
-import { isPro, loadPlan, PLAN_LABELS } from "../lib/plan";
+import { isPro, loadPlan, getLimits, PLAN_LABELS } from "../lib/plan";
 import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
@@ -1915,6 +1915,13 @@ export function ChatShell({
     }
     setError(null);
     const memberIds = [...new Set([...newGroupMembers, session.user.id])];
+    const memberLimit = getLimits().groupMemberMax;
+    if (memberIds.length > memberLimit) {
+      setError(
+        `Gruppe zu groß: ${memberIds.length}/${memberLimit} im aktuellen Plan. Pro: bis 50 Mitglieder — siehe Einstellungen → Plan & Abo.`
+      );
+      return;
+    }
     const description = newGroupDescription.trim();
     const { group: g } = await api.createGroup(session.token, {
       name: newGroupName.trim(),
