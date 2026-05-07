@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getLimits } from "./plan";
 
 export type VoiceRecording = {
   dataUrl: string;
@@ -9,13 +10,15 @@ export type VoiceRecording = {
 export function useVoiceRecorder() {
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [hitLimit, setHitLimit] = useState(false);
   const recRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const startRef = useRef<number>(0);
   const streamRef = useRef<MediaStream | null>(null);
   const tickRef = useRef<number | null>(null);
 
-  // Tick a 250ms timer while recording so the UI can show elapsed time.
+  // Tick a 250ms timer while recording so the UI can show elapsed time
+  // and auto-stop when the per-plan limit is reached.
   useEffect(() => {
     if (!recording) {
       if (tickRef.current !== null) {
@@ -25,8 +28,22 @@ export function useVoiceRecorder() {
       setElapsedMs(0);
       return;
     }
+    const limit = getLimits().voiceMaxMs;
     tickRef.current = window.setInterval(() => {
-      setElapsedMs(Date.now() - startRef.current);
+      const elapsed = Date.now() - startRef.current;
+      setElapsedMs(elapsed);
+      if (elapsed >= limit) {
+        // Hit plan limit — auto-stop + flag for upgrade hint
+        setHitLimit(true);
+        const rec = recRef.current;
+        if (rec && rec.state === "recording") {
+          try {
+            rec.stop();
+          } catch {
+            /* ignore */
+          }
+        }
+      }
     }, 250);
     return () => {
       if (tickRef.current !== null) {
@@ -101,5 +118,11 @@ export function useVoiceRecorder() {
     setRecording(false);
   }, []);
 
-  return { recording, elapsedMs, start, stop, cancel };
+  const consumeHitLimit = useCallback(() => {
+    const v = hitLimit;
+    setHitLimit(false);
+    return v;
+  }, [hitLimit]);
+
+  return { recording, elapsedMs, hitLimit, consumeHitLimit, start, stop, cancel };
 }

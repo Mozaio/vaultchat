@@ -1640,6 +1640,12 @@ export function ChatShell({
     if (voice.recording) {
       const rec = await voice.stop();
       if (!rec) return;
+      if (voice.consumeHitLimit()) {
+        pushToast(
+          "Aufnahme-Limit erreicht. Pro: bis 5 Min — siehe Einstellungen → Plan",
+          "warning"
+        );
+      }
       const payload: PlainPayload = {
         v: 2,
         cid: newCid(),
@@ -1724,6 +1730,12 @@ export function ChatShell({
     if (groupVoice.recording) {
       const rec = await groupVoice.stop();
       if (!rec) return;
+      if (groupVoice.consumeHitLimit()) {
+        pushToast(
+          "Aufnahme-Limit erreicht. Pro: bis 5 Min — siehe Einstellungen → Plan",
+          "warning"
+        );
+      }
       const payload: PlainPayload = {
         v: 2,
         cid: newCid(),
