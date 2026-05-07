@@ -1154,6 +1154,11 @@ select:focus-visible {
   line-height: 1.45;
   overflow-wrap: anywhere;
   position: relative;
+  transition: box-shadow 0.18s ease;
+}
+
+.message-wrapper:hover .message-bubble:not(.is-deleted):not(.system-message) {
+  box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.35);
 }
 
 .message-bubble p {
