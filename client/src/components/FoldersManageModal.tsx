@@ -15,7 +15,11 @@ type Props = {
   setEditing: (folder: ChatFolder | null) => void;
 };
 
-const ICON_OPTIONS = ["📁", "📌", "⭐", "🔥", "💼", "🎯", "🏠", "💬", "🔒", "🚀"];
+const ICON_OPTIONS = [
+  "📁", "📌", "⭐", "🔥", "💼",
+  "🎯", "🏠", "💬", "🔒", "🚀",
+  "📚", "🎨", "🎮", "🎵", "✈️",
+];
 
 export function FoldersManageModal({
   folders,
@@ -200,20 +204,28 @@ export function FoldersManageModal({
               >
                 Icon
               </label>
-              <div className="flex flex-wrap gap-1.5">
+              <div
+                className="grid gap-1.5"
+                style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}
+              >
                 {ICON_OPTIONS.map((opt) => (
                   <button
                     key={opt}
                     type="button"
                     onClick={() => setDraft({ ...draft, icon: opt })}
-                    className="rounded-lg border p-2 text-base transition"
+                    className="grid place-items-center rounded-lg border text-lg transition"
                     style={{
+                      aspectRatio: "1 / 1",
                       borderColor:
                         draft.icon === opt ? "var(--accent)" : "var(--border)",
                       background:
                         draft.icon === opt
                           ? "var(--accent-soft)"
                           : "transparent",
+                      boxShadow:
+                        draft.icon === opt
+                          ? "0 0 0 1px var(--accent) inset"
+                          : "none",
                     }}
                     aria-pressed={draft.icon === opt}
                     aria-label={`Icon ${opt}`}
