@@ -161,8 +161,9 @@ export function App() {
 
   if (!sodiumOk) {
     return (
-      <div className="flex min-h-full items-center justify-center p-6">
-        <p className="text-zinc-400">Kryptografie wird geladen…</p>
+      <div className="boot-loader">
+        <div className="boot-loader-spinner" aria-hidden />
+        <p>Kryptografie wird geladen …</p>
       </div>
     );
   }
