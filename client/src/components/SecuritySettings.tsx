@@ -833,7 +833,22 @@ export function SecuritySettings({
                 <li>Sealed Sender für Direktnachrichten</li>
                 <li>TOFU &amp; verifizierbare Sicherheitsnummern</li>
                 <li>Gruppennachrichten E2EE mit verteilten Schlüsseln</li>
+                <li>QR-Code-Sicherheitsnummer (out-of-band-Verifikation)</li>
+                <li>Threads in DMs &amp; Gruppen, Custom-Emoji-Reaktionen</li>
               </ul>
+              <a
+                href="https://github.com/Mozaio/vaultchat"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition"
+                style={{
+                  borderColor: "var(--border)",
+                  color: "var(--text-secondary)",
+                  textDecoration: "none",
+                }}
+              >
+                Quellcode auf GitHub →
+              </a>
               <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
                 Server sieht Nachrichteninhalte und DM-Absender nicht. Gruppen-
                 Frames enthalten nur ciphertext. Keine serverseitige
