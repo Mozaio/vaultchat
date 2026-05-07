@@ -3158,7 +3158,7 @@ export function ChatShell({
               type="button"
               onClick={onLock}
               className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-              title="Konto sperren — Schlüssel aus dem Speicher entfernen"
+              title="Konto sperren — Schlüssel aus dem Speicher entfernen (Ctrl/⌘+L)"
               aria-label="Konto sperren"
             >
               <IconLock size={14} />
@@ -3551,7 +3551,7 @@ export function ChatShell({
             type="button"
             onClick={() => setShortcutsHelpOpen(true)}
             className="sidebar-footer-action"
-            title="Tastatur-Shortcuts (?)"
+            title="Hilfe & Tastatur-Shortcuts (drücke ? jederzeit)"
             aria-label="Tastatur-Shortcuts anzeigen"
           >
             <IconHelpCircle size={16} />
