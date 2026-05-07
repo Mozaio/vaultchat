@@ -219,19 +219,20 @@ export function AuthPanel({
       {/* ── Left: always-dark brand panel ── */}
       <div className="auth-brand-panel" aria-hidden="true">
         <div className="auth-brand-top">
-          <VaultChatLogo size={28} style={{ color: "#0d9488" }} />
+          <VaultChatLogo size={32} style={{ color: "#0d9488" }} />
           <span className="auth-brand-top-name">VaultChat</span>
         </div>
 
-        <div className="auth-brand-hero">
-          <h1>
-            Kein Server kennt<br />deine Nachrichten.
-          </h1>
-          <p>
-            Post-Quantum-verschlüsselt, Zero-Knowledge-Relay —
-            kein Konto mit E-Mail nötig.
-          </p>
-        </div>
+        <div className="auth-brand-content">
+          <div className="auth-brand-hero">
+            <h1>
+              Kein Server kennt<br /><em>deine Nachrichten.</em>
+            </h1>
+            <p>
+              Post-Quantum-verschlüsselt, Zero-Knowledge-Relay —
+              kein Konto mit E-Mail nötig.
+            </p>
+          </div>
 
         <ul className="auth-brand-features">
           <li>
@@ -271,6 +272,7 @@ export function AuthPanel({
             </div>
           </li>
         </ul>
+        </div>{/* end auth-brand-content */}
 
         <p className="auth-brand-footer">
           Web-Build. Kein auditierter Signal-Ersatz — siehe{" "}
