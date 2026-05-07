@@ -156,7 +156,11 @@ export function ThreadPanel({
               void handleSend();
             }
           }}
-          placeholder={`Antwort an ${parentAuthor} …`}
+          placeholder={
+            parentAuthor === "Du"
+              ? "Im Thread antworten …"
+              : `Antwort an ${parentAuthor} …`
+          }
           rows={1}
           maxLength={4000}
           autoFocus

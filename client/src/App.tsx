@@ -109,13 +109,33 @@ export function App() {
 
   // Surface unexpected runtime errors instead of a blank screen.
   useEffect(() => {
+    // Transient errors that occur during lock/unlock races — surfacing them
+    // confuses users (the next async tick fixes them on its own).
+    const TRANSIENT = new Set([
+      "local_key_missing",
+      "session_missing",
+    ]);
+    const isTransient = (msg: string) =>
+      Array.from(TRANSIENT).some((m) => msg.includes(m));
+
     const onRejection = (ev: PromiseRejectionEvent) => {
       const r = ev.reason;
+      const text =
+        r instanceof Error ? r.message : typeof r === "string" ? r : String(r);
+      if (isTransient(text)) {
+        // eslint-disable-next-line no-console
+        console.warn("[vaultchat] transient error suppressed:", text);
+        ev.preventDefault();
+        return;
+      }
       const msg =
         r instanceof Error ? `${r.name}: ${r.message}\n${r.stack ?? ""}` : String(r);
       setRuntimeError(msg);
     };
     const onError = (ev: ErrorEvent) => {
+      if (isTransient(ev.message ?? "")) {
+        return;
+      }
       const err = ev.error as unknown;
       const msg =
         err instanceof Error
