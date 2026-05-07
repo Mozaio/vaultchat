@@ -42,6 +42,7 @@ import {
   PLAN_LABELS,
   PLAN_PRICES,
   PLAN_FEATURES,
+  PLAN_LIMITS,
   type PlanId,
 } from "../lib/plan";
 
@@ -878,6 +879,10 @@ function EmojiSettingsTab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const plan = loadPlan();
+  const limit = PLAN_LIMITS[plan].customEmojiMax;
+  const remaining = Math.max(0, limit - emojis.length);
+  const usagePercent = Math.min(100, Math.round((emojis.length / limit) * 100));
 
   async function handleAdd(file: File) {
     setError(null);
@@ -984,11 +989,55 @@ function EmojiSettingsTab() {
         </div>
       )}
 
-      <p
-        className="text-xs"
-        style={{ color: "var(--text-muted)" }}
+      <div
+        className="rounded-lg border p-3"
+        style={{
+          borderColor: usagePercent >= 90 ? "var(--accent)" : "var(--border)",
+          background:
+            usagePercent >= 90 ? "var(--accent-soft)" : "var(--bg-elevated)",
+        }}
       >
-        Maximal 32 Emojis · Bilder werden auf 48×48 verkleinert (~2 KB)
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span style={{ color: "var(--text-secondary)" }}>
+            {emojis.length} / {limit} im {PLAN_LABELS[plan]}-Plan
+          </span>
+          <span
+            style={{
+              color: remaining <= 2 ? "var(--accent)" : "var(--text-muted)",
+              fontWeight: 600,
+            }}
+          >
+            {remaining === 0
+              ? "Limit erreicht"
+              : `Noch ${remaining} möglich`}
+          </span>
+        </div>
+        <div
+          className="h-1.5 rounded-full overflow-hidden"
+          style={{ background: "var(--bg-sidebar)" }}
+        >
+          <div
+            className="h-full transition-all"
+            style={{
+              width: `${usagePercent}%`,
+              background:
+                usagePercent >= 90 ? "var(--accent)" : "var(--text-secondary)",
+            }}
+          />
+        </div>
+        {plan === "free" && remaining <= 4 && (
+          <p
+            className="mt-2 text-xs"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Mit <strong style={{ color: "var(--accent)" }}>Pro</strong> sind 50
+            eigene Emojis möglich. Tab „Plan & Abo" zum Upgrade.
+          </p>
+        )}
+      </div>
+
+      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+        Bilder werden auf 48×48 verkleinert (~2 KB) und bleiben lokal.
       </p>
     </div>
   );
