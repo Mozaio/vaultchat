@@ -362,15 +362,27 @@ export function ChatShell({
     () => loadStringSet("vaultchat.pinned.peers")
   );
   const [pinnedMessageByPeer, setPinnedMessageByPeer] = useState<
-    Record<string, string>
+    Record<string, string[]>
   >(() => {
     try {
       const raw = localStorage.getItem("vaultchat.pinned.messages");
-      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<string, string | string[]>;
+      // Migrate older single-string format -> array. Once written, the
+      // new format takes over via togglePinMessage.
+      const out: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        if (Array.isArray(v)) out[k] = v.filter((x) => typeof x === "string");
+        else if (typeof v === "string" && v) out[k] = [v];
+      }
+      return out;
     } catch {
       return {};
     }
   });
+  const [pinnedBannerIdxByPeer, setPinnedBannerIdxByPeer] = useState<
+    Record<string, number>
+  >({});
   const [searchOpen, setSearchOpen] = useState(false);
   const [newDmMessageWaiting, setNewDmMessageWaiting] = useState(false);
   const [newGroupMessageWaiting, setNewGroupMessageWaiting] = useState(false);
@@ -2170,12 +2182,16 @@ export function ChatShell({
   const togglePinMessage = useCallback(
     (chatKey: string | null, m: ChatMsg) => {
       if (!chatKey || !m.plain.cid) return;
+      const cid = m.plain.cid;
       setPinnedMessageByPeer((prev) => {
         const next = { ...prev };
-        if (next[chatKey] === m.plain.cid) {
-          delete next[chatKey];
+        const current = next[chatKey] ?? [];
+        if (current.includes(cid)) {
+          const filtered = current.filter((x) => x !== cid);
+          if (filtered.length === 0) delete next[chatKey];
+          else next[chatKey] = filtered;
         } else {
-          next[chatKey] = m.plain.cid as string;
+          next[chatKey] = [...current, cid];
         }
         try {
           localStorage.setItem(
@@ -2191,50 +2207,94 @@ export function ChatShell({
     []
   );
 
-  const dmPinnedCid = peer ? pinnedMessageByPeer[`dm:${peer.id}`] : undefined;
-  const groupPinnedCid = group
-    ? pinnedMessageByPeer[`group:${group.id}`]
-    : undefined;
+  const dmPinnedCids = peer ? pinnedMessageByPeer[`dm:${peer.id}`] ?? [] : [];
+  const groupPinnedCids = group
+    ? pinnedMessageByPeer[`group:${group.id}`] ?? []
+    : [];
 
-  const pinnedDmBanner = useMemo(() => {
-    if (!peer || !dmPinnedCid) return null;
-    const inList = messages.find((m) => m.plain.cid === dmPinnedCid);
-    if (inList) {
-      return { preview: previewForPayload(inList.plain), cid: dmPinnedCid };
+  const dmPinnedSet = useMemo(() => new Set(dmPinnedCids), [dmPinnedCids]);
+  const groupPinnedSet = useMemo(
+    () => new Set(groupPinnedCids),
+    [groupPinnedCids]
+  );
+
+  type PinSummary = { cid: string; preview: string };
+
+  /** Resolve cid -> {preview, cid} pairs by walking messages first, then the
+   *  raw IDB-backed buffer. Keeps the original pin order. */
+  function resolvePinned(
+    cids: string[],
+    visible: ChatMsg[],
+    raw: { plainJson: string }[]
+  ): PinSummary[] {
+    if (cids.length === 0) return [];
+    const lookup = new Map<string, string>();
+    for (const m of visible) {
+      if (m.plain.cid) lookup.set(m.plain.cid, previewForPayload(m.plain));
     }
+    if (cids.some((c) => !lookup.has(c))) {
+      for (const r of raw) {
+        try {
+          const p = JSON.parse(r.plainJson) as PlainPayload;
+          if (p.cid && !lookup.has(p.cid) && cids.includes(p.cid)) {
+            lookup.set(p.cid, previewForPayload(p));
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    return cids.map((cid) => ({
+      cid,
+      preview: lookup.get(cid) ?? "Angeheftete Nachricht",
+    }));
+  }
+
+  const pinnedDmList: PinSummary[] = useMemo(() => {
+    if (!peer || dmPinnedCids.length === 0) return [];
     const raw = rawDmRef.current.get(peer.id) ?? [];
-    for (const r of raw) {
-      try {
-        const p = JSON.parse(r.plainJson) as PlainPayload;
-        if (p.cid === dmPinnedCid) {
-          return { preview: previewForPayload(p), cid: dmPinnedCid };
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    return { preview: "Angeheftete Nachricht", cid: dmPinnedCid };
-  }, [peer, dmPinnedCid, messages]);
+    return resolvePinned(dmPinnedCids, messages, raw);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peer, dmPinnedCids, messages]);
 
-  const pinnedGroupBanner = useMemo(() => {
-    if (!group || !groupPinnedCid) return null;
-    const inList = groupMessages.find((m) => m.plain.cid === groupPinnedCid);
-    if (inList) {
-      return { preview: previewForPayload(inList.plain), cid: groupPinnedCid };
-    }
+  const pinnedGroupList: PinSummary[] = useMemo(() => {
+    if (!group || groupPinnedCids.length === 0) return [];
     const raw = rawGroupRef.current.get(group.id) ?? [];
-    for (const r of raw) {
-      try {
-        const p = JSON.parse(r.plainJson) as PlainPayload;
-        if (p.cid === groupPinnedCid) {
-          return { preview: previewForPayload(p), cid: groupPinnedCid };
-        }
-      } catch {
-        /* ignore */
-      }
-    }
-    return { preview: "Angeheftete Nachricht", cid: groupPinnedCid };
-  }, [group, groupPinnedCid, groupMessages]);
+    return resolvePinned(groupPinnedCids, groupMessages, raw);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [group, groupPinnedCids, groupMessages]);
+
+  const dmBannerKey = peer ? `dm:${peer.id}` : null;
+  const groupBannerKey = group ? `group:${group.id}` : null;
+
+  const dmBannerIdx = dmBannerKey
+    ? Math.min(
+        pinnedBannerIdxByPeer[dmBannerKey] ?? 0,
+        Math.max(0, pinnedDmList.length - 1)
+      )
+    : 0;
+  const groupBannerIdx = groupBannerKey
+    ? Math.min(
+        pinnedBannerIdxByPeer[groupBannerKey] ?? 0,
+        Math.max(0, pinnedGroupList.length - 1)
+      )
+    : 0;
+
+  const pinnedDmBanner =
+    pinnedDmList.length > 0 ? pinnedDmList[dmBannerIdx] : null;
+  const pinnedGroupBanner =
+    pinnedGroupList.length > 0 ? pinnedGroupList[groupBannerIdx] : null;
+
+  const cyclePinnedBanner = useCallback(
+    (chatKey: string, total: number) => {
+      if (total <= 1) return;
+      setPinnedBannerIdxByPeer((prev) => {
+        const cur = prev[chatKey] ?? 0;
+        return { ...prev, [chatKey]: (cur + 1) % total };
+      });
+    },
+    []
+  );
 
   const lastDmPreviewByPeer = useMemo(() => {
     const out = new Map<string, { text: string; at: number; fromMe: boolean }>();
@@ -3453,19 +3513,24 @@ export function ChatShell({
                   </span>
                 </div>
               )}
-              {pinnedDmBanner && (
+              {pinnedDmBanner && dmBannerKey && (
                 <button
                   type="button"
                   className="pinned-banner !mx-0 !mb-3 w-full shrink-0 text-left"
-                  onClick={() =>
-                    jumpToCid(pinnedDmBanner.cid, dmScrollRef.current)
-                  }
+                  onClick={() => {
+                    jumpToCid(pinnedDmBanner.cid, dmScrollRef.current);
+                    cyclePinnedBanner(dmBannerKey, pinnedDmList.length);
+                  }}
                 >
                   <span className="pinned-banner-icon">
                     <IconPin size={16} />
                   </span>
                   <span className="pinned-banner-content">
-                    <span className="pinned-banner-label">Angeheftet</span>
+                    <span className="pinned-banner-label">
+                      {pinnedDmList.length > 1
+                        ? `Angeheftet ${dmBannerIdx + 1}/${pinnedDmList.length}`
+                        : "Angeheftet"}
+                    </span>
                     <span className="pinned-banner-text">
                       {pinnedDmBanner.preview}
                     </span>
@@ -3498,7 +3563,7 @@ export function ChatShell({
                     isHighlighted={
                       !!m.plain.cid && m.plain.cid === jumpHighlightCid
                     }
-                    isPinned={!!m.plain.cid && dmPinnedCid === m.plain.cid}
+                    isPinned={!!m.plain.cid && dmPinnedSet.has(m.plain.cid)}
                     peerLabel={peer.username}
                     replyToPreview={replyPreviewForMessage(
                       messages,
@@ -4161,19 +4226,24 @@ export function ChatShell({
                   </div>
                 </div>
               )}
-              {pinnedGroupBanner && (
+              {pinnedGroupBanner && groupBannerKey && (
                 <button
                   type="button"
                   className="pinned-banner !mx-0 w-full shrink-0 text-left"
-                  onClick={() =>
-                    jumpToCid(pinnedGroupBanner.cid, groupScrollRef.current)
-                  }
+                  onClick={() => {
+                    jumpToCid(pinnedGroupBanner.cid, groupScrollRef.current);
+                    cyclePinnedBanner(groupBannerKey, pinnedGroupList.length);
+                  }}
                 >
                   <span className="pinned-banner-icon">
                     <IconPin size={16} />
                   </span>
                   <span className="pinned-banner-content">
-                    <span className="pinned-banner-label">Angeheftet</span>
+                    <span className="pinned-banner-label">
+                      {pinnedGroupList.length > 1
+                        ? `Angeheftet ${groupBannerIdx + 1}/${pinnedGroupList.length}`
+                        : "Angeheftet"}
+                    </span>
                     <span className="pinned-banner-text">
                       {pinnedGroupBanner.preview}
                     </span>
@@ -4220,7 +4290,7 @@ export function ChatShell({
                   isHighlighted={
                     !!m.plain.cid && m.plain.cid === jumpHighlightCid
                   }
-                  isPinned={!!m.plain.cid && groupPinnedCid === m.plain.cid}
+                  isPinned={!!m.plain.cid && groupPinnedSet.has(m.plain.cid)}
                   peerLabel={
                     users.find((u) => u.id === m.fromUserId)?.username ?? group.name
                   }
