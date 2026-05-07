@@ -3185,14 +3185,20 @@ export function ChatShell({
         </div>
 
         <div className="filter-chips mx-3 mt-3">
-          {[
-            ["all", "Alle"],
-            ["dm", "DMs"],
-            ["group", "Gruppen"],
-            ["fav", "Favoriten"],
-            ["unread", "Ungelesen"],
-            ["star", "Markiert"],
-          ].map(([value, label]) => (
+          {(() => {
+            const totalUnread = Object.values(unreadByPeer).reduce(
+              (a, b) => a + (b > 0 ? 1 : 0),
+              0
+            );
+            return [
+              ["all", "Alle", totalUnread],
+              ["dm", "DMs", totalUnread],
+              ["group", "Gruppen", 0],
+              ["fav", "Favoriten", 0],
+              ["unread", "Ungelesen", totalUnread],
+              ["star", "Markiert", 0],
+            ] as const;
+          })().map(([value, label, badgeCount]) => (
             <button
               key={value}
               type="button"
@@ -3205,10 +3211,18 @@ export function ChatShell({
               }}
             >
               {label}
+              {(value === "unread" || value === "all") && badgeCount > 0 && (
+                <span className="filter-chip-badge">{badgeCount}</span>
+              )}
             </button>
           ))}
           {folders.map((f) => {
             const value: SidebarFilter = `folder:${f.id}`;
+            const folderUnread = f.chatKeys.reduce((acc, key) => {
+              if (!key.startsWith("dm:")) return acc;
+              const peerId = key.slice(3);
+              return acc + ((unreadByPeer[peerId] ?? 0) > 0 ? 1 : 0);
+            }, 0);
             return (
               <button
                 key={f.id}
@@ -3221,6 +3235,9 @@ export function ChatShell({
                   {f.icon}
                 </span>
                 {f.name}
+                {folderUnread > 0 && (
+                  <span className="filter-chip-badge">{folderUnread}</span>
+                )}
               </button>
             );
           })}
