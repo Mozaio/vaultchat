@@ -3698,23 +3698,12 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  background:
-    linear-gradient(180deg, rgba(16, 185, 129, 0.035), transparent 34%),
-    linear-gradient(160deg, var(--bg-sidebar) 0%, var(--bg) 100%);
+  background: var(--bg-sidebar);
   position: relative;
   overflow: hidden;
 }
 
-.landing-hero::after {
-  content: "";
-  position: absolute;
-  inset: 1.5rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  pointer-events: none;
-  opacity: 0.45;
-}
-
+.landing-hero::after,
 .landing-hero::before {
   content: none;
 }
@@ -3722,18 +3711,15 @@ select:focus-visible {
 .landing-logo {
   position: relative;
   z-index: 1;
-  width: 4.5rem;
-  height: 4.5rem;
-  margin-bottom: 1.5rem;
-  border-radius: 1.5rem;
-  display: grid;
-  place-items: center;
+  margin-bottom: 1.75rem;
   color: var(--accent);
-  background:
-    linear-gradient(135deg, var(--accent-soft), transparent),
-    var(--bg-elevated);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg), 0 0 32px var(--accent-glow);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: 1.05rem;
+  color: var(--text);
 }
 
 .auth-brand {
@@ -3757,24 +3743,22 @@ select:focus-visible {
 }
 
 .landing-title {
-  font-size: 3.5rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  margin-bottom: 1rem;
-  background: linear-gradient(135deg, var(--text) 0%, var(--text-secondary) 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin-bottom: 0.85rem;
+  color: var(--text);
   position: relative;
   z-index: 1;
 }
 
 .landing-subtitle {
-  font-size: 1.125rem;
+  font-size: 1.05rem;
   color: var(--text-secondary);
-  line-height: 1.6;
-  margin-bottom: 3rem;
+  line-height: 1.55;
+  margin-bottom: 2.25rem;
+  max-width: 32rem;
   position: relative;
   z-index: 1;
 }
@@ -3825,50 +3809,52 @@ select:focus-visible {
 .landing-trust-grid {
   position: relative;
   z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   width: min(100%, 42rem);
   margin-top: 2rem;
 }
 
 .landing-trust-grid div {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-glass);
-  padding: 0.85rem;
-  box-shadow: var(--shadow-sm);
+  border-radius: 999px;
+  background: transparent;
+  padding: 0.4rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 .landing-trust-grid span {
-  display: block;
   color: var(--text-muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  text-transform: uppercase;
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
 }
 
 .landing-trust-grid strong {
-  display: block;
-  margin-top: 0.2rem;
   color: var(--text);
-  font-size: 0.82rem;
-  line-height: 1.3;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
 
 /* Auth Card */
 .auth-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: clamp(1.25rem, 4vw, 3rem);
+  border-radius: var(--radius-lg);
+  padding: clamp(1.25rem, 4vw, 2.5rem);
   margin: clamp(1rem, 3vw, 2.5rem);
   max-height: calc(100dvh - 4.5rem);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-md);
   position: relative;
   z-index: 1;
 }

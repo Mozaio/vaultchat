@@ -14,6 +14,7 @@ import type { Session } from "../lib/sessionHelpers";
 import { parseIdentityBackup } from "../lib/backup";
 import { ThemeToggle } from "./ThemeToggle";
 import { IconAlertTriangle, IconLock, IconShieldCheck, IconTimer } from "./Icons";
+import { VaultChatLogo } from "./Logo";
 
 type Mode = "unlock" | "login" | "register" | "import";
 type ProductPlanId = "personal" | "pro" | "team";
@@ -190,28 +191,26 @@ export function AuthPanel({
     <div className="landing-container min-h-full w-full bg-[var(--bg)]">
       <div className="landing-hero">
         <div className="landing-logo" aria-hidden>
-          <IconShieldCheck size={34} />
+          <VaultChatLogo size={44} style={{ color: "var(--accent)" }} />
+          <span>VaultChat</span>
         </div>
-        <p
-          className="relative z-[1] mb-2 text-xs font-semibold uppercase tracking-widest"
-          style={{ color: "var(--accent)" }}
-        >
-          Secure Messenger
-        </p>
-        <h1 className="landing-title">VaultChat</h1>
-        <p className="landing-subtitle max-w-lg">
-          Ende-zu-Ende verschluesselt. Sealed Sender. Private Gruppen.
+        <h1 className="landing-title">
+          Verschlüsselter Messenger.
+        </h1>
+        <p className="landing-subtitle">
+          Ende-zu-Ende verschlüsselt. Sealed Sender. Private Gruppen — ganz ohne
+          Telefonnummer oder Pflicht-E-Mail.
         </p>
         <div className="feature-list max-w-lg">
           <Feature
             icon={<IconLock size={18} />}
             title="Sealed Sender"
-            desc="Server sieht keinen Absender"
+            desc="Der Server sieht keinen Absender"
           />
           <Feature
             icon={<IconShieldCheck size={18} />}
             title="TOFU + Sicherheitsnummer"
-            desc="Schlüsselwechsel-Erkennung (TOFU)"
+            desc="Schlüsselwechsel werden erkannt"
           />
           <Feature
             icon={<IconTimer size={18} />}
@@ -220,25 +219,10 @@ export function AuthPanel({
           />
         </div>
         <div className="landing-trust-grid">
-          <div>
-            <span>Keine Pflicht-E-Mail</span>
-            <strong>Identitaet bleibt minimal</strong>
-          </div>
-          <div>
-            <span>Lokale Schluessel</span>
-            <strong>Backup statt Server-Zugriff</strong>
-          </div>
-          <div>
-            <span>Privacy Controls</span>
-            <strong>Typing, Receipts, Relay</strong>
-          </div>
+          <div>Keine Pflicht-E-Mail</div>
+          <div>Lokale Schlüssel</div>
+          <div>Privacy Controls</div>
         </div>
-        <p
-          className="relative z-[1] mt-10 max-w-md text-sm"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Starte ohne Pflicht-E-Mail. Recovery und Plan kannst du optional einstellen.
-        </p>
       </div>
 
       <div className="flex min-h-full w-full min-w-0 items-center justify-center p-4">
@@ -246,9 +230,7 @@ export function AuthPanel({
           <div className="mb-5 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="auth-brand">
-                <span className="auth-brand-logo" aria-hidden>
-                  <IconShieldCheck size={22} />
-                </span>
+                <VaultChatLogo size={26} style={{ color: "var(--accent)" }} aria-hidden />
                 <span>VaultChat</span>
               </div>
               <h2
@@ -273,11 +255,6 @@ export function AuthPanel({
                   ? "Lokale Schluessel mit deinem Passwort entsperren."
                   : "Privater Messenger mit lokalem Schluessel-Backup."}
               </p>
-              <div className="auth-assurance-row">
-                <span>Zero-Knowledge Login</span>
-                <span>Argon2id</span>
-                <span>E2E Backup</span>
-              </div>
             </div>
             <ThemeToggle />
           </div>
