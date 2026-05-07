@@ -79,6 +79,7 @@ import {
   NOTIFY_STORAGE_KEY,
 } from "./SecuritySettings";
 import { ChatEmptyState } from "./ChatEmptyState";
+import { ThreadPanel } from "./ThreadPanel";
 import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
@@ -369,6 +370,7 @@ export function ChatShell({
   const [sidebarFilter, setSidebarFilter] = useState<SidebarFilter>("all");
   const [folders, setFolders] = useState<ChatFolder[]>(() => loadFolders());
   const [foldersManageOpen, setFoldersManageOpen] = useState(false);
+  const [openThreadCid, setOpenThreadCid] = useState<string | null>(null);
   const [folderEdit, setFolderEdit] = useState<ChatFolder | null>(null);
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
 
@@ -4703,19 +4705,36 @@ export function ChatShell({
                   )}
                 </button>
               )}
-              {groupMessages.map((m, i) => (
+              {(() => {
+                const threadCounts = new Map<string, number>();
+                for (const m of groupMessages) {
+                  const parentCid = m.plain.threadParentCid;
+                  if (parentCid) {
+                    threadCounts.set(parentCid, (threadCounts.get(parentCid) ?? 0) + 1);
+                  }
+                }
+                const mainMsgs = groupMessages.filter(
+                  (m) => !m.plain.threadParentCid
+                );
+                return mainMsgs.map((m, i) => (
                 <MessageBubble
                   key={m.plain.cid ?? m.id}
                   msg={m}
                   isGrouped={
                     i > 0 &&
-                    groupMessages[i - 1].fromUserId === m.fromUserId &&
-                    groupMessages[i - 1].fromMe === m.fromMe
+                    mainMsgs[i - 1].fromUserId === m.fromUserId &&
+                    mainMsgs[i - 1].fromMe === m.fromMe
                   }
                   isLastInGroup={
-                    i === groupMessages.length - 1 ||
-                    groupMessages[i + 1].fromUserId !== m.fromUserId
+                    i === mainMsgs.length - 1 ||
+                    mainMsgs[i + 1].fromUserId !== m.fromUserId
                   }
+                  threadReplyCount={
+                    m.plain.cid ? threadCounts.get(m.plain.cid) : undefined
+                  }
+                  onOpenThread={(x) => {
+                    if (x.plain.cid) setOpenThreadCid(x.plain.cid);
+                  }}
                   isStarred={!!m.plain.cid && starredCids.has(m.plain.cid)}
                   isHighlighted={
                     !!m.plain.cid && m.plain.cid === jumpHighlightCid
@@ -4751,7 +4770,8 @@ export function ChatShell({
                   onToggleStar={toggleStar}
                   onTogglePin={(x) => togglePinMessage(`group:${group.id}`, x)}
                 />
-              ))}
+              ));
+              })()}
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
@@ -5155,6 +5175,43 @@ export function ChatShell({
           </>
         )}
       </main>
+
+      {openThreadCid && group && (() => {
+        const parent = groupMessages.find((m) => m.plain.cid === openThreadCid);
+        if (!parent) return null;
+        const replies = groupMessages.filter(
+          (m) => m.plain.threadParentCid === openThreadCid
+        );
+        const resolveAuthor = (m: ChatMsg) =>
+          m.fromMe
+            ? "Du"
+            : users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied";
+        return (
+          <ThreadPanel
+            parent={parent}
+            replies={replies}
+            resolveAuthor={resolveAuthor}
+            onClose={() => setOpenThreadCid(null)}
+            onSend={async (body) => {
+              const payload: PlainPayload = {
+                v: 2,
+                cid: newCid(),
+                kind: "text",
+                body,
+                threadParentCid: openThreadCid,
+              };
+              await sendGroupWire(group, payload);
+            }}
+            onReact={(x, e) => void reactGroup(x, e)}
+            onEdit={(x, body) => void editGroup(x, body)}
+            onDelete={(x) => void deleteGroup(x)}
+            onLocalDelete={(x) => void localDeleteGroupMsg(x)}
+            onCopy={copyText}
+            onForward={(x) => setForwardTarget(x)}
+            onJumpToCid={(cid) => jumpToCid(cid, groupScrollRef.current)}
+          />
+        );
+      })()}
 
       {/* Right info panel (desktop) */}
       {!isMobile && showConversation && (

@@ -131,6 +131,12 @@ export type PlainPayload = {
   replyToCid?: string;
   /** Kurzvorschau der zitierten Nachricht (wird vom Sender erzeugt, damit Empfänger rendern kann). */
   replyPreview?: string;
+  /**
+   * Wenn gesetzt, gehört diese Nachricht zu einem Thread, dessen
+   * Wurzel die angegebene Cid ist. Threads werden in der Hauptansicht
+   * unterdrückt und in einem separaten Thread-Panel angezeigt.
+   */
+  threadParentCid?: string;
   /** Bezug für Reaktion / Edit / Delete / Receipt. */
   refCid?: string;
   /** Emoji der Reaktion; leer = Reaktion entfernt. */

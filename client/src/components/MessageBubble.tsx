@@ -172,6 +172,8 @@ export function MessageBubble({
   onTogglePin,
   onLocalDelete,
   onPollVote,
+  threadReplyCount,
+  onOpenThread,
 }: {
   msg: ChatMsg;
   peerLabel: string;
@@ -194,6 +196,10 @@ export function MessageBubble({
   onLocalDelete?: (m: ChatMsg) => void;
   /** Cast a vote on a poll message at the given option index. */
   onPollVote?: (m: ChatMsg, optionIndex: number) => void;
+  /** Number of thread replies to this message (only shown on parents). */
+  threadReplyCount?: number;
+  /** Click handler to open the thread side panel. */
+  onOpenThread?: (m: ChatMsg) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
@@ -638,6 +644,18 @@ export function MessageBubble({
               >
                 <IconReply size={14} /> Antworten
               </button>
+              {onOpenThread && !msg.plain.threadParentCid && (
+                <button
+                  type="button"
+                  className="bubble-menu-item"
+                  onClick={() => {
+                    onOpenThread(msg);
+                    setMenuOpen(false);
+                  }}
+                >
+                  💬 Im Thread antworten
+                </button>
+              )}
               {onForward && msg.plain.kind !== "voice" && (
                 <button
                   type="button"
@@ -789,6 +807,24 @@ export function MessageBubble({
               );
             })}
           </div>
+        )}
+
+        {threadReplyCount && threadReplyCount > 0 && onOpenThread && (
+          <button
+            type="button"
+            className={`thread-indicator ${msg.fromMe ? "end" : "start"}`}
+            onClick={() => onOpenThread(msg)}
+            aria-label={`Thread mit ${threadReplyCount} ${
+              threadReplyCount === 1 ? "Antwort" : "Antworten"
+            } öffnen`}
+          >
+            <span className="thread-indicator-icon">💬</span>
+            <span>
+              {threadReplyCount}{" "}
+              {threadReplyCount === 1 ? "Antwort" : "Antworten"}
+            </span>
+            <span className="thread-indicator-arrow">→</span>
+          </button>
         )}
       </div>
 
