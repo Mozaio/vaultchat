@@ -27,6 +27,7 @@ import {
   IconTrash,
   IconX,
 } from "./Icons";
+import { EmojiPicker } from "./EmojiPicker";
 
 export type ChatMsg = {
   id: string;
@@ -191,6 +192,7 @@ export function MessageBubble({
   const [imageOpen, setImageOpen] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [viewOnceLeftMs, setViewOnceLeftMs] = useState<number | null>(null);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -645,9 +647,32 @@ export function MessageBubble({
                   {e}
                 </button>
               ))}
+              <button
+                type="button"
+                className="reaction-popover-btn"
+                onClick={() => {
+                  setReactOpen(false);
+                  setEmojiPickerOpen(true);
+                }}
+                aria-label="Mehr Emojis"
+                title="Mehr Emojis"
+              >
+                ＋
+              </button>
             </div>
           )}
         </div>
+        {emojiPickerOpen && (
+          <div className="reaction-emoji-overlay" onClick={(e) => e.stopPropagation()}>
+            <EmojiPicker
+              onPick={(emoji) => {
+                onReact(msg, msg.myReaction === emoji ? "" : emoji);
+                setEmojiPickerOpen(false);
+              }}
+              onClose={() => setEmojiPickerOpen(false)}
+            />
+          </div>
+        )}
 
         {reactEntries.length > 0 && (
           <div className={`reactions-row ${msg.fromMe ? "end" : "start"}`}>

@@ -857,6 +857,14 @@ select:focus-visible {
   .notify-prompt-actions { width: 100%; justify-content: flex-end; }
 }
 
+/* Floating emoji picker spawned from a reaction popover's "+" button. */
+.reaction-emoji-overlay {
+  position: absolute;
+  z-index: 60;
+  margin-top: 0.4rem;
+  right: 0;
+}
+
 /* View-once message cover — recipient sees this until they tap to reveal.
    Once revealed, a 10s countdown shown in the bubble's meta row triggers
    a local-only delete. */
