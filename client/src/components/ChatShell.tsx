@@ -4195,7 +4195,9 @@ export function ChatShell({
                       ? "Aufnahme läuft…"
                       : viewOnceDm
                         ? "Einmal-Nachricht…"
-                        : "Nachricht…"
+                        : peer && peer.id !== session.user.id
+                          ? `Nachricht an ${peer.username} …`
+                          : "Notiz für dich …"
                   }
                   value={text}
                   disabled={voice.recording || peerPin?.state === "mismatch"}
@@ -5046,7 +5048,9 @@ export function ChatShell({
                       ? "Aufnahme läuft…"
                       : viewOnceGroup
                         ? "Einmal-Nachricht…"
-                        : "Gruppennachricht…"
+                        : group
+                          ? `Nachricht an ${group.name} …`
+                          : "Gruppennachricht…"
                   }
                   value={groupText}
                   disabled={groupVoice.recording}

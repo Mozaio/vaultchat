@@ -359,22 +359,35 @@ select:focus-visible {
   justify-content: center;
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
-.btn-send:hover {
+.btn-send:hover:not(:disabled) {
   background: var(--accent-hover);
+  box-shadow: 0 4px 12px -4px rgba(13, 148, 136, 0.45);
+  transform: translateY(-1px);
 }
 
 .btn-send:disabled {
   background: var(--bg-hover);
   color: var(--text-muted);
   cursor: not-allowed;
+  box-shadow: none;
 }
 
-.btn-send:active {
-  transform: scale(0.96);
+.btn-send:active:not(:disabled) {
+  transform: scale(0.94);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+
+.btn-send:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 12px -4px rgba(13, 148, 136, 0.45);
 }
 
 /* ============================================================
