@@ -12,7 +12,7 @@ import { useEffect } from "react";
 
 export function useAutoLock(enabled: boolean, timeoutMs: number, onLock: () => void) {
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || timeoutMs <= 0) return;
     let t: ReturnType<typeof setTimeout> | null = null;
     const arm = () => {
       if (t) clearTimeout(t);
@@ -26,4 +26,44 @@ export function useAutoLock(enabled: boolean, timeoutMs: number, onLock: () => v
       ev.forEach((k) => window.removeEventListener(k, arm));
     };
   }, [enabled, timeoutMs, onLock]);
+}
+
+const AUTO_LOCK_STORAGE_KEY = "vaultchat.autoLockMinutes";
+/** Default 10 minutes; 0 = never auto-lock. */
+const DEFAULT_AUTO_LOCK_MINUTES = 10;
+const AUTO_LOCK_CHANGED_EVENT = "vaultchat:autoLockChanged";
+
+export function loadAutoLockMinutes(): number {
+  try {
+    const raw = localStorage.getItem(AUTO_LOCK_STORAGE_KEY);
+    if (raw === null) return DEFAULT_AUTO_LOCK_MINUTES;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return DEFAULT_AUTO_LOCK_MINUTES;
+    return Math.floor(n);
+  } catch {
+    return DEFAULT_AUTO_LOCK_MINUTES;
+  }
+}
+
+export function saveAutoLockMinutes(minutes: number): void {
+  try {
+    const clamped = Math.max(0, Math.floor(minutes));
+    localStorage.setItem(AUTO_LOCK_STORAGE_KEY, String(clamped));
+    window.dispatchEvent(
+      new CustomEvent(AUTO_LOCK_CHANGED_EVENT, { detail: clamped })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+export function subscribeAutoLockMinutes(
+  listener: (minutes: number) => void
+): () => void {
+  const handler = (ev: Event) => {
+    const detail = (ev as CustomEvent<number>).detail;
+    if (typeof detail === "number") listener(detail);
+  };
+  window.addEventListener(AUTO_LOCK_CHANGED_EVENT, handler);
+  return () => window.removeEventListener(AUTO_LOCK_CHANGED_EVENT, handler);
 }

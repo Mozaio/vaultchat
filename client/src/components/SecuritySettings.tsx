@@ -12,12 +12,17 @@ import {
   resetAllReplayProtection,
   getReplayStats,
 } from "../lib/replayProtection";
+import {
+  loadAutoLockMinutes,
+  saveAutoLockMinutes,
+} from "../lib/useAutoLock";
 import type { ServerStatus } from "../lib/api";
 import {
   IconAlertTriangle,
   IconCheck,
   IconRefreshCw,
   IconShieldCheck,
+  IconX,
 } from "./Icons";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -116,6 +121,9 @@ export function SecuritySettings({
 }: SecuritySettingsProps) {
   const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
+  const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
+    loadAutoLockMinutes()
+  );
   const [replayStats, setReplayStats] = useState(getReplayStats());
   const [desktopNotify, setDesktopNotify] = useState(readNotifyEnabled);
   const [notifyPreview, setNotifyPreview] = useState(readNotifyPreview);
@@ -217,9 +225,9 @@ export function SecuritySettings({
             onClick={onClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             style={{ color: "var(--text-muted)" }}
-            aria-label="Schließen"
+            aria-label="Einstellungen schließen"
           >
-            x
+            <IconX size={18} />
           </button>
         </div>
 
@@ -659,6 +667,41 @@ export function SecuritySettings({
                     Aggressives Wiping, häufiger Speicher-Zyklen.
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label
+                  className="mb-2 block text-sm font-medium"
+                  style={{ color: "var(--text-secondary)" }}
+                  htmlFor="auto-lock-select"
+                >
+                  Automatische Sperre nach
+                </label>
+                <select
+                  id="auto-lock-select"
+                  value={autoLockMinutes}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setAutoLockMinutes(next);
+                    saveAutoLockMinutes(next);
+                  }}
+                  className="app-input w-full !py-2 text-sm"
+                >
+                  <option value={0}>Aus (nicht empfohlen)</option>
+                  <option value={1}>1 Minute</option>
+                  <option value={5}>5 Minuten</option>
+                  <option value={10}>10 Minuten (Standard)</option>
+                  <option value={30}>30 Minuten</option>
+                  <option value={60}>1 Stunde</option>
+                </select>
+                <p
+                  className="mt-1 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Nach Inaktivität wird der lokale Schlüssel aus dem
+                  Arbeitsspeicher gelöscht. Beim nächsten Mal brauchst du dein
+                  Passwort.
+                </p>
               </div>
 
               <div className="space-y-2">

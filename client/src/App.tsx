@@ -11,7 +11,11 @@ import type { Session } from "./lib/sessionHelpers";
 import { AuthPanel } from "./components/AuthPanel";
 import { ChatShell } from "./components/ChatShell";
 import { idbPurgeExpired, setIdbAccountScope } from "./lib/idb";
-import { useAutoLock } from "./lib/useAutoLock";
+import {
+  loadAutoLockMinutes,
+  subscribeAutoLockMinutes,
+  useAutoLock,
+} from "./lib/useAutoLock";
 import {
   checkCodeIntegrity,
   pinCodeHash,
@@ -34,15 +38,18 @@ import { resetAllReplayProtection } from "./lib/replayProtection";
 
 export type { Session };
 
-/** Automatische Sperre nach N Millisekunden Inaktivität. */
-const AUTO_LOCK_MS = 10 * 60 * 1000;
-
 export function App() {
   const [sodiumOk, setSodiumOk] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [codeCheck, setCodeCheck] = useState<CodeCheck | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  // Auto-lock interval, in minutes. 0 disables auto-lock entirely.
+  const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
+    loadAutoLockMinutes()
+  );
+
+  useEffect(() => subscribeAutoLockMinutes(setAutoLockMinutes), []);
 
   useEffect(() => {
     sodiumReady()
@@ -98,7 +105,7 @@ export function App() {
     setSession(null);
   }, [session]);
 
-  useAutoLock(unlocked, AUTO_LOCK_MS, lock);
+  useAutoLock(unlocked, autoLockMinutes * 60 * 1000, lock);
 
   // Surface unexpected runtime errors instead of a blank screen.
   useEffect(() => {
