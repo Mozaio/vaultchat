@@ -19,6 +19,9 @@ import {
   IconShieldCheck,
   IconTimer,
   IconBookmark,
+  IconEye,
+  IconEyeOff,
+  IconLoader2,
 } from "./Icons";
 import { VaultChatLogo } from "./Logo";
 
@@ -108,6 +111,16 @@ export function AuthPanel({
   const [importJson, setImportJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
+
+  function detectCaps(e: React.KeyboardEvent<HTMLInputElement>) {
+    try {
+      setCapsLockOn(e.getModifierState && e.getModifierState("CapsLock"));
+    } catch {
+      /* ignore */
+    }
+  }
 
   useEffect(() => {
     void api
@@ -343,25 +356,57 @@ export function AuthPanel({
             <div className="auth-form">
               <div className="auth-input-group">
                 <label htmlFor="auth-password">Passwort für lokale Schlüssel</label>
-                <input
-                  id="auth-password"
-                  type="password"
-                  autoComplete="current-password"
-                  className="auth-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void handleUnlock()}
-                  required
-                  autoFocus
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    id="auth-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    className="auth-input auth-input-with-toggle"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      detectCaps(e);
+                      if (e.key === "Enter") void handleUnlock();
+                    }}
+                    onKeyUp={detectCaps}
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={
+                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                    }
+                    title={
+                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                    }
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                </div>
+                {capsLockOn && (
+                  <p className="auth-capslock">
+                    <IconAlertTriangle size={12} /> Feststelltaste ist aktiv
+                  </p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => void handleUnlock()}
-                disabled={busy}
+                disabled={busy || !password}
                 className="auth-button"
               >
-                {busy ? "…" : "Entsperren"}
+                {busy ? (
+                  <>
+                    <IconLoader2 size={16} className="auth-button-spinner" />
+                    <span>Entsperre …</span>
+                  </>
+                ) : (
+                  "Entsperren"
+                )}
               </button>
               <p className="auth-hint">
                 Backup &amp; Fingerprint findest du nach dem Entsperren in den
@@ -380,6 +425,7 @@ export function AuthPanel({
                   className="auth-input"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void handleLogin()}
                   autoComplete="username"
                   required
                   autoFocus
@@ -387,24 +433,56 @@ export function AuthPanel({
               </div>
               <div className="auth-input-group">
                 <label htmlFor="auth-password-login">Passwort</label>
-                <input
-                  id="auth-password-login"
-                  type="password"
-                  className="auth-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && void handleLogin()}
-                  autoComplete="current-password"
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    id="auth-password-login"
+                    type={showPassword ? "text" : "password"}
+                    className="auth-input auth-input-with-toggle"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      detectCaps(e);
+                      if (e.key === "Enter") void handleLogin();
+                    }}
+                    onKeyUp={detectCaps}
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={
+                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                    }
+                    title={
+                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                    }
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                </div>
+                {capsLockOn && (
+                  <p className="auth-capslock">
+                    <IconAlertTriangle size={12} /> Feststelltaste ist aktiv
+                  </p>
+                )}
               </div>
               <button
                 type="button"
                 onClick={() => void handleLogin()}
-                disabled={busy}
+                disabled={busy || !username || !password}
                 className="auth-button"
               >
-                {busy ? "…" : "Anmelden"}
+                {busy ? (
+                  <>
+                    <IconLoader2 size={16} className="auth-button-spinner" />
+                    <span>Anmeldung läuft …</span>
+                  </>
+                ) : (
+                  "Anmelden"
+                )}
               </button>
               <button
                 type="button"
@@ -459,16 +537,39 @@ export function AuthPanel({
                   <span>Passwort</span>
                   <span className="auth-label-hint">min. 10 Zeichen</span>
                 </label>
-                <input
-                  id="auth-password-reg"
-                  type="password"
-                  className="auth-input"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="new-password"
-                  minLength={10}
-                  required
-                />
+                <div className="auth-password-wrap">
+                  <input
+                    id="auth-password-reg"
+                    type={showPassword ? "text" : "password"}
+                    className="auth-input auth-input-with-toggle"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={detectCaps}
+                    onKeyUp={detectCaps}
+                    autoComplete="new-password"
+                    minLength={10}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={
+                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                    }
+                    title={
+                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                    }
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <IconEyeOff size={16} /> : <IconEye size={16} />}
+                  </button>
+                </div>
+                {capsLockOn && (
+                  <p className="auth-capslock">
+                    <IconAlertTriangle size={12} /> Feststelltaste ist aktiv
+                  </p>
+                )}
                 {password.length > 0 && (
                   <div className="auth-checks">
                     <span>
@@ -600,7 +701,14 @@ export function AuthPanel({
                 }
                 className="auth-button"
               >
-                {busy ? "…" : "Konto erstellen"}
+                {busy ? (
+                  <>
+                    <IconLoader2 size={16} className="auth-button-spinner" />
+                    <span>Konto wird erstellt …</span>
+                  </>
+                ) : (
+                  "Konto erstellen"
+                )}
               </button>
             </div>
           )}
@@ -638,7 +746,14 @@ export function AuthPanel({
                 onClick={() => void handleLogin()}
                 className="auth-button"
               >
-                {busy ? "…" : "Importieren & anmelden"}
+                {busy ? (
+                  <>
+                    <IconLoader2 size={16} className="auth-button-spinner" />
+                    <span>Import läuft …</span>
+                  </>
+                ) : (
+                  "Importieren & anmelden"
+                )}
               </button>
             </div>
           )}
