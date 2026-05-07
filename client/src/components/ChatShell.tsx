@@ -63,6 +63,7 @@ import { SafetyNumberDialog } from "./SafetyNumberDialog";
 import { useVoiceRecorder } from "../lib/useVoiceRecorder";
 import { ThemeToggle } from "./ThemeToggle";
 import { useShortcuts } from "../lib/shortcuts";
+import { loadDefaultTtl } from "../lib/disappearingDefault";
 import { SearchPanel } from "./SearchPanel";
 import { AddContactModal } from "./AddContactModal";
 import {
@@ -745,7 +746,11 @@ export function ChatShell({
       rawDmRef.current.set(p.id, authored);
       rebuildDm(p.id);
       const savedTtl = await metaGet(`ttl:dm:${p.id}`);
-      setTtlDm(savedTtl ? Number(savedTtl) || 0 : 0);
+      if (savedTtl) {
+        setTtlDm(Number(savedTtl) || 0);
+      } else {
+        setTtlDm(loadDefaultTtl());
+      }
     },
     [rebuildDm]
   );
@@ -757,7 +762,11 @@ export function ChatShell({
       rawGroupRef.current.set(g.id, authored);
       rebuildGroup(g.id);
       const savedTtl = await metaGet(`ttl:g:${g.id}`);
-      setTtlGroup(savedTtl ? Number(savedTtl) || 0 : 0);
+      if (savedTtl) {
+        setTtlGroup(Number(savedTtl) || 0);
+      } else {
+        setTtlGroup(loadDefaultTtl());
+      }
     },
     [rebuildGroup, session.user.id]
   );

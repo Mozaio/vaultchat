@@ -16,6 +16,11 @@ import {
   loadAutoLockMinutes,
   saveAutoLockMinutes,
 } from "../lib/useAutoLock";
+import {
+  DEFAULT_TTL_OPTIONS,
+  loadDefaultTtl,
+  saveDefaultTtl,
+} from "../lib/disappearingDefault";
 import type { ServerStatus } from "../lib/api";
 import {
   IconAlertTriangle,
@@ -124,6 +129,7 @@ export function SecuritySettings({
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
     loadAutoLockMinutes()
   );
+  const [defaultTtl, setDefaultTtl] = useState<number>(() => loadDefaultTtl());
   const [replayStats, setReplayStats] = useState(getReplayStats());
   const [desktopNotify, setDesktopNotify] = useState(readNotifyEnabled);
   const [notifyPreview, setNotifyPreview] = useState(readNotifyPreview);
@@ -442,6 +448,44 @@ export function SecuritySettings({
 
           {tab === "privacy" && (
             <div className="space-y-4">
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-1 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  Verschwindende Nachrichten
+                </h3>
+                <p
+                  className="mb-2 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Standardwert für neue Chats. Bestehende Chats behalten ihre
+                  individuelle Einstellung.
+                </p>
+                <select
+                  value={defaultTtl}
+                  onChange={(e) => {
+                    const next = Number(e.target.value);
+                    setDefaultTtl(next);
+                    saveDefaultTtl(next);
+                  }}
+                  className="app-input w-full !py-2 text-sm"
+                  aria-label="Standardablaufzeit für neue Chats"
+                >
+                  {DEFAULT_TTL_OPTIONS.map((opt) => (
+                    <option key={opt.ms} value={opt.ms}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div
                 className="rounded-lg border p-3"
                 style={{
