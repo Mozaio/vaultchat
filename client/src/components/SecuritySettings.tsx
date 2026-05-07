@@ -1,7 +1,7 @@
 /**
  * Einstellungen: Tabs Allgemein · Datenschutz · Sicherheit · Über
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   startPeriodicWipe,
   stopPeriodicWipe,
@@ -30,6 +30,12 @@ import {
   IconX,
 } from "./Icons";
 import { ThemeToggle } from "./ThemeToggle";
+import {
+  loadCustomEmojis,
+  removeCustomEmoji,
+  addCustomEmojiFromFile,
+  type CustomEmoji,
+} from "../lib/customEmojis";
 
 export type SecurityLevel = "normal" | "extreme";
 
@@ -60,12 +66,13 @@ export function saveSecurityLevel(level: SecurityLevel): void {
   }
 }
 
-type SettingsTabId = "general" | "privacy" | "security" | "about";
+type SettingsTabId = "general" | "privacy" | "security" | "emojis" | "about";
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
   { id: "general", label: "Allgemein" },
   { id: "privacy", label: "Datenschutz" },
   { id: "security", label: "Sicherheit" },
+  { id: "emojis", label: "Emojis" },
   { id: "about", label: "Über" },
 ];
 
@@ -806,6 +813,8 @@ export function SecuritySettings({
             </div>
           )}
 
+          {tab === "emojis" && <EmojiSettingsTab />}
+
           {tab === "about" && (
             <div className="space-y-4">
               <div>
@@ -834,6 +843,127 @@ export function SecuritySettings({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function EmojiSettingsTab() {
+  const [emojis, setEmojis] = useState<CustomEmoji[]>(() => loadCustomEmojis());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function handleAdd(file: File) {
+    setError(null);
+    setBusy(true);
+    try {
+      await addCustomEmojiFromFile(file);
+      setEmojis(loadCustomEmojis());
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "emoji_failed";
+      setError(
+        code === "emoji_invalid_type"
+          ? "Bitte ein Bild (PNG, JPEG, WebP, GIF) auswählen."
+          : code === "emoji_too_large"
+            ? "Bild zu groß — versuche ein kleineres Motiv."
+            : "Konnte den Emoji nicht hinzufügen."
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleRemove(id: string) {
+    removeCustomEmoji(id);
+    setEmojis(loadCustomEmojis());
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
+          Eigene Emojis
+        </p>
+        <p
+          className="mt-1 text-xs leading-relaxed"
+          style={{ color: "var(--text-muted)" }}
+        >
+          Lade Bilder hoch und nutze sie als Reaktionen. Sie liegen nur lokal
+          auf deinem Gerät; beim Reagieren wird das Bild als data-URL
+          mit dem verschlüsselten Frame mitgesendet — der Server sieht nichts.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        className="emoji-picker-upload"
+        onClick={() => fileRef.current?.click()}
+        disabled={busy}
+        style={{ width: "100%" }}
+      >
+        {busy ? "Lade …" : "+ Eigenes Emoji hinzufügen"}
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleAdd(f);
+          e.target.value = "";
+        }}
+      />
+      {error && (
+        <p className="text-xs" style={{ color: "var(--danger, #ef4444)" }}>
+          {error}
+        </p>
+      )}
+
+      {emojis.length === 0 ? (
+        <p
+          className="rounded-lg border p-4 text-center text-xs"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--text-muted)",
+          }}
+        >
+          Noch keine eigenen Emojis. Lade dein erstes hoch — z. B. ein Logo,
+          Sticker oder Inside-Joke-Bild.
+        </p>
+      ) : (
+        <div
+          className="grid gap-2"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))" }}
+        >
+          {emojis.map((e) => (
+            <div
+              key={e.id}
+              className="emoji-settings-cell"
+              title={e.name}
+            >
+              <img src={e.dataUrl} alt={e.name} />
+              <span className="emoji-settings-name">{e.name}</span>
+              <button
+                type="button"
+                onClick={() => handleRemove(e.id)}
+                className="emoji-settings-remove"
+                aria-label={`„${e.name}“ entfernen`}
+                title="Entfernen"
+              >
+                <IconX size={11} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p
+        className="text-xs"
+        style={{ color: "var(--text-muted)" }}
+      >
+        Maximal 32 Emojis · Bilder werden auf 48×48 verkleinert (~2 KB)
+      </p>
     </div>
   );
 }
