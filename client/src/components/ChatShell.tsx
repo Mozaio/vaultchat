@@ -3585,6 +3585,54 @@ export function ChatShell({
               </button>
               <button
                 type="button"
+                className="chat-menu-item"
+                onClick={async () => {
+                  setUserMenuOpen(false);
+                  const local = loadLocalIdentity();
+                  if (!local) return;
+                  const passphrase = window.prompt(
+                    "Passphrase für das verschlüsselte Backup eingeben"
+                  );
+                  if (!passphrase) return;
+                  try {
+                    const backup = await encryptIdentityBackup(local, passphrase);
+                    const blob = new Blob([JSON.stringify(backup, null, 2)], {
+                      type: "application/json",
+                    });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `vaultchat-backup-${local.username}-encrypted.json`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                    try {
+                      localStorage.setItem(
+                        "vaultchat.backupReminder.dismissed",
+                        "1"
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                    setBackupReminderVisible(false);
+                    pushToast("Backup heruntergeladen", "success");
+                  } catch {
+                    pushToast("Backup-Export fehlgeschlagen", "danger");
+                  }
+                }}
+              >
+                <IconDownload size={16} /> Backup exportieren
+              </button>
+              <button
+                type="button"
+                className="chat-menu-item"
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  void copyText(session.user.id);
+                }}
+              >
+                <IconCopy size={16} /> Eigene ID kopieren
+              </button>
+              <button
+                type="button"
                 className="chat-menu-item danger"
                 onClick={onLogout}
               >
