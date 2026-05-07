@@ -4098,7 +4098,7 @@ export function ChatShell({
                       className="h-9 w-9 shrink-0 rounded-full object-cover shadow"
                     />
                   ) : (
-                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow" style={{ background: "linear-gradient(135deg, var(--accent-hover), var(--accent))" }}>
+                    <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow" style={{ background: "var(--accent)" }}>
                       {group.name.slice(0, 1).toUpperCase()}
                     </div>
                   )}
@@ -4482,7 +4482,7 @@ export function ChatShell({
             </header>
             <div
               ref={groupScrollRef}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.06),transparent_40%)] px-4 py-4 relative"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 relative"
               onDragOver={(e) => {
                 e.preventDefault();
                 setGroupDragOver(true);
@@ -5144,7 +5144,7 @@ export function ChatShell({
               type="button"
               onClick={() => setTab("dm")}
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
-              style={tab === "dm" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              style={tab === "dm" ? { background: "var(--accent)", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
               Direkt
             </button>
@@ -5152,7 +5152,7 @@ export function ChatShell({
               type="button"
               onClick={() => setTab("group")}
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
-              style={tab === "group" ? { background: "linear-gradient(135deg, var(--accent-hover), var(--accent))", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              style={tab === "group" ? { background: "var(--accent)", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
               Gruppen
             </button>
