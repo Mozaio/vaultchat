@@ -105,10 +105,10 @@ export function AddContactModal({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-              Kontakt hinzufuegen
+              Kontakt hinzufügen
             </h2>
             <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              Suche nur nach Username. Keine Telefonnummer noetig.
+              Suche nur nach Username. Keine Telefonnummer nötig.
             </p>
           </div>
           <button
@@ -140,7 +140,7 @@ export function AddContactModal({
             )}
           </div>
           <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Mindestens {MIN_SEARCH_CHARS} Zeichen fuer die Suche eingeben.
+            Mindestens {MIN_SEARCH_CHARS} Zeichen für die Suche eingeben.
           </p>
         </div>
 
@@ -154,7 +154,7 @@ export function AddContactModal({
           {trimmedQuery.length < MIN_SEARCH_CHARS && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
               <p className="text-sm">Tippe mindestens {MIN_SEARCH_CHARS} Zeichen, um zu suchen.</p>
-              <p className="mt-1 text-xs">Registrierte Nutzer koennen direkt hinzugefuegt werden.</p>
+              <p className="mt-1 text-xs">Registrierte Nutzer können direkt hinzugefügt werden.</p>
             </div>
           )}
 
@@ -185,7 +185,7 @@ export function AddContactModal({
                       {user.username}
                     </p>
                     <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>
-                      Kontakt hinzufuegen und Chat starten
+                      Kontakt hinzufügen und Chat starten
                     </p>
                   </div>
                 </button>
@@ -196,7 +196,7 @@ export function AddContactModal({
 
         <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--border)" }}>
           <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-            Kontakte werden lokal ausgewaehlt. Der Server sieht keine privaten Nachrichten.
+            Kontakte werden lokal ausgewählt. Der Server sieht keine privaten Nachrichten.
           </p>
         </div>
       </div>

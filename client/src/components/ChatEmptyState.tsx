@@ -27,10 +27,10 @@ export function ChatEmptyState({
           <IconMessageSquare size={38} />
         </div>
         <h2 className="chat-empty-state-title">
-          Keine Unterhaltung ausgewaehlt
+          Keine Unterhaltung ausgewählt
         </h2>
         <p className="chat-empty-state-subtitle">
-          Waehle links einen Chat aus oder erstelle eine private Gruppe.
+          Wähle links einen Chat aus oder erstelle eine private Gruppe.
         </p>
       </div>
       {showQuickActions && (

@@ -3504,7 +3504,14 @@ export function ChatShell({
                       <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
                         {peer.username}
                       </p>
-                      {typing ? (
+                      {peer.id === session.user.id ? (
+                        <p
+                          className="header-status"
+                          style={{ color: "var(--text-muted)" }}
+                        >
+                          Notizen für dich
+                        </p>
+                      ) : typing ? (
                         <p className="header-status typing">
                           <span className="typing-indicator">
                             <span></span>
@@ -3541,14 +3548,16 @@ export function ChatShell({
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void beginCall()}
-                    className="btn btn-secondary btn-icon !h-9 !w-9"
-                    title="Anrufen"
-                  >
-                    <IconPhone size={18} />
-                  </button>
+                  {peer.id !== session.user.id && (
+                    <button
+                      type="button"
+                      onClick={() => void beginCall()}
+                      className="btn btn-secondary btn-icon !h-9 !w-9"
+                      title="Anrufen"
+                    >
+                      <IconPhone size={18} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setInfoOpen((v) => !v)}
