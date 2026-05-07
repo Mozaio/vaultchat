@@ -215,43 +215,100 @@ export function AuthPanel({
         : "Mit Benutzername und Passwort einloggen.";
 
   return (
-    <div className="auth-stage">
-      {/* Theme toggle floating top-right */}
-      <div className="auth-stage-toggle">
-        <ThemeToggle />
-      </div>
+    <div className="auth-split">
+      {/* ── Left: always-dark brand panel ── */}
+      <div className="auth-brand-panel" aria-hidden="true">
+        <div className="auth-brand-top">
+          <VaultChatLogo size={28} style={{ color: "#0d9488" }} />
+          <span className="auth-brand-top-name">VaultChat</span>
+        </div>
 
-      <main className="auth-stage-shell">
-        {/* Brand block ABOVE the card — large logo, wordmark, tagline */}
-        <div className="auth-stage-brand">
-          <div className="auth-stage-logo">
-            <VaultChatLogo size={56} style={{ color: "var(--accent)" }} />
-          </div>
-          <h1 className="auth-stage-wordmark">VaultChat</h1>
-          <p className="auth-stage-tagline">
-            Privater Browser-Messenger. Verschlüsselt by default.
+        <div className="auth-brand-hero">
+          <h1>
+            Kein Server kennt<br />deine Nachrichten.
+          </h1>
+          <p>
+            Post-Quantum-verschlüsselt, Zero-Knowledge-Relay —
+            kein Konto mit E-Mail nötig.
           </p>
         </div>
 
-        {/* Auth card — focused, no brand inside (brand sits above) */}
-        <section className="auth-card-v2" aria-labelledby="auth-card-title">
-          <header className="auth-card-v2-head">
-            <h2 id="auth-card-title">{cardTitle}</h2>
-            <p>{cardSubtitle}</p>
+        <ul className="auth-brand-features">
+          <li>
+            <span className="auth-brand-feat-icon">
+              <IconLock size={14} />
+            </span>
+            <div>
+              <strong>Double Ratchet + ML-KEM-1024</strong>
+              <span>Post-Quantum Forward Secrecy</span>
+            </div>
+          </li>
+          <li>
+            <span className="auth-brand-feat-icon">
+              <IconShieldCheck size={14} />
+            </span>
+            <div>
+              <strong>Sealed Sender</strong>
+              <span>Absender-Metadaten nicht übertragen</span>
+            </div>
+          </li>
+          <li>
+            <span className="auth-brand-feat-icon">
+              <IconTimer size={14} />
+            </span>
+            <div>
+              <strong>Auto-Lock</strong>
+              <span>Schlüssel automatisch aus dem Speicher löschen</span>
+            </div>
+          </li>
+          <li>
+            <span className="auth-brand-feat-icon">
+              <IconBookmark size={14} />
+            </span>
+            <div>
+              <strong>E2E-Backup</strong>
+              <span>Verschlüsselter Schlüssel-Export für neue Geräte</span>
+            </div>
+          </li>
+        </ul>
+
+        <p className="auth-brand-footer">
+          Web-Build. Kein auditierter Signal-Ersatz — siehe{" "}
+          <code>THREAT_MODEL.md</code>.
+        </p>
+      </div>
+
+      {/* ── Right: form panel ── */}
+      <div className="auth-form-panel">
+        <div className="auth-form-panel-toggle">
+          <ThemeToggle />
+        </div>
+
+        {/* Mobile-only compact brand header */}
+        <div className="auth-form-panel-mobile-brand">
+          <VaultChatLogo size={28} style={{ color: "var(--accent)" }} />
+          <span>VaultChat</span>
+        </div>
+
+        <div className="auth-form-body">
+          <header>
+            <h2 className="auth-form-head-title">{cardTitle}</h2>
+            <p className="auth-form-head-sub">{cardSubtitle}</p>
           </header>
 
+          {/* Tab switcher — unlock vs. other account */}
           {hasLocal && mode !== "import" && (
-            <div className="auth-tabs">
+            <div className="auth-pill-tabs">
               <button
                 type="button"
-                className={mode === "unlock" ? "auth-tab active" : "auth-tab"}
+                className={`auth-pill-tab${mode === "unlock" ? " active" : ""}`}
                 onClick={() => setMode("unlock")}
               >
                 Entsperren
               </button>
               <button
                 type="button"
-                className={mode === "login" ? "auth-tab active" : "auth-tab"}
+                className={`auth-pill-tab${mode === "login" ? " active" : ""}`}
                 onClick={() => setMode("login")}
               >
                 Anderes Konto
@@ -259,18 +316,19 @@ export function AuthPanel({
             </div>
           )}
 
+          {/* Tab switcher — login vs. register */}
           {!hasLocal && mode !== "import" && (
-            <div className="auth-tabs">
+            <div className="auth-pill-tabs">
               <button
                 type="button"
-                className={mode === "login" ? "auth-tab active" : "auth-tab"}
+                className={`auth-pill-tab${mode === "login" ? " active" : ""}`}
                 onClick={() => setMode("login")}
               >
                 Anmelden
               </button>
               <button
                 type="button"
-                className={mode === "register" ? "auth-tab active" : "auth-tab"}
+                className={`auth-pill-tab${mode === "register" ? " active" : ""}`}
                 onClick={() => setMode("register")}
               >
                 Registrieren
@@ -278,6 +336,7 @@ export function AuthPanel({
             </div>
           )}
 
+          {/* ── Unlock form ── */}
           {mode === "unlock" && hasLocal && (
             <div className="auth-form">
               <div className="auth-input-group">
@@ -289,6 +348,7 @@ export function AuthPanel({
                   className="auth-input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void handleUnlock()}
                   required
                   autoFocus
                 />
@@ -308,6 +368,7 @@ export function AuthPanel({
             </div>
           )}
 
+          {/* ── Login form ── */}
           {mode === "login" && (
             <div className="auth-form">
               <div className="auth-input-group">
@@ -330,6 +391,7 @@ export function AuthPanel({
                   className="auth-input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && void handleLogin()}
                   autoComplete="current-password"
                   required
                 />
@@ -352,6 +414,7 @@ export function AuthPanel({
             </div>
           )}
 
+          {/* ── Register form ── */}
           {mode === "register" && !hasLocal && (
             <div className="auth-form">
               <div className="auth-input-group">
@@ -371,9 +434,7 @@ export function AuthPanel({
                 {username.length > 0 && (
                   <div className="auth-checks">
                     <span>
-                      <CheckIcon
-                        valid={username.length >= 2 && username.length <= 32}
-                      />
+                      <CheckIcon valid={username.length >= 2 && username.length <= 32} />
                       2–32 Zeichen
                     </span>
                     <span>
@@ -414,17 +475,13 @@ export function AuthPanel({
                     </span>
                     <span>
                       <CheckIcon
-                        valid={
-                          /[A-Z]/.test(password) && /[a-z]/.test(password)
-                        }
+                        valid={/[A-Z]/.test(password) && /[a-z]/.test(password)}
                       />
                       Groß- und Kleinbuchstaben
                     </span>
                     <span>
                       <CheckIcon
-                        valid={
-                          /\d/.test(password) || /[^a-zA-Z0-9]/.test(password)
-                        }
+                        valid={/\d/.test(password) || /[^a-zA-Z0-9]/.test(password)}
                       />
                       Zahl oder Sonderzeichen
                     </span>
@@ -458,7 +515,7 @@ export function AuthPanel({
               >
                 {showAdvancedAuth
                   ? "Erweiterte Optionen ausblenden"
-                  : "Recovery &amp; Plan optional einstellen"}
+                  : "Recovery & Plan optional einstellen"}
               </button>
               {showAdvancedAuth && (
                 <div className="auth-advanced">
@@ -507,7 +564,7 @@ export function AuthPanel({
                       <button
                         key={plan.id}
                         type="button"
-                        className={`auth-plan ${selectedPlan === plan.id ? "active" : ""}`}
+                        className={`auth-plan${selectedPlan === plan.id ? " active" : ""}`}
                         onClick={() => setSelectedPlan(plan.id)}
                       >
                         <span className="auth-plan-name">{plan.name}</span>
@@ -546,6 +603,7 @@ export function AuthPanel({
             </div>
           )}
 
+          {/* ── Import form ── */}
           {mode === "import" && (
             <div className="auth-form">
               <div className="flex items-center justify-between">
@@ -578,44 +636,22 @@ export function AuthPanel({
                 onClick={() => void handleLogin()}
                 className="auth-button"
               >
-                {busy ? "…" : "Importieren &amp; anmelden"}
+                {busy ? "…" : "Importieren & anmelden"}
               </button>
             </div>
           )}
 
           {error && (
             <div className="auth-error">
-              <IconAlertTriangle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <IconAlertTriangle
+                size={16}
+                style={{ flexShrink: 0, marginTop: 1 }}
+              />
               <span>{error}</span>
             </div>
           )}
-        </section>
-
-        {/* Quiet pill row directly under the card */}
-        <ul className="auth-stage-pills" aria-label="Sicherheits-Eigenschaften">
-          <li>
-            <IconLock size={12} aria-hidden />
-            <span>Sealed Sender</span>
-          </li>
-          <li>
-            <IconShieldCheck size={12} aria-hidden />
-            <span>TOFU</span>
-          </li>
-          <li>
-            <IconTimer size={12} aria-hidden />
-            <span>Auto-Lock</span>
-          </li>
-          <li>
-            <IconBookmark size={12} aria-hidden />
-            <span>E2E Backup</span>
-          </li>
-        </ul>
-
-        <p className="auth-stage-footer">
-          Web-Build. Kein auditierter Signal-Ersatz — siehe{" "}
-          <code>THREAT_MODEL.md</code>.
-        </p>
-      </main>
+        </div>
+      </div>
     </div>
   );
 }
