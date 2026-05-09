@@ -478,6 +478,15 @@ export function ChatShell({
     Map<string, ReturnType<typeof setTimeout>>
   >(new Map());
   const seen = useRef(new Set<string>());
+  /**
+   * Buffered group ciphertexts that arrived BEFORE the group key was
+   * known. We retry them once the matching `group_key` DM lands so the
+   * race between `group_key` distribution and the first chat message
+   * does not silently drop messages.
+   */
+  const pendingGroupCipherRef = useRef<
+    Map<string, Array<{ id: string; ciphertext: string; createdAt: number }>>
+  >(new Map());
   const dmScrollRef = useRef<HTMLDivElement | null>(null);
   const groupScrollRef = useRef<HTMLDivElement | null>(null);
   const dmInputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1396,9 +1405,67 @@ export function ChatShell({
               const existingState = await getGroupKeyState(plain.groupId);
               if (!existingState) {
                 const peers = usersRef.current.map(u => u.id);
-                await initGroupKeyState(plain.groupId, peers, session.user.id, session.secretKey);
+                // CRITICAL: pass the received root key as importedRootKey so all
+                // members share the same root, not random per-side keys.
+                await initGroupKeyState(
+                  plain.groupId,
+                  peers,
+                  session.user.id,
+                  session.secretKey,
+                  keyBytes
+                );
               }
               await loadGroups();
+              // Retry any group ciphertexts that arrived before this key.
+              const pending = pendingGroupCipherRef.current.get(plain.groupId);
+              if (pending && pending.length > 0) {
+                pendingGroupCipherRef.current.delete(plain.groupId);
+                for (const buf of pending) {
+                  try {
+                    const retried = await decryptGroupPayload(
+                      plain.groupId,
+                      buf.ciphertext
+                    );
+                    if (
+                      typeof retried.cid === "string" &&
+                      retried.cid.length > 0 &&
+                      isGroupMessageDuplicate(plain.groupId, retried.cid)
+                    ) {
+                      continue;
+                    }
+                    seen.current.add(buf.id);
+                    const fromUid = retried.senderUserId ?? "";
+                    const tlEntry = {
+                      id: buf.id,
+                      groupId: plain.groupId,
+                      fromUserId: fromUid,
+                      plainJson: JSON.stringify(retried),
+                      at: buf.createdAt,
+                      ...(retried.ttlMs
+                        ? { expiresAt: buf.createdAt + retried.ttlMs }
+                        : {}),
+                    };
+                    await idbPutGroupMsg(tlEntry);
+                    const arr =
+                      rawGroupRef.current.get(plain.groupId) ?? [];
+                    arr.push({
+                      id: buf.id,
+                      fromMe: fromUid === session.user.id,
+                      fromUserId: fromUid,
+                      plainJson: JSON.stringify(retried),
+                      at: buf.createdAt,
+                      ...(retried.ttlMs
+                        ? { expiresAt: buf.createdAt + retried.ttlMs }
+                        : {}),
+                    });
+                    rawGroupRef.current.set(plain.groupId, arr);
+                    if (groupRef.current?.id === plain.groupId)
+                      rebuildGroup(plain.groupId);
+                  } catch {
+                    /* still cannot decrypt — drop quietly */
+                  }
+                }
+              }
               return;
             }
 
@@ -1461,6 +1528,13 @@ export function ChatShell({
             try {
               plain = await decryptGroupPayload(gid, ct);
             } catch {
+              // Buffer this ciphertext: the matching group_key DM may
+              // not have arrived yet. Retry on group_key arrival.
+              const buf = pendingGroupCipherRef.current.get(gid) ?? [];
+              if (buf.length < 256) {
+                buf.push({ id, ciphertext: ct, createdAt: Number(data.createdAt) || Date.now() });
+                pendingGroupCipherRef.current.set(gid, buf);
+              }
               return;
             }
             if (
@@ -1932,6 +2006,9 @@ export function ChatShell({
     });
     const key = await randomGroupKey();
     await setGroupKey(g.id, key);
+    // Initialize PFS state locally with the same rootKey so encryptGroupPayload
+    // can use the GC2 path consistently with what we distribute to peers.
+    await initGroupKeyState(g.id, memberIds, session.user.id, session.secretKey, key);
     await loadGroups();
     await distributeGroupKey(g, memberIds, base64FromUint8(key));
     setNewGroupName("");

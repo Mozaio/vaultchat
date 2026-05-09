@@ -215,7 +215,20 @@ export function MessageBubble({
   const [revealed, setRevealed] = useState(false);
   const [viewOnceLeftMs, setViewOnceLeftMs] = useState<number | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
   const bubbleRef = useRef<HTMLDivElement>(null);
+
+  // When opening menu/reaction popover, decide whether to flip
+  // down (instead of up) if the bubble is near the top of the
+  // viewport so the popover/menu does not go off-screen and never
+  // covers the message above.
+  useEffect(() => {
+    if (!menuOpen && !reactOpen) return;
+    const el = bubbleRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setFlipUp(rect.top < 220);
+  }, [menuOpen, reactOpen]);
 
   useEffect(() => {
     if (!msg.expiresAt) return;
@@ -337,7 +350,9 @@ export function MessageBubble({
             msg.fromMe ? "sent" : "received"
           } max-w-full ${msg.deleted ? "is-deleted" : ""} ${
             isGrouped ? "grouped" : ""
-          } ${isLastInGroup ? "tail" : ""} ${isImage ? "is-image" : ""}`}
+          } ${isLastInGroup ? "tail" : ""} ${isImage ? "is-image" : ""}${
+            flipUp ? " menu-flip-up" : ""
+          }`}
           onDoubleClick={(e) => {
             if (!msg.deleted && msg.plain.kind === "text") {
               e.stopPropagation();
