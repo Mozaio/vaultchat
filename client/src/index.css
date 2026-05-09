@@ -6393,3 +6393,193 @@ button:focus-visible,
 }
 
 /* End VAULTCHAT v2 Polish Layer */
+
+
+/* ============================================================
+   VAULTCHAT v3 — BUG FIX & POLISH LAYER
+   - Fixes: action buttons overlapping bubble text, bubble-menu
+     covering content, reaction popover going off-screen on first
+     messages.
+   - Polish: sticky date separators, refined typing dots, kebab
+     side-anchored.
+   ============================================================ */
+
+/* === FIX: actions to the SIDE of the bubble, not above ===
+   Old behavior put .message-actions on top of the bubble, which
+   blocked text reading on hover. New: float to the side. */
+.message-bubble .message-actions {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+/* Sent bubbles are right-aligned → actions appear to the LEFT */
+.message-bubble.sent .message-actions,
+.message-actions.from-me {
+  left: auto;
+  right: 100%;
+  margin-right: 6px;
+}
+
+/* Received bubbles are left-aligned → actions appear to the RIGHT */
+.message-bubble.received .message-actions,
+.message-actions.from-peer {
+  right: auto;
+  left: 100%;
+  margin-left: 6px;
+}
+
+/* Override the prior translateY(4px → 0) on hover so the
+   vertical centering survives. */
+.message-wrapper:hover .message-bubble .message-actions,
+.message-bubble .message-actions:focus-within {
+  transform: translateY(-50%);
+}
+
+/* On narrow viewports there is no room beside the bubble. Fall
+   back to top-of-bubble (original behavior) but with more clearance
+   so the buttons sit clearly above and don't overlay the text. */
+@media (max-width: 540px) {
+  .message-bubble .message-actions {
+    top: auto;
+    bottom: 100%;
+    margin-bottom: 4px;
+    transform: none;
+  }
+  .message-bubble.sent .message-actions,
+  .message-actions.from-me {
+    left: auto; right: 0; margin-right: 0;
+  }
+  .message-bubble.received .message-actions,
+  .message-actions.from-peer {
+    left: 0; right: auto; margin-left: 0;
+  }
+  .message-wrapper:hover .message-bubble .message-actions,
+  .message-bubble .message-actions:focus-within {
+    transform: translateY(-2px);
+  }
+}
+
+/* === FIX: bubble-menu drops BELOW the bubble instead of
+   covering its text. Auto-flip up via .menu-flip-up class. === */
+.bubble-menu {
+  top: 100%;
+  margin-top: 6px;
+  bottom: auto;
+}
+.message-bubble.menu-flip-up .bubble-menu {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: 6px;
+}
+
+/* === FIX: reaction popover sits ABOVE the bubble with a clear
+   gap. Auto-flip below via .menu-flip-up class for very high
+   bubbles (first message in chat). === */
+.reaction-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+.message-bubble.menu-flip-up .reaction-popover {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+/* === ENHANCE EXISTING DATE SEPARATOR ===
+   The existing .date-separator already uses sticky + glass blur on
+   the inner span. We just nudge typography for stronger hierarchy. */
+.date-separator span {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--bg-elevated) 86%, transparent);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+}
+
+/* === IMPROVED TYPING-INDICATOR DOTS === */
+@keyframes vault-typing-dot {
+  0%, 60%, 100% { transform: translateY(0) scale(0.7); opacity: 0.45; }
+  30%           { transform: translateY(-3px) scale(1);   opacity: 1; }
+}
+
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.typing-indicator > span:not(:last-child),
+.typing-indicator-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  display: inline-block;
+  animation: vault-typing-dot 1.2s ease-in-out infinite;
+}
+
+.typing-indicator > span:nth-child(1),
+.typing-indicator-dot:nth-child(1) { animation-delay: 0s; }
+.typing-indicator > span:nth-child(2),
+.typing-indicator-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-indicator > span:nth-child(3),
+.typing-indicator-dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* === REFINED VOICE-CARD WAVEFORM === */
+.voice-wave {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 22px;
+  flex: 1;
+  min-width: 80px;
+}
+
+.voice-bar {
+  width: 2.5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+  transition: background-color 0.15s ease, transform 0.15s ease;
+  display: inline-block;
+  min-height: 18%;
+}
+
+.voice-bar.played {
+  background: currentColor;
+  transform: scaleY(1.06);
+}
+
+.voice-card[data-playing="true"] .voice-bar:not(.played) {
+  background: color-mix(in srgb, currentColor 38%, transparent);
+}
+
+/* === BUBBLE LIFT WHEN ACTIONS ARE OPEN ===
+   Subtly lift the bubble when its menu/popover is open, so the
+   open state feels intentional and the bubble visually "owns" the
+   open menu. */
+.message-bubble:has(.bubble-menu),
+.message-bubble:has(.reaction-popover) {
+  z-index: 32;
+}
+
+/* === MOBILE TAP-TARGET BOOST === */
+@media (max-width: 540px) {
+  .message-action-btn {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* === SUBTLE highlight on jump-to-cid === */
+@keyframes vault-highlight-flash {
+  0%   { background-color: var(--accent-soft); }
+  100% { background-color: transparent; }
+}
+
+.message-wrapper.highlighted {
+  animation: vault-highlight-flash 1.6s ease-out;
+}
+
+/* End VAULTCHAT v3 */
