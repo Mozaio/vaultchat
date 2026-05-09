@@ -113,9 +113,16 @@ export function ThreadPanel({
 
       <div className="thread-panel-body" data-thread-cid={parent.plain.cid}>
         {replies.length === 0 ? (
-          <p className="thread-panel-empty">
-            Noch keine Antworten — starte den Thread mit einer Nachricht.
-          </p>
+          <div className="thread-panel-empty">
+            <IconMessageSquare
+              size={28}
+              aria-hidden
+              style={{ opacity: 0.45, marginBottom: 8 }}
+            />
+            <p style={{ margin: 0 }}>
+              Noch keine Antworten — starte den Thread mit einer Nachricht.
+            </p>
+          </div>
         ) : (
           replies.map((m, i) => {
             const isGrouped =
@@ -150,34 +157,51 @@ export function ThreadPanel({
       </div>
 
       <footer className="thread-panel-composer">
-        <textarea
-          ref={inputRef}
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            autoResize(e.currentTarget);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
-              e.preventDefault();
-              void handleSend();
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+          <textarea
+            ref={inputRef}
+            value={text}
+            onChange={(e) => {
+              setText(e.target.value);
+              autoResize(e.currentTarget);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            placeholder={
+              parentAuthor === "Du"
+                ? "Im Thread antworten …"
+                : `Antwort an ${parentAuthor} …`
             }
-          }}
-          placeholder={
-            parentAuthor === "Du"
-              ? "Im Thread antworten …"
-              : `Antwort an ${parentAuthor} …`
-          }
-          rows={1}
-          maxLength={4000}
-          autoFocus
-        />
+            rows={1}
+            maxLength={4000}
+            autoFocus
+          />
+          {text.length > 3600 && (
+            <span
+              aria-live="polite"
+              style={{
+                fontSize: "0.7rem",
+                color:
+                  text.length > 3900 ? "var(--danger)" : "var(--text-muted)",
+                alignSelf: "flex-end",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {text.length} / 4000
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={() => void handleSend()}
           disabled={busy || !text.trim()}
           className="thread-panel-send"
           aria-label="Antwort senden"
+          title="Antwort senden (Enter)"
         >
           <IconSend size={16} />
         </button>
