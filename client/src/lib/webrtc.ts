@@ -47,7 +47,7 @@ async function getCallStream(): Promise<MediaStream> {
       video: false,
     });
   } catch {
-    throw new Error("Mikrofon nicht verfügbar oder Berechtigung verweigert");
+    throw new Error("Mikrofon nicht verfuegbar oder Berechtigung verweigert");
   }
 }
 
@@ -89,6 +89,140 @@ async function flushPendingCandidates(
   }
 }
 
+/**
+ * Robust lifecycle wiring shared by startCall + acceptCall.
+ *
+ * Bug fixes vs. v1:
+ *  1. Did NOT end the call on iceConnectionState === "disconnected".
+ *     That state is transient and often recovers on its own (Wi-Fi blip,
+ *     handover, brief packet loss). v1 killed the call immediately,
+ *     making real-world reliability terrible. We now give a 8 s grace
+ *     window and only end if we are still disconnected/failed afterwards.
+ *  2. Listen on the high-level connectionState in addition to
+ *     iceConnectionState. connectionState aggregates ICE + DTLS and is
+ *     the right signal for "the call is up" / "the call is down".
+ *  3. Hard timeout of 45 s for getting to "connected" — otherwise we
+ *     end the call as failed (instead of ringing forever or burning
+ *     TURN allocations).
+ *  4. onEnd fires exactly once.
+ */
+function wireLifecycle(
+  pc: RTCPeerConnection,
+  onEnd: () => void
+): { onConnected: () => void; cancelTimers: () => void } {
+  let ended = false;
+  let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let connectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  const finish = () => {
+    if (ended) return;
+    ended = true;
+    if (disconnectTimer) {
+      clearTimeout(disconnectTimer);
+      disconnectTimer = null;
+    }
+    if (connectTimeout) {
+      clearTimeout(connectTimeout);
+      connectTimeout = null;
+    }
+    onEnd();
+  };
+
+  // 45-second connect timeout — if we never reach "connected"
+  // we end the call rather than ringing/half-connecting forever.
+  connectTimeout = setTimeout(() => {
+    if (
+      pc.connectionState !== "connected" &&
+      pc.iceConnectionState !== "connected" &&
+      pc.iceConnectionState !== "completed"
+    ) {
+      try {
+        pc.close();
+      } catch {
+        /* noop */
+      }
+      finish();
+    }
+  }, 45_000);
+
+  const handleDisconnect = () => {
+    if (ended) return;
+    if (disconnectTimer) return;
+    // Give 8 s for the connection to recover before ending the call.
+    disconnectTimer = setTimeout(() => {
+      disconnectTimer = null;
+      const s = pc.iceConnectionState;
+      if (s === "disconnected" || s === "failed" || s === "closed") {
+        try {
+          pc.close();
+        } catch {
+          /* noop */
+        }
+        finish();
+      }
+    }, 8_000);
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    const s = pc.iceConnectionState;
+    if (s === "failed") {
+      // Try ICE restart once; if it does not recover the
+      // connectionState listener will end the call.
+      try {
+        pc.restartIce();
+      } catch {
+        /* noop */
+      }
+      handleDisconnect();
+    } else if (s === "disconnected") {
+      handleDisconnect();
+    } else if (s === "closed") {
+      finish();
+    } else if (s === "connected" || s === "completed") {
+      if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+      }
+    }
+  };
+
+  pc.onconnectionstatechange = () => {
+    const s = pc.connectionState;
+    if (s === "failed" || s === "closed") {
+      finish();
+    }
+  };
+
+  return {
+    onConnected: () => {
+      if (connectTimeout) {
+        clearTimeout(connectTimeout);
+        connectTimeout = null;
+      }
+    },
+    cancelTimers: () => {
+      if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+      }
+      if (connectTimeout) {
+        clearTimeout(connectTimeout);
+        connectTimeout = null;
+      }
+    },
+  };
+}
+
+export type CallController = {
+  pc: RTCPeerConnection;
+  localStream: MediaStream;
+  handleRemote: (payload: RtcPayload) => Promise<void>;
+  addIce: (c: RTCIceCandidateInit) => Promise<void>;
+  setMuted: (muted: boolean) => void;
+  isMuted: () => boolean;
+  close: () => void;
+};
+
 export async function startCall(
   peer: ApiUser,
   token: string,
@@ -96,13 +230,13 @@ export async function startCall(
   sendRtc: (toUserId: string, payload: RtcPayload) => void,
   onRemoteStream: (s: MediaStream) => void,
   onEnd: () => void
-) {
+): Promise<CallController> {
   const cfg = await loadRtcConfig(token);
   const effectiveRelayOnly = relayOnly || cfg.forceRelay;
   const pc = buildPc(cfg.iceServers, effectiveRelayOnly);
   const pendingCandidates: RTCIceCandidateInit[] = [];
   const stream = await getCallStream();
-  
+
   for (const t of stream.getTracks()) pc.addTrack(t, stream);
 
   pc.ontrack = (ev) => {
@@ -111,8 +245,6 @@ export async function startCall(
 
   pc.onicecandidate = (ev) => {
     if (!ev.candidate) return;
-    // In relay-only mode, only send relay candidates.
-    // Treat candidates without a known type as non-relay (fail closed).
     if (effectiveRelayOnly && ev.candidate.type !== "relay") return;
     sendRtc(peer.id, {
       type: "candidate",
@@ -120,13 +252,20 @@ export async function startCall(
     });
   };
 
-  pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState === "failed") {
-      pc.restartIce();
+  const lifecycle = wireLifecycle(pc, () => {
+    try {
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* noop */
     }
-    if (pc.iceConnectionState === "closed" || pc.iceConnectionState === "disconnected") {
-      onEnd();
-    }
+    onEnd();
+  });
+
+  // Mark "connected" once we have it so the connect-timeout disarms.
+  const origOnConn = pc.onconnectionstatechange;
+  pc.onconnectionstatechange = (ev: Event) => {
+    if (origOnConn) origOnConn.call(pc, ev);
+    if (pc.connectionState === "connected") lifecycle.onConnected();
   };
 
   const offer = await pc.createOffer();
@@ -139,8 +278,10 @@ export async function startCall(
     handleRemote: async (payload: RtcPayload) => {
       try {
         if (payload.type === "answer") {
-          await pc.setRemoteDescription({ type: "answer", sdp: payload.sdp });
-          await flushPendingCandidates(pc, pendingCandidates, effectiveRelayOnly);
+          if (pc.signalingState === "have-local-offer") {
+            await pc.setRemoteDescription({ type: "answer", sdp: payload.sdp });
+            await flushPendingCandidates(pc, pendingCandidates, effectiveRelayOnly);
+          }
         } else if (payload.type === "candidate") {
           await addIceCandidateSafely(
             pc,
@@ -150,12 +291,25 @@ export async function startCall(
           );
         }
       } catch {
-        /* ignore — single bad remote payload should not abort the call */
+        /* ignore single bad remote payload */
       }
     },
+    addIce: async (c: RTCIceCandidateInit) => {
+      await addIceCandidateSafely(pc, c, pendingCandidates, effectiveRelayOnly);
+    },
+    setMuted: (muted: boolean) => {
+      for (const t of stream.getAudioTracks()) t.enabled = !muted;
+    },
+    isMuted: () =>
+      stream.getAudioTracks().some((t) => !t.enabled),
     close: () => {
+      lifecycle.cancelTimers();
       stream.getTracks().forEach((t) => t.stop());
-      pc.close();
+      try {
+        pc.close();
+      } catch {
+        /* noop */
+      }
       onEnd();
     },
   };
@@ -169,13 +323,13 @@ export async function acceptCall(
   sendRtc: (toUserId: string, payload: RtcPayload) => void,
   onRemoteStream: (s: MediaStream) => void,
   onEnd: () => void
-) {
+): Promise<CallController> {
   const cfg = await loadRtcConfig(token);
   const effectiveRelayOnly = relayOnly || cfg.forceRelay;
   const pc = buildPc(cfg.iceServers, effectiveRelayOnly);
   const pendingCandidates: RTCIceCandidateInit[] = [];
   const stream = await getCallStream();
-  
+
   for (const t of stream.getTracks()) pc.addTrack(t, stream);
 
   pc.ontrack = (ev) => {
@@ -184,7 +338,6 @@ export async function acceptCall(
 
   pc.onicecandidate = (ev) => {
     if (!ev.candidate) return;
-    // Treat candidates without a known type as non-relay (fail closed).
     if (effectiveRelayOnly && ev.candidate.type !== "relay") return;
     sendRtc(peer.id, {
       type: "candidate",
@@ -192,18 +345,24 @@ export async function acceptCall(
     });
   };
 
-  pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState === "failed") {
-      pc.restartIce();
+  const lifecycle = wireLifecycle(pc, () => {
+    try {
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* noop */
     }
-    if (pc.iceConnectionState === "closed" || pc.iceConnectionState === "disconnected") {
-      onEnd();
-    }
+    onEnd();
+  });
+
+  const origOnConn = pc.onconnectionstatechange;
+  pc.onconnectionstatechange = (ev: Event) => {
+    if (origOnConn) origOnConn.call(pc, ev);
+    if (pc.connectionState === "connected") lifecycle.onConnected();
   };
-  
+
   await pc.setRemoteDescription({ type: "offer", sdp: offerSdp });
   await flushPendingCandidates(pc, pendingCandidates, effectiveRelayOnly);
-  
+
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   sendRtc(peer.id, { type: "answer", sdp: answer.sdp ?? "" });
@@ -222,15 +381,25 @@ export async function acceptCall(
           );
         }
       } catch {
-        /* ignore — single bad remote payload should not abort the call */
+        /* ignore single bad remote payload */
       }
     },
     addIce: async (c: RTCIceCandidateInit) => {
       await addIceCandidateSafely(pc, c, pendingCandidates, effectiveRelayOnly);
     },
+    setMuted: (muted: boolean) => {
+      for (const t of stream.getAudioTracks()) t.enabled = !muted;
+    },
+    isMuted: () =>
+      stream.getAudioTracks().some((t) => !t.enabled),
     close: () => {
+      lifecycle.cancelTimers();
       stream.getTracks().forEach((t) => t.stop());
-      pc.close();
+      try {
+        pc.close();
+      } catch {
+        /* noop */
+      }
       onEnd();
     },
   };
