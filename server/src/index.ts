@@ -973,9 +973,34 @@ wss.on("connection", (ws, req) => {
   }
 
   const allow = createBucket();
+  // Anti-DoS: zählt malformed/unparseable Frames in einem Sliding-Fenster.
+  // Ein legitimer Client darf vereinzelt einen Frame failen (Bug, Race),
+  // aber 30+ in 60s = Angriff oder kaputter Build → Connection schließen.
+  let badFrames = 0;
+  let badFrameWindowStart = Date.now();
+  const BAD_FRAME_LIMIT = 30;
+  const BAD_FRAME_WINDOW_MS = 60_000;
+  const noteBadFrame = (): boolean => {
+    const now = Date.now();
+    if (now - badFrameWindowStart > BAD_FRAME_WINDOW_MS) {
+      badFrames = 0;
+      badFrameWindowStart = now;
+    }
+    badFrames += 1;
+    return badFrames < BAD_FRAME_LIMIT;
+  };
 
   ws.on("message", (data) => {
-    if ((data as Buffer).length > WS_MAX_FRAME_BYTES) return;
+    if ((data as Buffer).length > WS_MAX_FRAME_BYTES) {
+      if (!noteBadFrame()) {
+        log.warn("ws_bad_frame_limit", {
+          userId: jwtUser?.userId ?? null,
+          reason: "oversize",
+        });
+        ws.close(4413, "frame_too_large");
+      }
+      return;
+    }
     if (!jwtUser) {
       let first: { type?: string; token?: string };
       try {
@@ -1008,20 +1033,31 @@ wss.on("connection", (ws, req) => {
     try {
       msg = JSON.parse(data.toString());
     } catch {
+      if (!noteBadFrame()) {
+        log.warn("ws_bad_frame_limit", {
+          userId: jwtUser!.userId,
+          reason: "json_parse",
+        });
+        ws.close(4400, "bad_frame_flood");
+      }
       return;
     }
 
     const parsed = WsFrame.safeParse(msg);
     if (!parsed.success) {
-      // Schweigend verwerfen — könnte ein Bug oder ein Angriffsversuch sein.
-      // Auf debug-Level loggen, damit Operations das im Render-Tab sehen
-      // können, aber nicht jeden malformed Frame als prod-Warnung zählen.
       log.debug("ws_bad_frame", {
         userId: jwtUser!.userId,
         sample: typeof msg === "object" && msg && "type" in msg
           ? String((msg as { type: unknown }).type).slice(0, 32)
           : null,
       });
+      if (!noteBadFrame()) {
+        log.warn("ws_bad_frame_limit", {
+          userId: jwtUser!.userId,
+          reason: "schema",
+        });
+        ws.close(4400, "bad_frame_flood");
+      }
       return;
     }
 
