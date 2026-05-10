@@ -792,6 +792,37 @@ const wss = new WebSocketServer({
   maxPayload: WS_MAX_FRAME_BYTES,
 });
 
+// Server-side heartbeat: wir senden alle 30s einen WebSocket-Ping (control
+// frame, vom Client-Code unsichtbar — ws.on("pong") wird automatisch
+// gefeuert). Wenn ein Client zwischen zwei Heartbeats keinen Pong schickt,
+// terminieren wir die Verbindung. Schützt vor "Zombie-Sockets" wenn Wifi
+// abgerissen ist und kein FIN/RST kam (typisch beim Mobile-Netzwerk-Wechsel
+// oder NAT-Timeout).
+const WS_HEARTBEAT_MS = 30_000;
+const heartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    const alive = (ws as WebSocket & { _vcAlive?: boolean })._vcAlive;
+    if (alive === false) {
+      // Letzter Ping wurde nicht beantwortet → killen.
+      log.debug("ws_heartbeat_timeout", {});
+      try {
+        ws.terminate();
+      } catch {
+        /* socket already closed */
+      }
+      continue;
+    }
+    (ws as WebSocket & { _vcAlive?: boolean })._vcAlive = false;
+    try {
+      ws.ping();
+    } catch {
+      /* socket between OPEN and CLOSED — wird im nächsten Tick gehandled */
+    }
+  }
+}, WS_HEARTBEAT_MS);
+heartbeat.unref?.();
+wss.on("close", () => clearInterval(heartbeat));
+
 // ---------------------------------------------------------------------------
 // WebSocket-Frame-Schemas (modul-level für Performance — vorher wurden sie
 // bei JEDER eingehenden Message neu kompiliert, was bei 100+ msg/s spürbar ist).
@@ -947,6 +978,13 @@ function createBucket() {
 }
 
 wss.on("connection", (ws, req) => {
+  // Heartbeat-Tracking: Verbindung gilt als alive, bis der nächste Heartbeat-
+  // Tick keinen pong bekommen hat.
+  (ws as WebSocket & { _vcAlive?: boolean })._vcAlive = true;
+  ws.on("pong", () => {
+    (ws as WebSocket & { _vcAlive?: boolean })._vcAlive = true;
+  });
+
   const url = new URL(req.url ?? "", "http://localhost");
   const urlToken = url.searchParams.get("token");
   const allowUrlToken = process.env.VAULTCHAT_ALLOW_WS_URL_TOKEN === "1";
