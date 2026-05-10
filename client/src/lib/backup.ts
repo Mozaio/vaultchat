@@ -5,6 +5,33 @@ import { getSodium, sodiumReady } from "./sodium";
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
+/**
+ * Validiert das DEKODIERTE Backup-JSON gegen das LocalIdentity-Shape.
+ * crypto_secretbox_open authentifiziert die Bytes (Poly1305-MAC), aber wenn
+ * jemand uns einen verschlüsselten Backup mit der RICHTIGEN Passphrase aber
+ * inkompatibler Datenstruktur unterschiebt (z.B. v1 von einem anderen
+ * Branch oder gezielt manipuliert), würde der App-Code später unerwartete
+ * undefined-Felder treffen. Mit Schema-Check bekommen wir einen
+ * vorhersehbaren Error statt einen späten NPE.
+ */
+function isLocalIdentityShape(value: unknown): value is LocalIdentity {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  if (typeof v.userId !== "string" || v.userId.length === 0) return false;
+  if (typeof v.username !== "string" || v.username.length === 0) return false;
+  if (typeof v.publicKey !== "string" || v.publicKey.length === 0) return false;
+  if (!v.wrapped || typeof v.wrapped !== "object") return false;
+  const w = v.wrapped as Record<string, unknown>;
+  return (
+    typeof w.salt === "string" &&
+    typeof w.nonce === "string" &&
+    typeof w.cipher === "string" &&
+    w.salt.length > 0 &&
+    w.nonce.length > 0 &&
+    w.cipher.length > 0
+  );
+}
+
 export type EncryptedIdentityBackup = {
   type: "vaultchat.identity.backup";
   version: 2;
@@ -97,8 +124,25 @@ export async function parseIdentityBackup(
   const cipher = uint8FromBase64(parsed.cipher);
   const key = await deriveBackupKey(passphrase, salt);
   try {
-    const plain = sodium.crypto_secretbox_open_easy(cipher, nonce, key);
-    return JSON.parse(dec.decode(plain)) as LocalIdentity;
+    let plain: Uint8Array;
+    try {
+      plain = sodium.crypto_secretbox_open_easy(cipher, nonce, key);
+    } catch {
+      // crypto_secretbox_open wirft bei MAC-Mismatch — gleichbedeutend mit
+      // "falsche Passphrase ODER manipulierte Bytes". Wir können nicht
+      // unterscheiden, also sage es generisch.
+      throw new Error("backup_passphrase_wrong_or_tampered");
+    }
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(dec.decode(plain));
+    } catch {
+      throw new Error("backup_corrupt_json");
+    }
+    if (!isLocalIdentityShape(decoded)) {
+      throw new Error("backup_unexpected_shape");
+    }
+    return decoded;
   } finally {
     sodium.memzero(key);
   }
