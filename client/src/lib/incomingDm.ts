@@ -10,6 +10,7 @@ import {
 } from "./drSession";
 import { openSealedEnvelope } from "./sealedSender";
 import { isMessageDuplicate } from "./replayProtection";
+import { logSilentCryptoFailure } from "./errors";
 import type { Session } from "./sessionHelpers";
 
 export type DecryptedDm = {
@@ -44,7 +45,8 @@ export async function decryptIncomingSealedDm(
     );
     senderUserId = opened.senderUserId;
     innerB64 = opened.innerB64;
-  } catch {
+  } catch (e) {
+    logSilentCryptoFailure(e, "openSealedEnvelope");
     return null;
   }
   const peer = await resolvePeer(senderUserId);
@@ -85,7 +87,8 @@ export async function decryptIncomingSealedDm(
         session.secretKey
       );
     }
-  } catch {
+  } catch (e) {
+    logSilentCryptoFailure(e, "decryptIncomingSealedDm.inner");
     return null;
   }
   return { senderUserId: peer.id, plain };

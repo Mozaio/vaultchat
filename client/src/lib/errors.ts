@@ -76,6 +76,35 @@ export function errorCode(e: unknown): ErrorCode | null {
   return null;
 }
 
+/**
+ * Helper für Hot-Path-Krypto-Catches: ein erwarteter Krypto-Fehler
+ * (replay, mismatch, peer-key-revoked) ist KEIN Bug, sondern Design —
+ * die Nachricht wird verworfen. Wir wollen aber beim Debuggen den Code
+ * sehen, ohne die Production mit console.warn zu fluten.
+ *
+ * Im Dev (import.meta.env.DEV oder unset) → console.debug strukturiert.
+ * In Production → schweigen.
+ */
+export function logSilentCryptoFailure(
+  e: unknown,
+  context: string
+): ErrorCode | null {
+  const code = errorCode(e);
+  try {
+    const isDev =
+      typeof import.meta !== "undefined" &&
+      // @ts-expect-error vite-only flag
+      import.meta.env?.DEV !== false;
+    if (isDev && code) {
+      // eslint-disable-next-line no-console
+      console.debug(`[vaultchat:crypto] ${context} → ${code}`);
+    }
+  } catch {
+    /* import.meta nicht verfügbar in tests — ignorieren */
+  }
+  return code;
+}
+
 const LEGACY_MAP: Record<string, ErrorCode> = {
   bad_magic: "CRYPTO_BAD_MAGIC",
   short_wire: "CRYPTO_SHORT_WIRE",
