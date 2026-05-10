@@ -58,6 +58,7 @@ import {
 } from "./lib/codeIntegrityEnhanced";
 import { resetAllReplayProtection } from "./lib/replayProtection";
 import { shutdownCryptoWorker } from "./lib/cryptoWorkerClient";
+import { clearSearchIndex } from "./lib/searchIndex";
 
 export type { Session };
 
@@ -126,6 +127,7 @@ export function App() {
     resetAllReplayProtection();
     clearVerificationKey();
     shutdownCryptoWorker();
+    clearSearchIndex();
     setSession(null);
   }, [session]);
 

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { idbListAllDm, idbListAllGroupMsgs } from "../lib/idb";
-import type { PlainPayload } from "../lib/crypto";
+import {
+  getOrBuildIndex,
+  search as searchIndex,
+} from "../lib/searchIndex";
 import { IconSearch, IconX } from "./Icons";
 
 type SearchHit = {
@@ -37,62 +39,45 @@ export function SearchPanel({
   );
 
   const performSearch = useCallback(async () => {
-    const normalized = query.toLowerCase().trim();
+    const normalized = query.trim();
     if (!normalized) {
       setResults([]);
       return;
     }
 
     setSearching(true);
-    const hits: SearchHit[] = [];
     try {
-      const dms = await idbListAllDm();
-      for (const msg of dms) {
-        let plain: PlainPayload;
-        try {
-          plain = JSON.parse(msg.plainJson) as PlainPayload;
-        } catch {
-          continue;
+      // Index lazy bauen (idempotent, einmal pro Session aus IDB rehydriert).
+      await getOrBuildIndex();
+      const hitDocs = searchIndex(normalized, { limit: 50 });
+      const hits: SearchHit[] = hitDocs.map((doc) => {
+        if (doc.scope === "dm") {
+          const peer = userById.get(doc.scopeId);
+          return {
+            key: `dm:${doc.id}`,
+            type: "dm",
+            peerId: doc.scopeId,
+            title: peer?.username ?? "Unbekannt",
+            preview: doc.body.slice(0, 140),
+            timestamp: doc.at,
+            cid: doc.cid,
+          };
         }
-        const body = (plain.body ?? "").toLowerCase();
-        if (!body.includes(normalized)) continue;
-        const peer = userById.get(msg.peerId);
-        hits.push({
-          key: `dm:${msg.id}`,
-          type: "dm",
-          peerId: msg.peerId,
-          title: peer?.username ?? "Unbekannt",
-          preview: (plain.body ?? "").slice(0, 140),
-          timestamp: msg.at,
-          cid: plain.cid ?? msg.id,
-        });
-      }
-
-      const groupMsgs = await idbListAllGroupMsgs();
-      for (const msg of groupMsgs) {
-        let plain: PlainPayload;
-        try {
-          plain = JSON.parse(msg.plainJson) as PlainPayload;
-        } catch {
-          continue;
-        }
-        const body = (plain.body ?? "").toLowerCase();
-        if (!body.includes(normalized)) continue;
-        const group = groupById.get(msg.groupId);
-        const sender = userById.get(msg.fromUserId);
-        hits.push({
-          key: `group:${msg.id}`,
+        const group = groupById.get(doc.scopeId);
+        const sender = doc.fromUserId
+          ? userById.get(doc.fromUserId)
+          : undefined;
+        return {
+          key: `group:${doc.id}`,
           type: "group",
-          groupId: msg.groupId,
+          groupId: doc.scopeId,
           title: `${group?.name ?? "Gruppe"} — ${sender?.username ?? "Unbekannt"}`,
-          preview: (plain.body ?? "").slice(0, 140),
-          timestamp: msg.at,
-          cid: plain.cid ?? msg.id,
-        });
-      }
-
-      hits.sort((a, b) => b.timestamp - a.timestamp);
-      setResults(hits.slice(0, 50));
+          preview: doc.body.slice(0, 140),
+          timestamp: doc.at,
+          cid: doc.cid,
+        };
+      });
+      setResults(hits);
     } finally {
       setSearching(false);
     }
