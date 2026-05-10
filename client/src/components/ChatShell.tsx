@@ -1542,8 +1542,45 @@ export function ChatShell({
     const interval = setInterval(() => {
       void flushOutbox();
     }, 15_000);
+
+    // Fast-Reconnect: wenn der Tab wieder sichtbar wird oder das Netz
+    // online ist, kürzen wir den exponential-backoff. Mobile pausiert
+    // Hintergrund-Tabs aggressiv — ohne diesen Hook braucht ein wieder-
+    // sichtbarer Tab bis zu 30s, bis der nächste Backoff-Tick reconnectet.
+    const triggerFastReconnect = (reason: string) => {
+      if (disposed) return;
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+      if (!reconnectTimer.current) return;
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+      reconnectAttempts.current = 0;
+      setReconnectAttempt(0);
+      // eslint-disable-next-line no-console
+      console.debug("[vaultchat:ws] fast_reconnect", { reason });
+      // Trigger sofortige Reconnect via close→re-open Pattern. ws.onclose
+      // wäre der reguläre Pfad — wir schedulen aber direkt für den nächsten
+      // Tick statt 1s exponential-backoff.
+      reconnectTimer.current = setTimeout(() => {
+        if (disposed) return;
+        const newWs = new WebSocket(getWsUrl());
+        wsRef.current = newWs;
+        newWs.onopen = ws.onopen;
+        newWs.onclose = ws.onclose;
+        newWs.onerror = ws.onerror;
+        newWs.onmessage = ws.onmessage;
+      }, 50);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") triggerFastReconnect("visible");
+    };
+    const onOnline = () => triggerFastReconnect("online");
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", onOnline);
+
     return () => {
       disposed = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("online", onOnline);
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
         reconnectTimer.current = null;
@@ -1551,7 +1588,7 @@ export function ChatShell({
       try {
         ws.close();
       } catch {
-        /* ignore */
+        /* socket already closing/closed */
       }
       clearInterval(interval);
       if (typingTimer.current) clearTimeout(typingTimer.current);
