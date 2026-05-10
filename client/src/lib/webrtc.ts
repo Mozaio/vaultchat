@@ -1,6 +1,27 @@
 import type { ApiUser } from "./api";
 import { getRtcConfig } from "./api";
 
+/**
+ * Strukturierter Logger für RTC-Edge-Cases.
+ * Bisher waren ICE/SDP-Fehler komplett silent (catch {}); damit Diagnose
+ * unmöglich. Wir loggen jetzt auf console.debug — zur Laufzeit unsichtbar
+ * für User, in DevTools sichtbar für Entwickler. Production-Build wird
+ * console.debug typischerweise sowieso droppen.
+ */
+function rtcDebug(evt: string, fields: Record<string, unknown> = {}) {
+  try {
+    // eslint-disable-next-line no-console
+    console.debug(`[vaultchat:rtc] ${evt}`, fields);
+  } catch {
+    /* noop */
+  }
+}
+
+function shortError(e: unknown): string {
+  if (e instanceof Error) return e.name + ": " + e.message.slice(0, 120);
+  return String(e).slice(0, 120);
+}
+
 export type RtcPayload =
   | { type: "offer"; sdp: string }
   | { type: "answer"; sdp: string }
@@ -68,8 +89,11 @@ async function addIceCandidateSafely(
   }
   try {
     await pc.addIceCandidate(candidate);
-  } catch {
-    /* ignore single bad candidate */
+  } catch (e) {
+    rtcDebug("ice_add_failed", {
+      err: shortError(e),
+      type: candidate.candidate?.split(" ")[7] ?? null,
+    });
   }
 }
 
@@ -79,13 +103,23 @@ async function flushPendingCandidates(
   relayOnly: boolean
 ) {
   const pending = pendingCandidates.splice(0);
+  let failed = 0;
   for (const candidate of pending) {
     if (relayOnly && !isRelayCandidate(candidate)) continue;
     try {
       await pc.addIceCandidate(candidate);
-    } catch {
-      /* ignore single bad candidate */
+    } catch (e) {
+      failed += 1;
+      rtcDebug("ice_flush_failed", {
+        err: shortError(e),
+      });
     }
+  }
+  if (failed > 0) {
+    rtcDebug("ice_flush_summary", {
+      total: pending.length,
+      failed,
+    });
   }
 }
 
@@ -290,8 +324,11 @@ export async function startCall(
             effectiveRelayOnly
           );
         }
-      } catch {
-        /* ignore single bad remote payload */
+      } catch (e) {
+        rtcDebug("remote_handle_failed", {
+          payloadType: payload.type,
+          err: shortError(e),
+        });
       }
     },
     addIce: async (c: RTCIceCandidateInit) => {
@@ -308,7 +345,7 @@ export async function startCall(
       try {
         pc.close();
       } catch {
-        /* noop */
+        /* close() may be a no-op on an already-closed pc; harmless */
       }
       onEnd();
     },
