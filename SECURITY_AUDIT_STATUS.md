@@ -71,19 +71,35 @@ Das ist der entscheidende Audit-Gap zu Signal/Element. Status pro Datei:
   Rotation kommt mit eigener ID dazu.
 - Tests prüfen VCG6-Magic-Detection.
 
-### Phase 4 — Aktivierung im Send-Pfad (separate Session)
-- ChatShell-Send-Pfad: bevorzuge `olmEncryptJson` wenn das PreKey-Bundle
-  des Empfängers `olm`-Felder hat, sonst fallback `drEncryptJson`.
-- `incomingDm.ts`: prüfe `isOlmCiphertext` vor `isDrCiphertext` und
-  route entsprechend.
-- Group-Send: `megolmEncryptGroup` mit Key-Distribution via Olm 1:1.
-- Migration-UI in Settings: "Krypto auf auditierte Olm-Schicht
-  umstellen" — bestehende Sessions werden neu ausgehandelt.
+### Phase 4 — Aktivierung im Send- und Receive-Pfad ✅ erledigt
+- **Boot-Pfad** in ChatShell publisht ab jetzt zusätzlich Olm-Identity +
+  50 Olm-OTKs in `/api/keys` über `buildUploadBodyWithOlm`.
+- **`sendDmWire`** versucht zuerst `olmEncryptJson` (VCO5-Wire) und
+  fällt bei `no_olm_bundle` auf DR v4 zurück (Bestandskompatibilität).
+- **`incomingDm`** prüft `isOlmCiphertext` als ersten Branch, vor allen
+  DR-Pfaden.
+- **`sendGroupWire`** verteilt vor dem eigentlichen Send einen
+  `megolm_session_key`-Frame an jeden neuen Member via Olm-1:1-DM,
+  encryptet die Nachricht dann via Megolm (VCG6). Pro Group wird
+  in-memory getrackt, an wen der Key schon ging.
+- **Group-Receive** prüft `isMegolmGroupCiphertext` und routet zu
+  `megolmDecryptGroup`. Bei fehlender Inbound-Session wird der Frame
+  in `pendingGroupCipherRef` gepuffert und nach Eintreffen des
+  `megolm_session_key`-DM neu verarbeitet.
+- **Member-Add/Remove** triggert `rotateForMemberRemoval(groupId)` und
+  leert das Distribution-Tracking — neuer Megolm-Session-Key wird
+  automatisch an alle verbleibenden Mitglieder verteilt. Ein
+  entfernter User kann zukünftige Frames nicht mehr lesen.
 
-### Phase 5 — Self-rolled Code löschen
+Fallback bleibt aktiv: existierende v4-DR-Sessions und GC2-Group-Ciphers
+werden weiter dekodiert, Sender fallen darauf nur zurück, wenn das
+Olm-Bundle fehlt.
+
+### Phase 5 — Self-rolled Code löschen (späterer Schritt)
 - `doubleRatchet.ts`, `x3dh.ts`, `groupCrypto.ts` werden gelöscht,
-  sobald keine v4-Session-Records mehr in lokalen DBs hängen (z.B.
-  nach 90 Tagen ohne v4-Roundtrip).
+  sobald sichtbar ist, dass keine v4/GC2-State-Records mehr in
+  lokalen DBs aktiv sind. Bis dahin bleibt der Fallback-Pfad als
+  Sicherheitsnetz für Bestandsdaten.
 
 ## Was bleibt auch nach allen Phasen selbst geschrieben
 

@@ -4,6 +4,14 @@ import * as api from "../lib/api";
 import { decryptIncomingSealedDmWithReplayCheck } from "../lib/incomingDm";
 import { drEncryptJsonForDm } from "../lib/drSession";
 import { olmEncryptJson } from "../lib/olmSession";
+import {
+  buildSessionKeyDistribution,
+  ingestSessionKey,
+  isMegolmGroupCiphertext,
+  megolmDecryptGroup,
+  megolmEncryptGroup,
+  rotateForMemberRemoval,
+} from "../lib/megolmSession";
 import { getWsUrl } from "../lib/wsUrl";
 import {
   fingerprintFromPublicKeyB64,
@@ -764,6 +772,11 @@ export function ChatShell({
     setGroupMessages(reduceChatMessages(raw));
   }, []);
 
+  // In-memory: an welche {groupId × memberId} haben wir den aktuellen Megolm-
+  // Session-Key schon via Olm-1:1 verschickt? Bei Rotation wird der Eintrag
+  // gelöscht (membership-add/remove/leave) und neu verteilt.
+  const megolmDistributedRef = useRef<Map<string, Set<string>>>(new Map());
+
   // Purge expired messages continuously so they disappear "live".
   useEffect(() => {
     const h = setInterval(() => {
@@ -1081,7 +1094,63 @@ export function ChatShell({
         return null;
       }
       const p: PlainPayload = { ...payload, senderUserId: session.user.id };
-      const ciphertext = await encryptGroupPayload(g.id, p);
+
+      // Phase 4: Megolm (auditiert) zuerst probieren. Bei Membership-Wechsel
+      // muss der Caller megolmDistributedRef für die Group bereinigen, dann
+      // wird der Key automatisch neu verteilt.
+      let ciphertext: string;
+      let usedMegolm = false;
+      try {
+        // 1) Session-Key-Distribution: an jeden Member, der ihn noch nicht
+        //    hat, ein Olm-1:1-DM mit kind:"megolm_session_key" schicken.
+        const distribution = await buildSessionKeyDistribution(g.id);
+        const sent = megolmDistributedRef.current.get(g.id) ?? new Set<string>();
+        const needed = g.memberIds.filter(
+          (mid) => mid !== session.user.id && !sent.has(mid)
+        );
+        for (const memberId of needed) {
+          const member = usersRef.current.find((u) => u.id === memberId);
+          if (!member) continue;
+          const keyPayload: PlainPayload = {
+            v: 2,
+            cid: newCid(),
+            kind: "megolm_session_key",
+            groupId: g.id,
+            megolmSessionId: distribution.sessionId,
+            megolmSessionKey: distribution.sessionKey,
+            senderUserId: session.user.id,
+          };
+          // Best-effort: ein fehlendes Mitglied (z.B. ohne Olm-Bundle)
+          // blockiert die Gruppe nicht. sendDmWire fällt selbst auf DR
+          // zurück, wenn der Empfänger noch kein Olm hat.
+          await sendDmWire(member, keyPayload, true).catch((err: unknown) => {
+            // eslint-disable-next-line no-console
+            console.debug("[vaultchat:megolm] dist_failed", {
+              member: memberId.slice(0, 8),
+              err: err instanceof Error ? err.message : String(err),
+            });
+          });
+          sent.add(memberId);
+        }
+        megolmDistributedRef.current.set(g.id, sent);
+        // 2) Eigentlicher Group-Frame via Megolm-Ratchet.
+        ciphertext = await megolmEncryptGroup(
+          g.id,
+          session.user.id,
+          JSON.stringify(p)
+        );
+        usedMegolm = true;
+      } catch (megolmErr) {
+        // Fallback auf den alten GC2-Pfad — z.B. wenn Olm-WASM nicht geladen
+        // werden konnte oder andere unerwartete Fehler.
+        // eslint-disable-next-line no-console
+        console.debug("[vaultchat:megolm] outbound_fail_fallback_gc2", {
+          groupId: g.id.slice(0, 8),
+          err: megolmErr instanceof Error ? megolmErr.message : String(megolmErr),
+        });
+        ciphertext = await encryptGroupPayload(g.id, p);
+      }
+
       const at = Date.now();
       const tmpId = `local-g-${newCid()}`;
       const ttl = p.ttlMs ?? 0;
@@ -1108,9 +1177,10 @@ export function ChatShell({
       }
       ws.send(JSON.stringify({ type: "group", groupId: g.id, ciphertext }));
       coverRef.current?.markRealActivity();
+      void usedMegolm; // Debug only
       return tmpId;
     },
-    [rebuildGroup, session.user.id]
+    [rebuildGroup, session.user.id, sendDmWire]
   );
 
   /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
@@ -1365,6 +1435,84 @@ export function ChatShell({
             if (!peerUser) return;
 
             const plain = dec.plain;
+            if (
+              plain.kind === "megolm_session_key" &&
+              plain.groupId &&
+              plain.megolmSessionId &&
+              plain.megolmSessionKey
+            ) {
+              // Megolm-Inbound-Session aus dem 1:1-Olm-Channel aufbauen.
+              try {
+                await ingestSessionKey(
+                  plain.groupId,
+                  dec.senderUserId,
+                  plain.megolmSessionKey
+                );
+              } catch (err) {
+                // eslint-disable-next-line no-console
+                console.debug("[vaultchat:megolm] ingest_failed", {
+                  groupId: plain.groupId.slice(0, 8),
+                  err: err instanceof Error ? err.message : String(err),
+                });
+                return;
+              }
+              // Pending VCG6-Cipher für diese Gruppe nochmal versuchen.
+              const pending = pendingGroupCipherRef.current.get(plain.groupId);
+              if (pending && pending.length > 0) {
+                pendingGroupCipherRef.current.delete(plain.groupId);
+                for (const buf of pending) {
+                  if (!isMegolmGroupCiphertext(buf.ciphertext)) {
+                    // Nicht-Megolm bleiben dem alten Pfad überlassen.
+                    const re = pendingGroupCipherRef.current.get(plain.groupId) ?? [];
+                    re.push(buf);
+                    pendingGroupCipherRef.current.set(plain.groupId, re);
+                    continue;
+                  }
+                  try {
+                    const r = await megolmDecryptGroup(plain.groupId, buf.ciphertext);
+                    const retried = JSON.parse(r.plaintext) as PlainPayload;
+                    if (!retried.senderUserId) retried.senderUserId = r.senderUuid;
+                    if (
+                      typeof retried.cid === "string" &&
+                      retried.cid.length > 0 &&
+                      isGroupMessageDuplicate(plain.groupId, retried.cid)
+                    ) {
+                      continue;
+                    }
+                    seen.current.add(buf.id);
+                    const fromUid = retried.senderUserId ?? "";
+                    await idbPutGroupMsg({
+                      id: buf.id,
+                      groupId: plain.groupId,
+                      fromUserId: fromUid,
+                      plainJson: JSON.stringify(retried),
+                      at: buf.createdAt,
+                      ...(retried.ttlMs
+                        ? { expiresAt: buf.createdAt + retried.ttlMs }
+                        : {}),
+                    });
+                    const arr = rawGroupRef.current.get(plain.groupId) ?? [];
+                    arr.push({
+                      id: buf.id,
+                      fromMe: false,
+                      fromUserId: fromUid,
+                      plainJson: JSON.stringify(retried),
+                      at: buf.createdAt,
+                      ...(retried.ttlMs
+                        ? { expiresAt: buf.createdAt + retried.ttlMs }
+                        : {}),
+                    });
+                    rawGroupRef.current.set(plain.groupId, arr);
+                    if (groupRef.current?.id === plain.groupId) {
+                      rebuildGroup(plain.groupId);
+                    }
+                  } catch {
+                    /* Frame bleibt verworfen */
+                  }
+                }
+              }
+              return;
+            }
             if (plain.kind === "group_key" && plain.groupId && plain.keyB64) {
               const keyBytes = uint8FromBase64(plain.keyB64);
               await setGroupKey(plain.groupId, keyBytes);
@@ -1494,10 +1642,20 @@ export function ChatShell({
             const ct = String(data.ciphertext);
             let plain: PlainPayload;
             try {
-              plain = await decryptGroupPayload(gid, ct);
+              // Phase 4: Megolm (auditiert, VCG6) zuerst probieren.
+              // Fallback auf den selbstgeschriebenen GC2-Pfad nur bei
+              // Bestandsdaten oder wenn die Olm-Schicht nicht verfügbar ist.
+              if (isMegolmGroupCiphertext(ct)) {
+                const r = await megolmDecryptGroup(gid, ct);
+                plain = JSON.parse(r.plaintext) as PlainPayload;
+                if (!plain.senderUserId) plain.senderUserId = r.senderUuid;
+              } else {
+                plain = await decryptGroupPayload(gid, ct);
+              }
             } catch {
-              // Buffer this ciphertext: the matching group_key DM may
-              // not have arrived yet. Retry on group_key arrival.
+              // Buffer this ciphertext: der passende Session-Key
+              // (megolm_session_key oder group_key) ist evtl. noch nicht
+              // angekommen. Wird beim Eintreffen erneut verarbeitet.
               const buf = pendingGroupCipherRef.current.get(gid) ?? [];
               if (buf.length < 256) {
                 buf.push({ id, ciphertext: ct, createdAt: Number(data.createdAt) || Date.now() });
@@ -2307,6 +2465,14 @@ export function ChatShell({
       setGroup(g2);
       await loadGroups();
       await rotateGroupKey(g2, g2.memberIds);
+      // Megolm-Rotation: neue Outbound + Distribution-Tracking leeren,
+      // damit der neue Key an alle (auch neue Mitglieder) verteilt wird.
+      try {
+        await rotateForMemberRemoval(g2.id);
+        megolmDistributedRef.current.delete(g2.id);
+      } catch {
+        /* Olm nicht verfügbar — alter Pfad bleibt aktiv */
+      }
       setAddMemberId("");
       await sendGroupSystemMessage(
         g2,
@@ -2330,6 +2496,14 @@ export function ChatShell({
       setGroup(g2);
       await loadGroups();
       await rotateGroupKey(g2, g2.memberIds);
+      // Megolm-Rotation: zwingender Schritt, sonst kann der entfernte
+      // Member auch zukünftige Frames mit dem alten Session-Key lesen.
+      try {
+        await rotateForMemberRemoval(g2.id);
+        megolmDistributedRef.current.delete(g2.id);
+      } catch {
+        /* Olm nicht verfügbar — alter Pfad bleibt aktiv */
+      }
       await sendGroupSystemMessage(
         g2,
         `${session.user.username} hat ${memberLabel} entfernt`
