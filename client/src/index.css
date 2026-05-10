@@ -6842,4 +6842,46 @@ button:focus-visible,
   background: currentColor;
 }
 
+/* ────────────────────────────────────────────────────────────
+   Accessibility primitives
+   ──────────────────────────────────────────────────────────── */
+
+/* Screen-reader only — visually hide while staying announceable. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus ring: sichtbar bei Tastaturnavigation, neutral bei Maus.
+   Tailwind focus-visible:ring-* tut das punktuell — wir setzen einen
+   konservativen globalen Fallback, damit kein interaktives Element
+   ohne Hinweis bleibt. */
+:focus-visible {
+  outline: 2px solid var(--accent, #0d9488);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* prefers-reduced-motion: alle dekorativen Animations- und
+   Transition-Längen praktisch auf 0 setzen. Wir schalten Animationen
+   nicht komplett aus (manche Komponenten brauchen einen Trigger), aber
+   der visuelle Effekt entfällt für Menschen mit Vestibulär-Sensitivität. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* End VAULTCHAT v4 */
