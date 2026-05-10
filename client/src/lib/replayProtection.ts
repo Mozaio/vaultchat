@@ -1,146 +1,92 @@
 /**
- * Anti-Replay-Schutz für VaultChat-Nachrichten
- * 
+ * Anti-Replay-Schutz für VaultChat-Nachrichten (clientseitig)
+ *
  * Verhindert Nachrichten-Replay-Angriffe durch:
- * - Client-seitige Duplicate-Detection mit kompaktem Set
- * - Message-ID basierte Prüfung mit Zeitfenster
- * - Automatisches Cleanup alter Einträge
- * 
- * Hinweis: Server-seitiger Sequence-Check wird separat empfohlen
- * (in wsHub.ts als Token-Bucket + weitere Maßnahmen)
+ * - Duplicate-Detection mit O(1)-Lookup über Map (vorher: O(n) Array-scan)
+ * - Insertion-Order-FIFO-Eviction (Map.keys() ist insertion-ordered, Spec)
+ * - Hard-Cap MAX_MESSAGE_IDS + Zeitfenster MESSAGE_WINDOW_MS
+ *
+ * Hinweis: Diese Schicht ist client-only. Ein vollwertiger Replay-Schutz
+ * benötigt zusätzlich serverseitige Sequence-Checks (siehe SECURITY_ROADMAP).
  */
 
-// Kompakte Set-Struktur für Message-IDs
-// Verwendet ein zeitbasiertes Fenster mit automatischer Bereinigung
-const MAX_MESSAGE_IDS = 1000; // Maximale Anzahl gespeicherter IDs
-const MESSAGE_WINDOW_MS = 5 * 60 * 1000; // 5 Minuten Fenster für Replay-Schutz
+const MAX_MESSAGE_IDS = 1000;
+const MESSAGE_WINDOW_MS = 5 * 60 * 1000;
 
-type MessageRecord = {
-  cid: string;
-  receivedAt: number;
-};
+const _seenAt = new Map<string, number>();
+const _groupSeen = new Map<string, Map<string, number>>();
 
-let _recentMessages: MessageRecord[] = [];
+function pruneOnInsert(map: Map<string, number>, now: number) {
+  // Zeitfenster zuerst: alte Einträge löschen, solange das älteste Element
+  // (= erste Map-Iteration, weil insertion-ordered) abgelaufen ist.
+  const cutoff = now - MESSAGE_WINDOW_MS;
+  for (const [k, ts] of map) {
+    if (ts > cutoff) break;
+    map.delete(k);
+  }
+  // Hard-Cap: ältester Eintrag fliegt raus.
+  while (map.size >= MAX_MESSAGE_IDS) {
+    const oldest = map.keys().next();
+    if (oldest.done) break;
+    map.delete(oldest.value);
+  }
+}
 
 /**
  * Prüft ob eine Message-ID bereits verarbeitet wurde.
  * @param cid Client-generierte Message-ID
- * @returns true wenn Duplikat, false wenn neu
+ * @returns true wenn Duplikat, false wenn neu (und nun gemerkt)
  */
 export function isMessageDuplicate(cid: string): boolean {
+  if (_seenAt.has(cid)) return true;
   const now = Date.now();
-  
-  // Prüfe ob ID bereits existiert
-  const exists = _recentMessages.some((r) => r.cid === cid);
-  if (exists) {
-    return true;
-  }
-  
-  // Füge neue ID hinzu
-  _recentMessages.push({
-    cid,
-    receivedAt: now,
-  });
-  
-  // Cleanup alter Einträge
-  cleanupOldMessages(now);
-  
+  pruneOnInsert(_seenAt, now);
+  _seenAt.set(cid, now);
   return false;
 }
 
 /**
- * Prüft und markiert eine Message-ID als verarbeitet (atomar).
- * @param cid Client-generierte Message-ID
- * @returns true wenn Duplikat (sollte verworfen werden), false wenn neu
+ * Alias zu isMessageDuplicate für API-Kompatibilität.
  */
 export function checkAndMarkMessage(cid: string): boolean {
-  if (isMessageDuplicate(cid)) {
-    return true; // Duplikat
-  }
-  return false; // Neu
+  return isMessageDuplicate(cid);
 }
 
 /**
- * Bereinigt alte Message-IDs außerhalb des Zeitfensters.
- */
-function cleanupOldMessages(now: number): void {
-  const cutoff = now - MESSAGE_WINDOW_MS;
-  
-  // Alte Einträge entfernen
-  const before = _recentMessages.length;
-  _recentMessages = _recentMessages.filter((r) => r.receivedAt > cutoff);
-  
-  // Falls Set zu groß wird, älteste entfernen
-  if (_recentMessages.length > MAX_MESSAGE_IDS) {
-    _recentMessages = _recentMessages
-      .sort((a, b) => b.receivedAt - a.receivedAt)
-      .slice(0, MAX_MESSAGE_IDS);
-  }
-}
-
-/**
- * Setzt die Replay-Protection zurück (z.B. bei Lock).
+ * Setzt die globale Replay-Protection zurück (z.B. bei Lock).
  */
 export function resetReplayProtection(): void {
-  _recentMessages = [];
+  _seenAt.clear();
 }
 
 /**
- * Gibt Statistiken zurück (für Debugging).
+ * Stats für Debugging.
  */
 export function getReplayStats(): { stored: number; windowMs: number } {
-  return {
-    stored: _recentMessages.length,
-    windowMs: MESSAGE_WINDOW_MS,
-  };
+  return { stored: _seenAt.size, windowMs: MESSAGE_WINDOW_MS };
 }
 
 /**
- * Gruppenspezifische Replay-Protection.
- * Hält separate Sets pro Gruppe.
+ * Gruppenspezifischer Replay-Schutz mit eigener Map pro Gruppe.
  */
-const _groupMessages = new Map<string, MessageRecord[]>();
-
 export function isGroupMessageDuplicate(groupId: string, messageId: string): boolean {
+  let map = _groupSeen.get(groupId);
+  if (!map) {
+    map = new Map<string, number>();
+    _groupSeen.set(groupId, map);
+  }
+  if (map.has(messageId)) return true;
   const now = Date.now();
-  let messages = _groupMessages.get(groupId);
-  
-  if (!messages) {
-    messages = [];
-    _groupMessages.set(groupId, messages);
-  }
-  
-  const exists = messages.some((r) => r.cid === messageId);
-  if (exists) {
-    return true;
-  }
-  
-  messages.push({
-    cid: messageId,
-    receivedAt: now,
-  });
-  
-  // Cleanup
-  const cutoff = now - MESSAGE_WINDOW_MS;
-  _groupMessages.set(
-    groupId,
-    messages.filter((r) => r.receivedAt > cutoff)
-  );
-  
+  pruneOnInsert(map, now);
+  map.set(messageId, now);
   return false;
 }
 
-/**
- * Setzt gruppenspezifische Replay-Protection zurück.
- */
 export function resetGroupReplayProtection(groupId: string): void {
-  _groupMessages.delete(groupId);
+  _groupSeen.delete(groupId);
 }
 
-/**
- * Setzt alle Replay-Protection-Daten zurück.
- */
 export function resetAllReplayProtection(): void {
-  _recentMessages = [];
-  _groupMessages.clear();
+  _seenAt.clear();
+  _groupSeen.clear();
 }
