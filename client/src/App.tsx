@@ -36,6 +36,49 @@ function ChunkFallback({ label }: { label: string }) {
     </div>
   );
 }
+
+/**
+ * Error-Boundary für die Suspense-Chunks. Wenn der dynamic import scheitert
+ * (Network-Drop während Cold-Start, oder eine gepushte Datei fehlt im
+ * Render-Bundle), würde React ohne dies in einen ewigen Suspense-Loop
+ * gehen. Diese Boundary fängt es ab und bietet einen "Erneut versuchen"-
+ * Knopf, der die Seite reloadet (Chunk-Cache wird invalidiert).
+ */
+class ChunkErrorBoundary extends React.Component<
+  { children: React.ReactNode; label: string },
+  { err: Error | null }
+> {
+  state = { err: null as Error | null };
+  static getDerivedStateFromError(err: Error) {
+    return { err };
+  }
+  componentDidCatch(err: Error) {
+    // eslint-disable-next-line no-console
+    console.error("[vaultchat] chunk load failed", err);
+  }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (
+      <div className="chunk-fallback" role="alert">
+        <p style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}>
+          {this.props.label} konnte nicht geladen werden.
+        </p>
+        <p style={{ fontSize: "0.78rem", textAlign: "center", maxWidth: "32rem" }}>
+          Vermutlich ist die Netzwerk-Verbindung kurz weg oder ein neuer Build
+          ist gerade live. Ein Reload sollte das beheben.
+        </p>
+        <button
+          type="button"
+          onClick={() => location.reload()}
+          className="auth-button"
+          style={{ maxWidth: "12rem", marginTop: "0.5rem" }}
+        >
+          Neu laden
+        </button>
+      </div>
+    );
+  }
+}
 import { idbPurgeExpired, setIdbAccountScope } from "./lib/idb";
 import {
   loadAutoLockMinutes,
@@ -318,6 +361,7 @@ export function App() {
           }}
         >
           <div className="flex flex-1 items-center justify-center">
+            <ChunkErrorBoundary label="Login">
             <Suspense fallback={<ChunkFallback label="Login wird geladen …" />}>
               <AuthPanel
                 onSession={async (s, local) => {
@@ -337,6 +381,7 @@ export function App() {
                 }}
               />
             </Suspense>
+            </ChunkErrorBoundary>
           </div>
         </AppErrorBoundary>
       </div>
@@ -389,17 +434,19 @@ export function App() {
         }}
       >
         <div className="flex flex-1 min-h-0">
-          <Suspense fallback={<ChunkFallback label="Chat wird geladen …" />}>
-            <ChatShell
-              session={session!}
-              onLogout={() => {
-                clearToken();
-                clearLocalIdentity();
-                lock();
-              }}
-              onLock={lock}
-            />
-          </Suspense>
+          <ChunkErrorBoundary label="Chat">
+            <Suspense fallback={<ChunkFallback label="Chat wird geladen …" />}>
+              <ChatShell
+                session={session!}
+                onLogout={() => {
+                  clearToken();
+                  clearLocalIdentity();
+                  lock();
+                }}
+                onLock={lock}
+              />
+            </Suspense>
+          </ChunkErrorBoundary>
         </div>
       </AppErrorBoundary>
     </div>
