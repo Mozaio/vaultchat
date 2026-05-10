@@ -20,6 +20,18 @@ type OlmModule = typeof import("@matrix-org/olm");
 type OlmAccount = InstanceType<OlmModule["Account"]>;
 type OlmSession = InstanceType<OlmModule["Session"]>;
 
+/**
+ * @matrix-org/olm's bundled JS liest beim Start `OLM_OPTIONS` aus dem
+ * globalen Scope (Emscripten-Pattern). In modernen ESM-/strict-Kontexten
+ * wirft das `ReferenceError: OLM_OPTIONS is not defined`, weil keine
+ * implizit-globalen Variablen mehr existieren. Fix: leeres Default-Objekt
+ * setzen, BEVOR der dynamic-import resolved.
+ *
+ * Idempotent dank `??=` — falls jemand vorher schon Optionen reingesteckt
+ * hat (z.B. Tests), respektieren wir die.
+ */
+(globalThis as { OLM_OPTIONS?: Record<string, unknown> }).OLM_OPTIONS ??= {};
+
 let _olm: OlmModule | null = null;
 let _initPromise: Promise<OlmModule> | null = null;
 
