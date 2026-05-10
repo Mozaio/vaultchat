@@ -3,6 +3,7 @@ import type { Session } from "../lib/sessionHelpers";
 import * as api from "../lib/api";
 import { decryptIncomingSealedDmWithReplayCheck } from "../lib/incomingDm";
 import { drEncryptJsonForDm } from "../lib/drSession";
+import { olmEncryptJson } from "../lib/olmSession";
 import { getWsUrl } from "../lib/wsUrl";
 import {
   fingerprintFromPublicKeyB64,
@@ -41,11 +42,11 @@ import {
 import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import { isGroupMessageDuplicate } from "../lib/replayProtection";
 import {
+  buildUploadBodyWithOlm,
   generateKeyMaterial,
   loadKeyMaterial,
   replenishOneTimePreKeys,
   saveKeyMaterial,
-  toUploadBody,
 } from "../lib/keyStore";
 import { encryptIdentityBackup } from "../lib/backup";
 import { loadLocalIdentity } from "../lib/localIdentity";
@@ -712,7 +713,10 @@ export function ChatShell({
           km = replenished;
           await saveKeyMaterial(km);
         }
-        await api.uploadPreKeys(session.token, toUploadBody(km));
+        // Olm-Material wird parallel ins Bundle gepackt — der auditierte
+        // VCO5-Pfad ist ab jetzt der Default für neue Sessions.
+        const body = await buildUploadBodyWithOlm(km);
+        await api.uploadPreKeys(session.token, body);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("[vaultchat] prekey upload", e);
@@ -942,19 +946,42 @@ export function ChatShell({
         setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
         return null;
       }
-      const encrypted = await drEncryptJsonForDm(
-        session.secretKey,
-        toUser.id,
-        toUser.publicKey,
-        JSON.stringify(payload),
-        tokenRef.current
-      );
+      // Phase 4: Olm (auditiert, Matrix.org) ist der Default-Pfad. Fällt
+      // automatisch auf den selbstgeschriebenen DR v4 zurück, wenn der
+      // Empfänger noch kein Olm-Bundle publishet hat (Legacy-Kompatibilität).
+      let innerB64: string;
+      let usedLegacyDh = false;
+      try {
+        innerB64 = await olmEncryptJson(
+          toUser.id,
+          tokenRef.current,
+          JSON.stringify(payload)
+        );
+      } catch (olmErr) {
+        const reason = olmErr instanceof Error ? olmErr.message : String(olmErr);
+        if (reason !== "no_olm_bundle") {
+          // eslint-disable-next-line no-console
+          console.debug("[vaultchat:olm] outbound_fail_fallback_dr", {
+            peer: toUser.id.slice(0, 8),
+            err: reason.slice(0, 120),
+          });
+        }
+        const encrypted = await drEncryptJsonForDm(
+          session.secretKey,
+          toUser.id,
+          toUser.publicKey,
+          JSON.stringify(payload),
+          tokenRef.current
+        );
+        innerB64 = encrypted.innerB64;
+        usedLegacyDh = encrypted.mode === "legacy";
+      }
       const envelope = await sealSender(
         session.user.id,
-        encrypted.innerB64,
+        innerB64,
         toUser.publicKey
       );
-      if (encrypted.mode === "legacy") {
+      if (usedLegacyDh) {
         setError("Legacy-DH-Fallback genutzt: Prekey-Bundle des Kontakts nicht verfügbar.");
       }
       const cid = newCid();

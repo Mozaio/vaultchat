@@ -153,6 +153,38 @@ export function toUploadBody(km: LocalKeyMaterial) {
   };
 }
 
+/**
+ * Erweitert das Upload-Body mit der auditierten Olm-Identity + One-Time-Keys.
+ * Wird beim Boot zusätzlich zu toUploadBody aufgerufen — sender kann dann
+ * den VCO5/Olm-Pfad wählen.
+ *
+ * Lazy: holt Olm-Account via olmSessionStore (eigenständig persistiert).
+ */
+export async function buildUploadBodyWithOlm(
+  km: LocalKeyMaterial
+): Promise<ReturnType<typeof toUploadBody> & {
+  olm: {
+    identityCurve25519: string;
+    identityEd25519: string;
+    oneTimeKeys: { keyId: string; publicKey: string }[];
+  };
+}> {
+  const base = toUploadBody(km);
+  const { getOlmPublishBundle } = await import("./olmSessionStore");
+  const olm = await getOlmPublishBundle(50);
+  return {
+    ...base,
+    olm: {
+      identityCurve25519: olm.identityCurve25519,
+      identityEd25519: olm.identityEd25519,
+      oneTimeKeys: Object.entries(olm.oneTimeKeys).map(([keyId, publicKey]) => ({
+        keyId,
+        publicKey,
+      })),
+    },
+  };
+}
+
 export async function getOneTimePreKeySk(
   km: LocalKeyMaterial,
   keyId: number

@@ -8,6 +8,7 @@ import {
   isDmBundleFrame,
   isX3dhPreKeyFrame,
 } from "./drSession";
+import { isOlmCiphertext, olmDecryptJson } from "./olmSession";
 import { openSealedEnvelope } from "./sealedSender";
 import { isMessageDuplicate } from "./replayProtection";
 import { logSilentCryptoFailure } from "./errors";
@@ -54,7 +55,12 @@ export async function decryptIncomingSealedDm(
 
   let plain: PlainPayload;
   try {
-    if (isDmBundleFrame(innerB64)) {
+    // Olm-Wire (VCO5) zuerst — der auditierte Pfad ist Default.
+    // Falls vorhanden, geht alles andere am Sender vorbei.
+    if (isOlmCiphertext(innerB64)) {
+      const json = await olmDecryptJson(peer.id, innerB64);
+      plain = JSON.parse(json) as PlainPayload;
+    } else if (isDmBundleFrame(innerB64)) {
       const json = await drDecryptDmBundleJson(
         session.secretKey,
         peer.id,

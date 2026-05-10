@@ -110,6 +110,7 @@ export type PlainPayload = {
     | "file"
     | "voice"
     | "group_key"
+    | "megolm_session_key"
     | "reaction"
     | "edit"
     | "delete"
@@ -158,6 +159,11 @@ export type PlainPayload = {
   keyB64?: string;
   /** Sender ephemeral public key für Gruppen-PFS */
   senderEphemeral?: string;
+  /** Nur bei kind === "megolm_session_key": Megolm-Sitzungs-ID + Session-Key
+   *  des Senders. Empfänger ruft `ingestSessionKey` auf, um eine
+   *  InboundGroupSession aufzubauen. */
+  megolmSessionId?: string;
+  megolmSessionKey?: string;
   /**
    * Für Gruppen-Sealed-Sender: der Absender ist in der E2EE-Payload enthalten,
    * nicht im server-sichtbaren Group-Frame. Für DMs wird der Absender per
