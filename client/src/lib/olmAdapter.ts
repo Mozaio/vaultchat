@@ -26,12 +26,20 @@ let _initPromise: Promise<OlmModule> | null = null;
 /**
  * Lädt @matrix-org/olm dynamisch + wartet auf Olm.init() (WASM-Bootstrap).
  * Idempotent.
+ *
+ * `locateFile` tells the olm-WASM-Bootstrapper, wo er die `olm.wasm`-Datei
+ * findet. Vite emittiert die JS-Loader-Datei nach `/assets/olm-HASH.js`,
+ * aber die wasm-Datei wird über unseren `vaultchat-copy-olm-wasm`-Plugin
+ * separat nach `/olm.wasm` kopiert. Ohne den expliziten Override würde
+ * Olm relativ zum loader-Pfad nach `/assets/olm.wasm` suchen — die Datei
+ * existiert dort nicht, der SPA-Fallback liefert `<!doctype html>`
+ * zurück und WebAssembly.instantiate failed mit "expected magic word
+ * 00 61 73 6d, found 3c 21 64 6f".
  */
 export async function olmInit(): Promise<OlmModule> {
   if (_olm) return _olm;
   if (_initPromise) return _initPromise;
   _initPromise = (async () => {
-    // Dynamic import, damit der olm-WASM-Chunk nicht im Main-Bundle landet.
     const mod = (await import("@matrix-org/olm")) as unknown as OlmModule & {
       default?: OlmModule;
     };
@@ -39,7 +47,9 @@ export async function olmInit(): Promise<OlmModule> {
     if (typeof olm.init !== "function") {
       throw new Error("olm_module_missing_init");
     }
-    await olm.init();
+    await (olm.init as (opts?: { locateFile?: (f: string) => string }) => Promise<void>)({
+      locateFile: () => "/olm.wasm",
+    });
     _olm = olm;
     return olm;
   })();

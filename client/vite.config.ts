@@ -1,7 +1,9 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { defineConfig } from "vite";
+import { dirname, join } from "node:path";
+import { defineConfig, type Plugin } from "vite";
 import { vaultchatSri } from "./vite-plugin-sri";
 
 // Sumo-Variante: CJS unter dist/modules-sumo/ — schlanke "libsodium-wrappers"
@@ -10,8 +12,36 @@ import { vaultchatSri } from "./vite-plugin-sri";
 const nodeRequire = createRequire(import.meta.url);
 const libsodiumSumoPath = nodeRequire.resolve("libsodium-wrappers-sumo");
 
+/**
+ * @matrix-org/olm liefert eine olm.wasm-Datei neben seinem JS-Modul.
+ * Vite zieht das JS in den Bundle, vergisst aber die wasm-Datei — also
+ * kopieren wir sie explizit nach dist/ als /olm.wasm. olmAdapter.ts ruft
+ * dann `Olm.init({ locateFile: () => "/olm.wasm" })`.
+ */
+function copyOlmWasm(): Plugin {
+  return {
+    name: "vaultchat-copy-olm-wasm",
+    apply: "build",
+    closeBundle() {
+      const olmJs = nodeRequire.resolve("@matrix-org/olm");
+      const wasmSrc = join(dirname(olmJs), "olm.wasm");
+      if (!existsSync(wasmSrc)) {
+        // eslint-disable-next-line no-console
+        console.warn("[vaultchat] olm.wasm nicht gefunden bei", wasmSrc);
+        return;
+      }
+      const distDir = join(process.cwd(), "dist");
+      if (!existsSync(distDir)) mkdirSync(distDir, { recursive: true });
+      const wasmDst = join(distDir, "olm.wasm");
+      copyFileSync(wasmSrc, wasmDst);
+      // eslint-disable-next-line no-console
+      console.log("[vaultchat-copy-olm-wasm] copied", wasmSrc, "→", wasmDst);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), vaultchatSri()],
+  plugins: [react(), tailwindcss(), copyOlmWasm(), vaultchatSri()],
   resolve: {
     alias: {
       "libsodium-wrappers-sumo": libsodiumSumoPath,
