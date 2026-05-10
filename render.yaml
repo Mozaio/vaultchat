@@ -82,7 +82,11 @@ services:
     headers:
       - path: /*
         name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://vaultchat-server-g0p2.onrender.com wss://vaultchat-server-g0p2.onrender.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'"
+        # wasm-unsafe-eval ist nötig für libsodium-wrappers-sumo (Argon2-WASM)
+        # und @matrix-org/olm (Olm-WASM, auditierte DR/Megolm-Implementation).
+        # Beide Module instanziieren das WASM-Modul über `WebAssembly.instantiate`,
+        # was unter aktueller Browser-Auslegung wasm-unsafe-eval verlangt.
+        value: "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; script-src-attr 'none'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://vaultchat-server-g0p2.onrender.com wss://vaultchat-server-g0p2.onrender.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; manifest-src 'self'"
       - path: /*
         name: Strict-Transport-Security
         value: max-age=63072000; includeSubDomains; preload

@@ -9,6 +9,11 @@ Sicherheitsorientierter **Browser-Chat** mit selbstentwickeltem **Double Ratchet
 **Ehrlicher Anspruch:** kein auditierter Signal-Ersatz. Siehe [`THREAT_MODEL.md`](./THREAT_MODEL.md).
 Produktions-Gates und der Weg aus dem Demo-/Preview-Modus sind in [`PRODUCT_READINESS.md`](./PRODUCT_READINESS.md) dokumentiert.
 
+**Audit-Status der Krypto** ist in [`SECURITY_AUDIT_STATUS.md`](./SECURITY_AUDIT_STATUS.md) detailliert aufgeschlüsselt:
+- ✅ Primitiven (libsodium, ML-KEM via noble, Argon2) — formal auditiert.
+- ⚠️ Selbstgeschriebene DR/X3DH/Group-Logik — nicht extern auditiert.
+- 🛣 **Olm/Megolm-Foundation eingebaut** (`@matrix-org/olm`, NCC Group 2016/2020 + Quarkslab 2024 auditiert) — Migration in Phasen geplant, siehe Status-Dokument.
+
 ## Feature-Übersicht
 
 | Bereich | Status |
@@ -83,7 +88,8 @@ docker compose up --build
 ## Sicherheitsprimitive
 
 - **Identität**: X25519-Keypair, Secret mit Argon2id-abgeleitetem Key + `crypto_secretbox` gewickelt.
-- **Double Ratchet v4**: libsodium-basierte Eigen­implementierung. Symmetrische BLAKE2b-Kette (Forward Secrecy), DH-Ratchet pro neuem Peer-Public-Key (Post-Compromise Security), AEAD über `crypto_aead_xchacha20poly1305_ietf` mit Header-Binding via AAD (Magic, Flags, Ratchet-Pub, Counter). Domain-getrennte KDFs (`vaultchat-dr-v4-*`).
+- **Olm + Megolm (Foundation, Migration in Phasen)**: `@matrix-org/olm` ist als Dependency drin. Olm ist Matrix.orgs DR-Implementation, auditiert von NCC Group 2016 + 2020 und Quarkslab 2024. Die Adapter (`lib/olmAdapter.ts`, `lib/megolmAdapter.ts`) sind eingebaut und tested, aber der ChatShell-Send-Pfad nutzt sie noch nicht (siehe [`SECURITY_AUDIT_STATUS.md`](./SECURITY_AUDIT_STATUS.md)).
+- **Double Ratchet v4** *(aktueller Pfad, eigene Implementation, Migration zu Olm geplant)*: libsodium-basiert. Symmetrische BLAKE2b-Kette (Forward Secrecy), DH-Ratchet pro neuem Peer-Public-Key (Post-Compromise Security), AEAD über `crypto_aead_xchacha20poly1305_ietf` mit Header-Binding via AAD (Magic, Flags, Ratchet-Pub, Counter). Domain-getrennte KDFs (`vaultchat-dr-v4-*`).
 - **PQXDH-v1 Hybrid-Handshake**: Neue Sessions verwenden, wenn beide Clients es unterstuetzen, X3DH plus ML-KEM-1024 aus `@noble/post-quantum`. Das hybride Secret initialisiert weiterhin den bestehenden Double Ratchet. Alte Bundles ohne PQ-Key fallen automatisch auf X3DH zurueck.
 - **Sealed Sender**: Jede DM wird vor dem Versand in `crypto_box_seal(recipient_pk, HEADER||sender_uuid||len||inner)` gewrappt. Der Relay-Server sieht nur `toUserId` + Envelope.
 - **Sealed Group Sender**: Gruppenframes haben kein `fromUserId` im Transport. Der Absender liegt verschlüsselt in der Payload (`senderUserId`).

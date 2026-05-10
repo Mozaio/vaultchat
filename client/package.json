@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "tsx --test src/lib/cryptoCore.test.ts src/lib/backup.test.ts src/lib/messagePreview.test.ts",
+    "test": "tsx --test src/lib/cryptoCore.test.ts src/lib/backup.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/x3dh.test.ts src/lib/doubleRatchet.property.test.ts src/lib/olmAdapter.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@matrix-org/olm": "^3.2.15",
     "@noble/post-quantum": "^0.6.1",
     "libsodium-wrappers-sumo": "^0.7.15",
     "react": "^19.0.0",

@@ -101,7 +101,9 @@ app.use(
       useDefaults: false,
       directives: {
         "default-src": ["'self'"],
-        "script-src": ["'self'"],
+        // wasm-unsafe-eval erforderlich für libsodium-wrappers-sumo (Argon2-WASM)
+        // und @matrix-org/olm (Olm/Megolm WASM, auditierte Krypto-Implementation).
+        "script-src": ["'self'", "'wasm-unsafe-eval'"],
         "script-src-attr": ["'none'"],
         "style-src": ["'self'"],
         "style-src-attr": ["'unsafe-inline'"],

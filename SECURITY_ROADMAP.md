@@ -4,6 +4,12 @@ VaultChat remains a browser-first app. That means every page load can receive ne
 JavaScript from the host, so claims must stay below audited native messengers
 until the release pipeline changes.
 
+For the **per-component audit status** (which libs are audited, which
+code paths are still self-rolled), see [`SECURITY_AUDIT_STATUS.md`](./SECURITY_AUDIT_STATUS.md).
+That document also describes the planned migration to **Olm + Megolm**
+(auditeted DR/Group implementations from Matrix.org) over the
+self-rolled `doubleRatchet.ts` / `x3dh.ts` / `groupCrypto.ts`.
+
 ## Native And Signed Releases
 
 1. Extract a shared crypto core used by web, desktop, and mobile clients.

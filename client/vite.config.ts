@@ -19,6 +19,12 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["libsodium-wrappers-sumo"],
+    // @matrix-org/olm wird über dynamic import in lib/olmAdapter.ts geladen.
+    // Wir EXCLUDIEREN es bewusst aus optimizeDeps — Vite würde sonst die
+    // WASM-Datei via fetch zur Build-Zeit auflösen und das Modul in den
+    // Hauptbundle ziehen, was den Initial-Bundle aufbläht obwohl die meisten
+    // Sessions Olm (noch) nicht aktiv nutzen.
+    exclude: ["@matrix-org/olm"],
   },
   server: {
     port: 5173,
