@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { sodiumReady, getSodium } from "./lib/sodium";
 import {
   clearLocalIdentity,
@@ -8,8 +15,23 @@ import {
 } from "./lib/localIdentity";
 import { clearLocalKey, setLocalKeyFromSecret } from "./lib/localKey";
 import type { Session } from "./lib/sessionHelpers";
-import { AuthPanel } from "./components/AuthPanel";
-import { ChatShell } from "./components/ChatShell";
+// Route-level Code-Splitting: AuthPanel + ChatShell wandern in eigene Chunks,
+// damit der Initial-Bundle für Splash + Sodium-Boot klein bleibt.
+const AuthPanel = lazy(() =>
+  import("./components/AuthPanel").then((m) => ({ default: m.AuthPanel }))
+);
+const ChatShell = lazy(() =>
+  import("./components/ChatShell").then((m) => ({ default: m.ChatShell }))
+);
+
+function ChunkFallback({ label }: { label: string }) {
+  return (
+    <div className="boot-loader" role="status" aria-live="polite">
+      <div className="boot-loader-spinner" aria-hidden />
+      <p>{label}</p>
+    </div>
+  );
+}
 import { idbPurgeExpired, setIdbAccountScope } from "./lib/idb";
 import {
   loadAutoLockMinutes,
@@ -185,23 +207,25 @@ export function App() {
           }}
         >
           <div className="flex flex-1 items-center justify-center">
-            <AuthPanel
-              onSession={async (s, local) => {
-                saveToken(s.token);
-                saveLocalIdentity(local);
-                await setLocalKeyFromSecret(s.secretKey);
-                setIdbAccountScope(s.user.id);
+            <Suspense fallback={<ChunkFallback label="Login wird geladen …" />}>
+              <AuthPanel
+                onSession={async (s, local) => {
+                  saveToken(s.token);
+                  saveLocalIdentity(local);
+                  await setLocalKeyFromSecret(s.secretKey);
+                  setIdbAccountScope(s.user.id);
 
-                // Verification-Key setzen, aber bei pinned_mismatch nur warnen
-                // (der rote Integrity-Banner bleibt sichtbar als Warnung)
-                await setVerificationKey(s.secretKey);
-                registerKeyForProtection(s.secretKey);
-                startPeriodicWipe();
+                  // Verification-Key setzen, aber bei pinned_mismatch nur warnen
+                  // (der rote Integrity-Banner bleibt sichtbar als Warnung)
+                  await setVerificationKey(s.secretKey);
+                  registerKeyForProtection(s.secretKey);
+                  startPeriodicWipe();
 
-                await idbPurgeExpired().catch(() => {});
-                setSession(s);
-              }}
-            />
+                  await idbPurgeExpired().catch(() => {});
+                  setSession(s);
+                }}
+              />
+            </Suspense>
           </div>
         </AppErrorBoundary>
       </div>
@@ -242,15 +266,17 @@ export function App() {
         }}
       >
         <div className="flex flex-1 min-h-0">
-          <ChatShell
-            session={session!}
-            onLogout={() => {
-              clearToken();
-              clearLocalIdentity();
-              lock();
-            }}
-            onLock={lock}
-          />
+          <Suspense fallback={<ChunkFallback label="Chat wird geladen …" />}>
+            <ChatShell
+              session={session!}
+              onLogout={() => {
+                clearToken();
+                clearLocalIdentity();
+                lock();
+              }}
+              onLock={lock}
+            />
+          </Suspense>
         </div>
       </AppErrorBoundary>
     </div>
