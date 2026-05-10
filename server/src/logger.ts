@@ -73,16 +73,41 @@ export const log = {
 /**
  * Express-Middleware: loggt jeden Request mit Methode, Pfad, Status, Dauer.
  * Nur Pfad, kein Query-String (kann sensibles enthalten — z.B. ?q=...).
+ *
+ * Plus Request-ID: jeder Request bekommt eine kurze, eindeutige ID
+ * (X-Request-Id falls vom Client/Render gesetzt, sonst random base36).
+ * Die ID liegt als req.id auf jedem Request-Objekt und wird in
+ * http_request mit-geloggt — Operations kann dann einen Bug-Report
+ * "ich habe um 14:32 Uhr versucht zu registrieren" mit den passenden
+ * Log-Zeilen korrelieren ohne reine Zeitstempel zu raten.
  */
 import type { Request, Response, NextFunction } from "express";
+import { randomUUID } from "node:crypto";
+
+declare module "express-serve-static-core" {
+  interface Request {
+    id?: string;
+  }
+}
+
+function makeRequestId(req: Request): string {
+  const incoming = req.header("x-request-id");
+  if (incoming && /^[A-Za-z0-9-]{4,64}$/.test(incoming)) return incoming;
+  // Kurze ID: erste 12 Zeichen einer UUID ohne Bindestriche reichen für
+  // Korrelation im 5-min-Fenster, sind aber lesbar im Log.
+  return randomUUID().replace(/-/g, "").slice(0, 12);
+}
 
 export function requestLogger(req: Request, res: Response, next: NextFunction) {
   const start = Date.now();
+  req.id = makeRequestId(req);
+  res.setHeader("X-Request-Id", req.id);
   res.on("finish", () => {
     // /healthz und /readyz sind Render-Polls und würden den Log-Stream
     // mit Lärm fluten — die zählen wir auf debug.
     const isProbe = req.path === "/healthz" || req.path === "/readyz";
     log[isProbe ? "debug" : "info"]("http_request", {
+      reqId: req.id,
       method: req.method,
       path: req.path,
       status: res.statusCode,
