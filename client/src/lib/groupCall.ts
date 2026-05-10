@@ -34,6 +34,20 @@
 import type { ApiUser } from "./api";
 import { loadRtcConfig, type RtcPayload } from "./webrtc";
 
+/** Diagnostic-only debug logger for the group-call mesh. */
+function gcDebug(evt: string, fields: Record<string, unknown> = {}) {
+  try {
+    // eslint-disable-next-line no-console
+    console.debug(`[vaultchat:groupCall] ${evt}`, fields);
+  } catch {
+    /* noop */
+  }
+}
+function shortErr(e: unknown): string {
+  if (e instanceof Error) return e.name + ": " + e.message.slice(0, 120);
+  return String(e).slice(0, 120);
+}
+
 /** Wire-format announcement carried inside the encrypted group payload. */
 export type VoiceAnnounce =
   | { kind: "voice_join"; from: string; at: number }
@@ -222,15 +236,23 @@ export class GroupCallController {
         if (slot.pc.remoteDescription) {
           try {
             await slot.pc.addIceCandidate(payload.candidate);
-          } catch {
-            /* ignore single bad candidate */
+          } catch (e) {
+            gcDebug("ice_add_failed", {
+              peer: slot.userId,
+              err: shortErr(e),
+            });
           }
         } else {
           slot.pending.push(payload.candidate);
         }
       }
-    } catch {
-      /* one bad payload should not kill the call */
+    } catch (e) {
+      // Eine fehlerhafte rtc-Payload darf nicht den ganzen Call killen.
+      gcDebug("rtc_payload_failed", {
+        peer: slot.userId,
+        type: payload.type,
+        err: shortErr(e),
+      });
     }
   }
 
@@ -373,19 +395,28 @@ export class GroupCallController {
       const offer = await slot.pc.createOffer();
       await slot.pc.setLocalDescription(offer);
       this.events.sendRtc(otherUserId, { type: "offer", sdp: offer.sdp ?? "" });
-    } catch {
+    } catch (e) {
+      gcDebug("offer_failed", { peer: otherUserId, err: shortErr(e) });
       this.dropPeer(otherUserId);
     }
   }
 
   private async flushPending(slot: PeerSlot) {
     const pending = slot.pending.splice(0);
+    let failed = 0;
     for (const c of pending) {
       try {
         await slot.pc.addIceCandidate(c);
       } catch {
-        /* ignore */
+        failed += 1;
       }
+    }
+    if (failed > 0) {
+      gcDebug("flush_pending_failed", {
+        peer: slot.userId,
+        total: pending.length,
+        failed,
+      });
     }
   }
 
