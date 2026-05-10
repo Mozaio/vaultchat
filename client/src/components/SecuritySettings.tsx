@@ -820,6 +820,7 @@ export function SecuritySettings({
                   </p>
                 </div>
               )}
+              <AccountDangerZone />
             </div>
           )}
 
@@ -870,6 +871,130 @@ export function SecuritySettings({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AccountDangerZone() {
+  const [confirming, setConfirming] = useState(false);
+  const [typed, setTyped] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const requiredPhrase = "ACCOUNT LÖSCHEN";
+
+  async function handleDelete() {
+    setError(null);
+    setBusy(true);
+    try {
+      const token = (await import("../lib/localIdentity")).loadToken();
+      if (!token) throw new Error("no_token");
+      const { deleteMyAccount } = await import("../lib/api");
+      await deleteMyAccount(token);
+      // Server gelöscht — jetzt alles lokal wipen und reloaden.
+      const li = await import("../lib/localIdentity");
+      li.clearToken();
+      li.clearLocalIdentity();
+      try {
+        await new Promise<void>((resolve) => {
+          const r = indexedDB.deleteDatabase("vaultchat");
+          r.onsuccess = () => resolve();
+          r.onerror = () => resolve();
+          r.onblocked = () => resolve();
+        });
+      } catch {
+        /* best effort */
+      }
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        /* noop */
+      }
+      location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="rounded-xl border p-4"
+      style={{
+        borderColor: "rgba(220, 38, 38, 0.4)",
+        background: "rgba(127, 29, 29, 0.08)",
+        marginTop: "1.5rem",
+      }}
+    >
+      <p className="text-sm font-semibold" style={{ color: "#fca5a5" }}>
+        Gefahrenzone
+      </p>
+      <p className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>
+        Account-Löschung entfernt den Benutzer + alle Gruppen-Mitgliedschaften
+        auf dem Server, dazu lokale Identity, Backup-Schlüssel und Chat-Verlauf.
+        Diese Aktion ist nicht rückgängig zu machen.
+      </p>
+      {!confirming ? (
+        <button
+          type="button"
+          className="mt-3 rounded-lg px-3 py-2 text-sm font-medium"
+          style={{ background: "rgba(220, 38, 38, 0.2)", color: "#fca5a5", border: "1px solid rgba(220, 38, 38, 0.5)" }}
+          onClick={() => setConfirming(true)}
+        >
+          Account löschen …
+        </button>
+      ) : (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+            Tippe <code style={{ color: "#fca5a5" }}>{requiredPhrase}</code> um zu bestätigen:
+          </p>
+          <input
+            type="text"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-elevated)",
+              color: "var(--text)",
+            }}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder={requiredPhrase}
+            autoFocus
+            disabled={busy}
+          />
+          {error && (
+            <p className="text-xs" style={{ color: "#fca5a5" }}>
+              Fehler: {error}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 rounded-lg px-3 py-2 text-sm font-medium"
+              style={{ background: "var(--bg-elevated)", color: "var(--text)" }}
+              onClick={() => {
+                setConfirming(false);
+                setTyped("");
+                setError(null);
+              }}
+              disabled={busy}
+            >
+              Abbrechen
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-lg px-3 py-2 text-sm font-medium"
+              style={{ background: "rgb(220, 38, 38)", color: "white" }}
+              onClick={() => void handleDelete()}
+              disabled={busy || typed !== requiredPhrase}
+            >
+              {busy ? "Lösche …" : "Endgültig löschen"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

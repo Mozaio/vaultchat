@@ -111,6 +111,32 @@ export function listUsersSafe() {
   }));
 }
 
+/**
+ * Komplette Account-Löschung: User + alle Gruppen-Mitgliedschaften + Gruppen,
+ * bei denen der User der EINZIGE Member war. Gruppen mit anderen Mitgliedern
+ * bleiben bestehen, der User wird nur entfernt.
+ * Returns true wenn der User existierte und gelöscht wurde.
+ */
+export function deleteUserCompletely(userId: string): boolean {
+  const user = users.get(userId);
+  if (!user) return false;
+
+  // Aus allen Gruppen entfernen; leere Gruppen droppen.
+  for (const g of [...groups.values()]) {
+    const idx = g.memberIds.indexOf(userId);
+    if (idx === -1) continue;
+    g.memberIds.splice(idx, 1);
+    if (g.memberIds.length === 0) {
+      groups.delete(g.id);
+    }
+  }
+
+  users.delete(userId);
+  usersByName.delete(user.username.toLowerCase());
+  persistDirectory();
+  return true;
+}
+
 export function getDirectoryStats() {
   return {
     users: users.size,

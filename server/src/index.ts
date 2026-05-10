@@ -10,6 +10,7 @@ import {
   addGroupMember,
   createGroup,
   createUser,
+  deleteUserCompletely,
   findUserById,
   findUserByUsername,
   getDirectoryStats,
@@ -480,6 +481,45 @@ app.delete("/api/blobs/:id", (req, res) => {
   }
   const removed = unlinkBlob(jwtUser.userId, id);
   res.status(removed ? 204 : 404).end();
+});
+
+/**
+ * Self-delete: User löscht den eigenen Account.
+ *
+ * - Entfernt den User aus allen Group-Memberships
+ * - Droppt Gruppen, die danach leer sind
+ * - Löscht Pre-Keys, Mailbox-Einträge und Replay-State
+ * - Server-Daten sind weg; lokale Identity muss der Client selbst wipen
+ *   (clearLocalIdentity + IDB delete) — das passiert UI-seitig nach
+ *   erfolgreicher Response.
+ *
+ * Passwortbestätigung ist NICHT eingebaut weil JWT-Authentifizierung
+ * bereits den Besitz nachweist. Der Client soll trotzdem einen
+ * "Wirklich löschen?"-Dialog zeigen (siehe SecuritySettings).
+ */
+app.delete("/api/me", async (req, res) => {
+  const t = bearer(req);
+  if (!t) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const jwtUser = verifyToken(t);
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const removed = deleteUserCompletely(jwtUser.userId);
+  if (!removed) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  log.info("auth_account_deleted", {
+    reqId: req.id,
+    userId: jwtUser.userId,
+    username: jwtUser.username,
+    ip: req.ip,
+  });
+  res.status(204).end();
 });
 
 app.get("/api/me", async (req, res) => {

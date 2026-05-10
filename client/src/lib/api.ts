@@ -452,3 +452,17 @@ export async function deleteBlob(token: string, id: string): Promise<void> {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+/**
+ * Self-delete: löscht den eigenen Account auf dem Server. Client muss
+ * danach lokale Identity, IDB und Token selbst wipen.
+ */
+export async function deleteMyAccount(token: string): Promise<void> {
+  const r = await fetch(`${apiBase()}/api/me`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok && r.status !== 204) {
+    throw new Error(`account_delete_${r.status}`);
+  }
+}
