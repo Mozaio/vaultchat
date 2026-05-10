@@ -51,6 +51,7 @@ import {
   redeemInvite,
   revokeInvite,
 } from "./inviteStore.js";
+import { log, requestLogger } from "./logger.js";
 
 assertRuntimeConfig();
 
@@ -125,6 +126,7 @@ app.use(
   })
 );
 app.use(express.json({ limit: process.env.VAULTCHAT_JSON_LIMIT ?? "12mb" }));
+app.use(requestLogger);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -1147,9 +1149,13 @@ async function start() {
   server.listen(port, () => {
     const config = loadRuntimeConfig();
     const state = getStateStatus();
-    console.log(
-      `[vaultchat] API + WS :${port} profile=${config.profile} state=${state.mode} messages=persistent:false`
-    );
+    log.info("server_start", {
+      port,
+      profile: config.profile,
+      state: state.mode,
+      messagesPersistent: false,
+      nodeEnv: process.env.NODE_ENV ?? "development",
+    });
   });
 }
 

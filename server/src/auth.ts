@@ -1,6 +1,7 @@
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { log } from "./logger.js";
 
 const JwtPayload = z.object({
   sub: z.string(),
@@ -11,11 +12,12 @@ export type JwtUser = { userId: string; username: string };
 
 const JWT_SECRET = process.env.VAULTCHAT_JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
-  console.warn(
-    "[vaultchat] Set VAULTCHAT_JWT_SECRET (min 32 chars) in production."
-  );
+  log.warn("auth_jwt_secret_missing", {
+    msg: "Set VAULTCHAT_JWT_SECRET (min 32 chars) in production.",
+  });
 }
 
+let _devSecretWarned = false;
 const secret = () => {
   if (!JWT_SECRET || JWT_SECRET.length < 32) {
     if (process.env.NODE_ENV === "production") {
@@ -23,9 +25,12 @@ const secret = () => {
         "VAULTCHAT_JWT_SECRET must be set in production and be at least 32 characters"
       );
     }
-    console.warn(
-      "[vaultchat] Using insecure dev JWT secret. Set VAULTCHAT_JWT_SECRET in production!"
-    );
+    if (!_devSecretWarned) {
+      log.warn("auth_jwt_dev_secret", {
+        msg: "Using insecure dev JWT secret. Set VAULTCHAT_JWT_SECRET in production.",
+      });
+      _devSecretWarned = true;
+    }
     return "dev-only-insecure-secret-change-me-in-production-please";
   }
   return JWT_SECRET;
