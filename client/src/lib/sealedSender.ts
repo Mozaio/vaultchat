@@ -70,6 +70,8 @@ export async function sealSender(
   plaintext.set(inner, p);
   const pk = publicKeyFromBase64(recipientIdentityPkB64);
   const sealed = sodium.crypto_box_seal(plaintext, pk);
+  sodium.memzero(plaintext);
+  sodium.memzero(sid);
   return base64FromUint8(sealed);
 }
 
@@ -98,8 +100,13 @@ export async function openSealedEnvelope(
   p += 4;
   if (plaintext.length - p !== len) throw new Error("bad_envelope_len");
   const inner = plaintext.subarray(p);
-  return {
+  const result = {
     senderUserId: bytesToUuid(sid),
     innerB64: base64FromUint8(inner),
   };
+  // Plaintext-Buffer enthält Sender-ID + Inner — beide nach Verwendung zeroen.
+  // (subarray-Views referenzieren denselben Speicher, daher reicht es, den
+  //  Hauptbuffer einmal zu zeroen.)
+  sodium.memzero(plaintext);
+  return result;
 }

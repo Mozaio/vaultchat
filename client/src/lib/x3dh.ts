@@ -18,18 +18,35 @@ async function combineHybridSecret(
   await sodiumReady();
   if (!pqSecret) return x3dhSecret;
   const sodium = getSodium();
-  const input = new Uint8Array(x3dhSecret.length + pqSecret.length);
-  input.set(x3dhSecret, 0);
-  input.set(pqSecret, x3dhSecret.length);
-  const hybrid = sodium.crypto_generichash(
-    32,
-    input,
-    enc.encode("vaultchat-pqxdh-mlkem1024-v1")
+  // Streaming-KDF (multipart BLAKE2b) — vermeidet Konkatenations-Buffer
+  // mit beiden Secrets im Klartext.
+  const state = sodium.crypto_generichash_init(
+    enc.encode("vaultchat-pqxdh-mlkem1024-v1"),
+    32
   );
-  sodium.memzero(input);
+  sodium.crypto_generichash_update(state, x3dhSecret);
+  sodium.crypto_generichash_update(state, pqSecret);
+  const hybrid = sodium.crypto_generichash_final(state, 32);
   sodium.memzero(x3dhSecret);
   sodium.memzero(pqSecret);
   return hybrid;
+}
+
+/**
+ * Hash mehrerer DH-Outputs ohne sie in einem temporären Konkat-Buffer zu
+ * vereinen. Die DH-Outputs werden anschliessend gezeroed.
+ */
+async function hashDhsStreaming(
+  dhs: Uint8Array[],
+  domainLabel: Uint8Array
+): Promise<Uint8Array> {
+  await sodiumReady();
+  const sodium = getSodium();
+  const state = sodium.crypto_generichash_init(domainLabel, 32);
+  for (const dh of dhs) sodium.crypto_generichash_update(state, dh);
+  const out = sodium.crypto_generichash_final(state, 32);
+  for (const dh of dhs) sodium.memzero(dh);
+  return out;
 }
 
 export async function x3dhSender(
@@ -56,18 +73,12 @@ export async function x3dhSender(
       )
     );
   }
-  const input = new Uint8Array(dhs.reduce((sum, dh) => sum + dh.length, 0));
-  let offset = 0;
-  for (const dh of dhs) {
-    input.set(dh, offset);
-    offset += dh.length;
-  }
-  const x3dhSecret = sodium.crypto_generichash(
-    32,
-    input,
+  // Ephemeral DH-Privatkey wird nicht mehr gebraucht — direkt zeroen.
+  sodium.memzero(ephemeralKp.privateKey);
+  const x3dhSecret = await hashDhsStreaming(
+    dhs,
     enc.encode("vaultchat-x3dh-v1")
   );
-  for (const dh of dhs) sodium.memzero(dh);
   let pqKemCiphertext: string | undefined;
   let pqSharedSecret: Uint8Array | null = null;
   if (peerPqKemPublicKeyB64) {
@@ -111,18 +122,11 @@ export async function x3dhReceiver(
       )
     );
   }
-  const input = new Uint8Array(dhs.reduce((sum, dh) => sum + dh.length, 0));
-  let offset = 0;
-  for (const dh of dhs) {
-    input.set(dh, offset);
-    offset += dh.length;
-  }
-  const x3dhSecret = sodium.crypto_generichash(
-    32,
-    input,
+  sodium.memzero(mySignedPreKeySk);
+  const x3dhSecret = await hashDhsStreaming(
+    dhs,
     enc.encode("vaultchat-x3dh-v1")
   );
-  for (const dh of dhs) sodium.memzero(dh);
   const pqSharedSecret =
     myPqKemSecretKeyB64 && pqKemCiphertextB64
       ? ml_kem1024.decapsulate(

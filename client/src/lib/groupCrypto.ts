@@ -1,11 +1,23 @@
 /**
- * VaultChat Group Crypto — v2
- * 
- * Verbesserungen gegenüber v1:
- * - Perfect Forward Secrecy (PFS) durchSender-Ratchet pro Nachricht
- * - Sender-specific chains verhindern dassGruppenmitglieder dieNachrichten anderer entschlüsseln wenn sie nur denGruppenkey haben
- * - Jedes Mitglied generiert ephemeral key pro send Vorgang
- * - Metadata-Minimierung: Server sieht keinenSender
+ * VaultChat Group Crypto — v2 (Sender Chains)
+ *
+ * Status (ehrlich):
+ *  - Sender-Chains laufen pro Sender, sodass Out-of-Order-Decryption innerhalb
+ *    eines Senders sauber via Counter funktioniert.
+ *  - PFS gegenüber externen Angreifern: ja (Chain-Advance via BLAKE2b ist
+ *    one-way; ein Snapshot eines aktuellen Chain-Keys gibt ältere MKs nicht her).
+ *  - PFS gegenüber Ex-Mitgliedern, die den Root-Key kannten: NEIN. Ein Sender
+ *    initialisiert seine Chain derzeit mit dem geteilten rootKey, daher kann
+ *    jedes (Ex-)Mitglied alle Sender-Chains rekonstruieren. Das ist ein echtes
+ *    Design-Loch und blockiert Member-Removal-PFS.
+ *  - Behebung verlangt entweder pro-Sender-Random-Start (per Distribution-Frame
+ *    übertragen) oder einen TreeKEM/MLS-basierten Group-Ratchet. Beides ist
+ *    Wire-Format-V3 und wird separat geplant.
+ *
+ * Aktuelle Maßnahmen:
+ *  - Memory-Hygiene: alle Zwischenkeys (Chain, Message, Root) werden gezeroed.
+ *  - Server sieht keinen Sender im Klartext (sealed-sender Layer kapselt das).
+ *  - Counter-AAD bindet Header an Ciphertext (Header-Manipulation = Decryption-Fail).
  */
 import { base64FromUint8, uint8FromBase64 } from "./b64";
 import { getSodium, sodiumReady } from "./sodium";
@@ -173,7 +185,7 @@ export async function rotateGroupKey(
   return { newRootKey, newSenderKey, messages: distributionMessages };
 }
 
-// Encrypt group message with sender-specific ratchet (PFS)
+// Encrypt group message with sender-specific ratchet
 export async function encryptGroupMessage(
   groupId: string,
   senderId: string,
@@ -183,26 +195,23 @@ export async function encryptGroupMessage(
   const sodium = getSodium();
   const state = await getGroupKeyState(groupId);
   if (!state) throw new Error("no_group_state");
-  
+
   const senderState = state.senderStates[senderId];
   if (!senderState) throw new Error("no_sender_state");
-  
-  // Derive current chain key
+
   const chainKey = uint8FromBase64(senderState.senderKey);
   const [nextChainKey, messageKey] = await deriveChainKey(chainKey, senderState.chainCounter);
-  
-  // Generate message nonce
+  sodium.memzero(chainKey);
+
   const nonce = sodium.randombytes_buf(sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES);
-  
-  // Include sender ephemeral public key in AAD for verification
+
   const senderPub = uint8FromBase64(senderState.ephemeralPub);
   const aad = new Uint8Array(32 + 4);
   aad.set(senderPub, 0);
   const counterBuf = new Uint8Array(4);
   new DataView(counterBuf.buffer).setUint32(0, senderState.chainCounter, false);
   aad.set(counterBuf, 32);
-  
-  // Encrypt payload
+
   const plaintext = enc.encode(JSON.stringify(payload));
   const ciphertext = sodium.crypto_aead_xchacha20poly1305_ietf_encrypt(
     plaintext,
@@ -211,12 +220,13 @@ export async function encryptGroupMessage(
     nonce,
     messageKey
   );
-  
-  // Build wire format: MAGIC || senderId || counter || senderEphPub || nonce || ciphertext
+  sodium.memzero(messageKey);
+  sodium.memzero(plaintext);
+
   const senderIdBytes = uuidToBytes(senderId);
   const counterBytes = new Uint8Array(4);
   new DataView(counterBytes.buffer).setUint32(0, senderState.chainCounter, false);
-  
+
   const wire = new Uint8Array(
     MAGIC.length + 16 + 4 + 32 + nonce.length + ciphertext.length
   );
@@ -232,15 +242,16 @@ export async function encryptGroupMessage(
   wire.set(nonce, p);
   p += nonce.length;
   wire.set(ciphertext, p);
-  
-  // Update sender state
-  senderState.senderKey = base64FromUint8(nextChainKey);
+
+  const nextChainKeyB64 = base64FromUint8(nextChainKey);
+  sodium.memzero(nextChainKey);
+  senderState.senderKey = nextChainKeyB64;
   senderState.chainCounter += 1;
   await setGroupKeyState(groupId, state);
-  
+
   return {
     ciphertext: base64FromUint8(wire),
-    senderChainKey: base64FromUint8(nextChainKey),
+    senderChainKey: nextChainKeyB64,
   };
 }
 
@@ -286,40 +297,40 @@ export async function decryptGroupMessage(
   // Find sender state - if not exists, initialize from stored chain key
   let senderState = state.senderStates[senderId];
   if (!senderState) {
-    // Need to derive chain key from stored root key + counter
-    // For now, derive from root key (in production would store chain keys per sender)
-    const rootKey = uint8FromBase64(state.rootKey);
-    let chainKey = rootKey;
+    // Initialer Sender-Chain für unbekannten Sender: aus dem geteilten rootKey
+    // ableiten + bis zu counter advancen. Zwischen-Chain-Keys werden gezeroed.
+    let chainKey = uint8FromBase64(state.rootKey);
     for (let i = 0; i < counter; i++) {
       const [next] = await deriveChainKey(chainKey, i);
+      sodium.memzero(chainKey);
       chainKey = next;
     }
     senderState = {
       senderKey: base64FromUint8(chainKey),
       chainCounter: counter,
       ephemeralPub: base64FromUint8(senderEphPub),
-      ephemeralPriv: "", // We don't have their private key
+      ephemeralPriv: "",
     };
+    sodium.memzero(chainKey);
     state.senderStates[senderId] = senderState;
   }
-  
-  // Build AAD for decryption
+
   const aad = new Uint8Array(32 + 4);
   aad.set(senderEphPub, 0);
   const counterBuf = new Uint8Array(4);
   new DataView(counterBuf.buffer).setUint32(0, counter, false);
   aad.set(counterBuf, 32);
-  
-  // Get message key (need to advance chain to counter)
+
   let chainKey = uint8FromBase64(senderState.senderKey);
   for (let i = senderState.chainCounter; i < counter; i++) {
     const [next] = await deriveChainKey(chainKey, i);
+    sodium.memzero(chainKey);
     chainKey = next;
   }
-  
+
   const [nextChainKey, messageKey] = await deriveChainKey(chainKey, counter);
-  
-  // Decrypt
+  sodium.memzero(chainKey);
+
   const plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
     null,
     ciphertext,
@@ -327,12 +338,13 @@ export async function decryptGroupMessage(
     nonce,
     messageKey
   );
-  
-  // Update chain counter
+  sodium.memzero(messageKey);
+
   senderState.chainCounter = counter + 1;
   senderState.senderKey = base64FromUint8(nextChainKey);
+  sodium.memzero(nextChainKey);
   await setGroupKeyState(groupId, state);
-  
+
   return {
     plaintext: JSON.parse(new TextDecoder().decode(plaintext)) as PlainPayload,
     senderId,

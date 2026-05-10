@@ -41,26 +41,21 @@ function concat(a: Uint8Array, b: Uint8Array): Uint8Array {
 async function kdfRoot(root: Uint8Array, input: Uint8Array): Promise<Uint8Array> {
   await sodiumReady();
   const sodium = getSodium();
-  return sodium.crypto_generichash(
-    32,
-    concat(enc.encode("vaultchat-dr-v4-ck"), input),
-    root
-  );
+  const labelled = concat(enc.encode("vaultchat-dr-v4-ck"), input);
+  const out = sodium.crypto_generichash(32, labelled, root);
+  sodium.memzero(labelled);
+  return out;
 }
 
 async function advanceChain(ck: Uint8Array): Promise<[Uint8Array, Uint8Array]> {
   await sodiumReady();
   const sodium = getSodium();
-  const next = sodium.crypto_generichash(
-    32,
-    concat(enc.encode("vaultchat-dr-v4-next"), new Uint8Array([0x02])),
-    ck
-  );
-  const mk = sodium.crypto_generichash(
-    32,
-    concat(enc.encode("vaultchat-dr-v4-mk"), new Uint8Array([0x01])),
-    ck
-  );
+  const nextLabel = concat(enc.encode("vaultchat-dr-v4-next"), new Uint8Array([0x02]));
+  const mkLabel = concat(enc.encode("vaultchat-dr-v4-mk"), new Uint8Array([0x01]));
+  const next = sodium.crypto_generichash(32, nextLabel, ck);
+  const mk = sodium.crypto_generichash(32, mkLabel, ck);
+  sodium.memzero(nextLabel);
+  sodium.memzero(mkLabel);
   return [next, mk];
 }
 
@@ -74,6 +69,7 @@ export async function drInit(
   const peerPk = publicKeyFromBase64(peerIdentityPkB64);
   const ss = sodium.crypto_scalarmult(myIdentitySk, peerPk);
   const root = sodium.crypto_generichash(32, enc.encode("vaultchat-dr-v4-root"), ss);
+  sodium.memzero(ss);
   return {
     v: 4,
     peerId,
@@ -137,15 +133,20 @@ export async function drEncrypt(
     s.ckSend = null;
   }
   if (!s.ckSend) {
-    const dhOut = sodium.crypto_scalarmult(
-      uint8FromBase64(s.myRatchet.priv),
-      uint8FromBase64(s.peerRatchetPub)
-    );
-    const ck = await kdfRoot(uint8FromBase64(s.root), dhOut);
+    const ratchetPriv = uint8FromBase64(s.myRatchet.priv);
+    const dhOut = sodium.crypto_scalarmult(ratchetPriv, uint8FromBase64(s.peerRatchetPub));
+    const rootBytes = uint8FromBase64(s.root);
+    const ck = await kdfRoot(rootBytes, dhOut);
     s.ckSend = base64FromUint8(ck);
     s.nSend = 0;
+    sodium.memzero(dhOut);
+    sodium.memzero(ratchetPriv);
+    sodium.memzero(rootBytes);
+    sodium.memzero(ck);
   }
-  const [newCk, mk] = await advanceChain(uint8FromBase64(s.ckSend));
+  const ckSendBytes = uint8FromBase64(s.ckSend);
+  const [newCk, mk] = await advanceChain(ckSendBytes);
+  sodium.memzero(ckSendBytes);
   const nonceLen = sodium.crypto_aead_xchacha20poly1305_ietf_NPUBBYTES;
   const nonce = sodium.randombytes_buf(nonceLen);
   const flags = isBootstrap ? 0x01 : 0x00;
@@ -164,6 +165,7 @@ export async function drEncrypt(
     nonce,
     mk
   );
+  sodium.memzero(mk);
   const wire = new Uint8Array(aad.length + nonce.length + ct.length);
   let p = 0;
   wire.set(aad, p);
@@ -172,6 +174,7 @@ export async function drEncrypt(
   p += nonce.length;
   wire.set(ct, p);
   s.ckSend = base64FromUint8(newCk);
+  sodium.memzero(newCk);
   s.nSend += 1;
   return { state: s, wire };
 }
@@ -209,20 +212,27 @@ export async function drDecrypt(
   if (isBootstrap) {
     if (s.peerRatchetPub !== dhPubB64) {
       const dhOut = sodium.crypto_scalarmult(myIdentitySk, dhPub);
-      s.ckRecv = base64FromUint8(await kdfRoot(uint8FromBase64(s.root), dhOut));
+      const rootBytes = uint8FromBase64(s.root);
+      const newCkRecv = await kdfRoot(rootBytes, dhOut);
+      s.ckRecv = base64FromUint8(newCkRecv);
       s.nRecv = 0;
       s.peerRatchetPub = dhPubB64;
+      sodium.memzero(dhOut);
+      sodium.memzero(rootBytes);
+      sodium.memzero(newCkRecv);
     }
   } else {
     if (s.peerRatchetPub !== dhPubB64) {
       if (!s.myRatchet) {
         throw new Error("no_ratchet_but_non_bootstrap");
       }
-      const dh1 = sodium.crypto_scalarmult(uint8FromBase64(s.myRatchet.priv), dhPub);
-      const newCkRecv = await kdfRoot(uint8FromBase64(s.root), dh1);
+      const oldRatchetPriv = uint8FromBase64(s.myRatchet.priv);
+      const rootBytes = uint8FromBase64(s.root);
+      const dh1 = sodium.crypto_scalarmult(oldRatchetPriv, dhPub);
+      const newCkRecv = await kdfRoot(rootBytes, dh1);
       const newKp = sodium.crypto_box_keypair();
       const dh2 = sodium.crypto_scalarmult(newKp.privateKey, dhPub);
-      const newCkSend = await kdfRoot(uint8FromBase64(s.root), dh2);
+      const newCkSend = await kdfRoot(rootBytes, dh2);
       s = {
         ...s,
         myRatchet: {
@@ -235,6 +245,12 @@ export async function drDecrypt(
         nRecv: 0,
         peerRatchetPub: dhPubB64,
       };
+      sodium.memzero(oldRatchetPriv);
+      sodium.memzero(dh1);
+      sodium.memzero(dh2);
+      sodium.memzero(rootBytes);
+      sodium.memzero(newCkRecv);
+      sodium.memzero(newCkSend);
     }
   }
 
@@ -244,10 +260,13 @@ export async function drDecrypt(
   if (skips > 64) throw new Error("too_many_skipped");
   let ck = uint8FromBase64(s.ckRecv);
   for (let i = 0; i < skips; i++) {
-    const [nextCk] = await advanceChain(ck);
+    const [nextCk, skippedMk] = await advanceChain(ck);
+    sodium.memzero(skippedMk);
+    sodium.memzero(ck);
     ck = nextCk;
   }
   const [newCk, mk] = await advanceChain(ck);
+  sodium.memzero(ck);
   const plaintext = sodium.crypto_aead_xchacha20poly1305_ietf_decrypt(
     null,
     ct,
@@ -255,7 +274,9 @@ export async function drDecrypt(
     nonce,
     mk
   );
+  sodium.memzero(mk);
   s.ckRecv = base64FromUint8(newCk);
+  sodium.memzero(newCk);
   s.nRecv = n + 1;
   return { state: s, plaintext };
 }
