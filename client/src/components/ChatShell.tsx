@@ -64,6 +64,7 @@ import {
 } from "./MessageBubble";
 import { PeerRow } from "./PeerRow";
 import { InfoPanel, type SharedMediaItem } from "./InfoPanel";
+import { BackupReminder } from "./BackupReminder";
 import {
   authoredFromDm,
   authoredFromGroup,
@@ -3163,36 +3164,17 @@ export function ChatShell({
         </div>
       )}
       {backupReminderVisible && (
-        <div className="backup-reminder mx-3 mt-2 shrink-0 md:mx-4">
-          <IconShieldCheck size={18} className="shrink-0" style={{ color: "var(--accent)" }} aria-hidden />
-          <div className="backup-reminder-text">
-            <strong>Backup sichern</strong>
-            <span> — Exportiere deine Identität verschlüsselt, sonst kein Zugang von einem neuen Gerät.</span>
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary !shrink-0 !px-2.5 !py-1 !text-xs"
-            onClick={() => setSecurityOpen(true)}
-          >
-            Export
-          </button>
-          <button
-            type="button"
-            className="!text-[var(--text-muted)] hover:!text-[var(--text)]"
-            title="Erinnerung dauerhaft ausblenden"
-            aria-label="Erinnerung dauerhaft ausblenden"
-            onClick={() => {
-              try {
-                localStorage.setItem("vaultchat.backupReminder.dismissed", "1");
-              } catch {
-                /* ignore */
-              }
-              setBackupReminderVisible(false);
-            }}
-          >
-            <IconX size={16} />
-          </button>
-        </div>
+        <BackupReminder
+          onExport={() => setSecurityOpen(true)}
+          onDismiss={() => {
+            try {
+              localStorage.setItem("vaultchat.backupReminder.dismissed", "1");
+            } catch {
+              /* localStorage write may fail in private mode */
+            }
+            setBackupReminderVisible(false);
+          }}
+        />
       )}
       <div className="flex min-h-0 flex-1 overflow-visible">
       <aside
