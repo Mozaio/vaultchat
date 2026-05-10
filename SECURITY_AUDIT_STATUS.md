@@ -37,31 +37,53 @@ Das ist der entscheidende Audit-Gap zu Signal/Element. Status pro Datei:
 
 ## Migrations-Plan auf auditierte Protocols
 
-### Phase 1 — Foundation (jetzt eingebaut, koexistierend)
+### Phase 1 — Foundation ✅ erledigt
 - `@matrix-org/olm` ist als dependency drin.
 - `lib/olmAdapter.ts` und `lib/megolmAdapter.ts` wrappen die Olm-API mit
   typsafem TS-Interface. Lazy-loaded, kein automatischer Code-Pfad
   benutzt sie heute schon.
 - Test-Suite (`olmAdapter.test.ts`) prüft Roundtrip + Tamper-Reject mit Olm.
+- CSP-Header (`render.yaml`, `server/src/index.ts`) erlauben
+  `wasm-unsafe-eval` für Olm + libsodium WASM.
 
-### Phase 2 — Coexistence (separate Session)
-- Wire-Format-Version-Byte: `VCD4` (heutige DR) vs. `VCO5` (Olm).
-- Empfänger erkennt am Magic-Prefix welche Decryption-Pfad.
-- Neue Sessions → Olm (sofern beide Peers V5 supporten — Capability-Bit
-  in PreKey-Bundle).
-- Bestehende Sessions → bleiben auf v4 DR.
-- Migrationspfad: User klickt in Security-Settings "Krypto upgraden",
-  alle Sessions werden neu ausgehandelt.
+### Phase 2 — Coexistence ✅ Foundation erledigt
+- **Wire-Format `VCO5`** definiert: `MAGIC(4)="VCO5" || type(1) || body`.
+  encodeVco5/decodeVco5/isOlmCiphertext sind tested.
+- **PreKey-Bundle** auf Server + Client um optionales `olm`-Feld
+  erweitert (identityCurve25519, identityEd25519, oneTimeKeys[]).
+  Backwards-kompatibel: alte Bundles ohne `olm` lassen den Sender auf
+  DR-v4 zurückfallen.
+- **olmSessionStore + olmSession** persistieren die Olm-Account- und
+  -Session-Pickles in IDB, mit einem aus dem Local-Key abgeleiteten
+  Pickle-Sub-Key (`deriveSubKey("vaultchat-olm-pickle-v1")`).
+- **ensureOlmSession / olmEncryptJson / olmDecryptJson** sind eingebaut
+  — der Send-/Receive-Pfad in ChatShell / incomingDm muss in einer
+  Folge-Iteration auf den `VCO5`-Magic prüfen und entsprechend routen.
 
-### Phase 3 — Group via Megolm (separate Session)
-- Group-Sender-Keys analog Signal/Matrix.
-- Ex-Member-Removal triggert Megolm-Group-Rotation (auditierter Pfad).
-- groupCryptoV3-Skeleton wird zu Megolm-Wrapper umgeschrieben.
+### Phase 3 — Megolm-Group ✅ Foundation erledigt
+- **Wire-Format `VCG6`** definiert: `MAGIC(4)="VCG6" || sessionIdLen(1)
+  || sessionId || senderUuid(16) || cipher-bytes`.
+- **megolmSessionStore + megolmSession** mit
+  ensureOutbound/loadInbound/saveInbound/rotateForMemberRemoval,
+  buildSessionKeyDistribution für 1:1-Olm-basierten Key-Versand.
+- Inbound-Sessions werden pro `{groupId, senderId, sessionId}` indexed
+  — alte Sessions bleiben erhalten für Decryption alter Frames, neue
+  Rotation kommt mit eigener ID dazu.
+- Tests prüfen VCG6-Magic-Detection.
 
-### Phase 4 — Self-rolled Code löschen (separate Session)
-- `doubleRatchet.ts`, `x3dh.ts`, `groupCrypto.ts` werden gelöscht, sobald
-  keine v4-Session-Records mehr in lokalen DBs hängen (z.B. nach 90 Tagen
-  ohne v4-Roundtrip).
+### Phase 4 — Aktivierung im Send-Pfad (separate Session)
+- ChatShell-Send-Pfad: bevorzuge `olmEncryptJson` wenn das PreKey-Bundle
+  des Empfängers `olm`-Felder hat, sonst fallback `drEncryptJson`.
+- `incomingDm.ts`: prüfe `isOlmCiphertext` vor `isDrCiphertext` und
+  route entsprechend.
+- Group-Send: `megolmEncryptGroup` mit Key-Distribution via Olm 1:1.
+- Migration-UI in Settings: "Krypto auf auditierte Olm-Schicht
+  umstellen" — bestehende Sessions werden neu ausgehandelt.
+
+### Phase 5 — Self-rolled Code löschen
+- `doubleRatchet.ts`, `x3dh.ts`, `groupCrypto.ts` werden gelöscht,
+  sobald keine v4-Session-Records mehr in lokalen DBs hängen (z.B.
+  nach 90 Tagen ohne v4-Roundtrip).
 
 ## Was bleibt auch nach allen Phasen selbst geschrieben
 

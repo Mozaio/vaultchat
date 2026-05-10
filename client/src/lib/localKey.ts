@@ -68,3 +68,24 @@ export async function decryptToString(blob: Uint8Array): Promise<string> {
   const bytes = await localDecrypt(blob);
   return new TextDecoder().decode(bytes);
 }
+
+/**
+ * Leitet einen sekundären Schlüssel mit Domain-Separation aus dem
+ * Local Data Key ab. Anwendung: Olm pickleKey (DR-Sessions in IDB),
+ * ähnliche "ich brauche einen stabilen Key, der nicht der LDK selbst
+ * ist, aber an dieselbe Unlock-Session gebunden ist".
+ *
+ * Returns base64. Caller darf NICHT memzero'n — die Funktion löscht
+ * den Zwischen-Buffer selbst und gibt nur den base64-String zurück.
+ */
+export async function deriveSubKey(domainLabel: string): Promise<string> {
+  await sodiumReady();
+  const sodium = getSodium();
+  if (!_key) throw new Error("local_key_missing");
+  const sub = sodium.crypto_generichash(32, enc.encode(domainLabel), _key);
+  // base64-Konvertierung; die Bytes-Form bleibt nur temporär hier.
+  let s = "";
+  for (let i = 0; i < sub.length; i++) s += String.fromCharCode(sub[i]!);
+  sodium.memzero(sub);
+  return btoa(s);
+}

@@ -38,6 +38,7 @@ import {
   getPreKeyStats,
   getRemainingPreKeyCount,
   initPreKeyBundle,
+  uploadOlmKeys,
   uploadOneTimePreKeys,
 } from "./prekeyStore.js";
 import {
@@ -932,6 +933,21 @@ const PreKeyUploadBody = z.object({
       publicKey: z.string().min(1).max(4096),
     })
     .optional(),
+  /** Optional: auditierte Olm-Schicht (Matrix.org). */
+  olm: z
+    .object({
+      identityCurve25519: z.string().min(1).max(256),
+      identityEd25519: z.string().min(1).max(256),
+      oneTimeKeys: z
+        .array(
+          z.object({
+            keyId: z.string().min(1).max(64),
+            publicKey: z.string().min(1).max(256),
+          })
+        )
+        .max(200),
+    })
+    .optional(),
 });
 
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
@@ -991,6 +1007,10 @@ app.post("/api/keys", async (req, res) => {
     parsed.data.pqKem
   );
   uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
+  // Optional: Olm-Identity + OTKs für den auditierten Krypto-Pfad.
+  if (parsed.data.olm) {
+    uploadOlmKeys(jwtUser.userId, parsed.data.olm);
+  }
   res.json({ ok: true, remaining: getRemainingPreKeyCount(jwtUser.userId) });
 });
 

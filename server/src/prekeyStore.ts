@@ -18,6 +18,17 @@ type PreKeyBundle = {
     alg: "ML-KEM-1024";
     publicKey: string;
   };
+  /**
+   * Optionale Olm-Schicht (Matrix.org-DR-Implementation, NCC-Group 2016/2020
+   * + Quarkslab 2024 auditiert). Wenn vorhanden, kann der Sender den
+   * VCO5-Wire-Pfad statt unseres eigenen DR v4 wählen.
+   */
+  olm?: {
+    identityCurve25519: string;
+    identityEd25519: string;
+    /** Map<otkId, publicKey> — verbraucht analog zu oneTimePreKeys. */
+    oneTimeKeys: Map<string, string>;
+  };
   nextKeyId: number;
 };
 
@@ -27,6 +38,17 @@ function hydrateBundle(bundle: PersistedPreKeyBundle): PreKeyBundle {
     oneTimePreKeys: new Map(
       bundle.oneTimePreKeys.map((key) => [key.keyId, key.publicKey])
     ),
+    ...(bundle.olm
+      ? {
+          olm: {
+            identityCurve25519: bundle.olm.identityCurve25519,
+            identityEd25519: bundle.olm.identityEd25519,
+            oneTimeKeys: new Map(
+              bundle.olm.oneTimeKeys.map((k) => [k.keyId, k.publicKey])
+            ),
+          },
+        }
+      : {}),
   };
 }
 
@@ -37,6 +59,18 @@ function serializeBundle(bundle: PreKeyBundle): PersistedPreKeyBundle {
       keyId,
       publicKey,
     })),
+    ...(bundle.olm
+      ? {
+          olm: {
+            identityCurve25519: bundle.olm.identityCurve25519,
+            identityEd25519: bundle.olm.identityEd25519,
+            oneTimeKeys: [...bundle.olm.oneTimeKeys].map(([keyId, publicKey]) => ({
+              keyId,
+              publicKey,
+            })),
+          },
+        }
+      : {}),
   };
 }
 
@@ -101,6 +135,12 @@ export function getPreKeyBundle(userId: string): {
     alg: "ML-KEM-1024";
     publicKey: string;
   };
+  olm?: {
+    identityCurve25519: string;
+    identityEd25519: string;
+    oneTimeKey: { keyId: string; publicKey: string } | null;
+    remainingOneTimeKeys: number;
+  };
 } | null {
   const b = bundles.get(userId);
   if (!b) return null;
@@ -111,13 +151,66 @@ export function getPreKeyBundle(userId: string): {
     persistBundles();
     break;
   }
+  // Olm-OTK separat verbrauchen — gleicher Pattern, eigene Map.
+  let olmOut: {
+    identityCurve25519: string;
+    identityEd25519: string;
+    oneTimeKey: { keyId: string; publicKey: string } | null;
+    remainingOneTimeKeys: number;
+  } | undefined;
+  if (b.olm) {
+    let olmOtk: { keyId: string; publicKey: string } | null = null;
+    for (const [keyId, publicKey] of b.olm.oneTimeKeys) {
+      olmOtk = { keyId, publicKey };
+      b.olm.oneTimeKeys.delete(keyId);
+      persistBundles();
+      break;
+    }
+    olmOut = {
+      identityCurve25519: b.olm.identityCurve25519,
+      identityEd25519: b.olm.identityEd25519,
+      oneTimeKey: olmOtk,
+      remainingOneTimeKeys: b.olm.oneTimeKeys.size,
+    };
+  }
   return {
     identityKey: b.identityKey,
     signedPreKey: b.signedPreKey,
     remainingPreKeys: b.oneTimePreKeys.size,
     oneTimePreKey: otp,
     ...(b.pqKem ? { pqKem: b.pqKem } : {}),
+    ...(olmOut ? { olm: olmOut } : {}),
   };
+}
+
+/**
+ * Olm-Schlüssel im Bundle aktualisieren — Identity (einmalig) und/oder
+ * one-time keys (regelmäßig nachfüllen). Olm-OTKs sind unabhängig von
+ * den Curve25519-OTKs aus dem X3DH-Pfad.
+ */
+export function uploadOlmKeys(
+  userId: string,
+  data: {
+    identityCurve25519?: string;
+    identityEd25519?: string;
+    oneTimeKeys?: { keyId: string; publicKey: string }[];
+  }
+): void {
+  const b = bundles.get(userId);
+  if (!b) return;
+  if (data.identityCurve25519 && data.identityEd25519) {
+    b.olm = {
+      identityCurve25519: data.identityCurve25519,
+      identityEd25519: data.identityEd25519,
+      oneTimeKeys: b.olm?.oneTimeKeys ?? new Map(),
+    };
+  }
+  if (data.oneTimeKeys && b.olm) {
+    for (const k of data.oneTimeKeys) {
+      b.olm.oneTimeKeys.set(k.keyId, k.publicKey);
+    }
+  }
+  persistBundles();
 }
 
 export function getRemainingPreKeyCount(userId: string): number {

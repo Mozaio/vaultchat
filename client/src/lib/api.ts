@@ -382,6 +382,12 @@ export async function uploadPreKeys(
       alg: "ML-KEM-1024";
       publicKey: string;
     };
+    /** Optional: auditierte Olm-Schicht. */
+    olm?: {
+      identityCurve25519: string;
+      identityEd25519: string;
+      oneTimeKeys: { keyId: string; publicKey: string }[];
+    };
   }
 ) {
   return req<{ ok: true; remaining: number }>("/api/keys", {

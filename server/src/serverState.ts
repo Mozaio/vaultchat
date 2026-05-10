@@ -57,6 +57,16 @@ export type PersistedPreKeyBundle = {
     alg: "ML-KEM-1024";
     publicKey: string;
   };
+  /**
+   * Olm-Identity + One-Time-Keys für den auditierten Krypto-Pfad
+   * (`@matrix-org/olm`). Optional — alte Bundles ohne dieses Feld
+   * funktionieren weiter, Sender wählt dann den DR-v4-Pfad.
+   */
+  olm?: {
+    identityCurve25519: string;
+    identityEd25519: string;
+    oneTimeKeys: { keyId: string; publicKey: string }[];
+  };
   nextKeyId: number;
 };
 
