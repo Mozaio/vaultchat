@@ -67,7 +67,7 @@ export type StoredGroupMessage = {
   expiresAt?: number;
 };
 
-function openDb(): Promise<IDBDatabase> {
+export function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const r = indexedDB.open(DB, VER);
     r.onerror = () => reject(r.error);

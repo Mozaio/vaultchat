@@ -7,9 +7,7 @@
  * vollständig beim Sender, verschlüsselt in der IDB via LDK.
  */
 import { hasLocalKey, encryptString, decryptToString } from "./localKey";
-
-const DB = "vaultchat";
-const VER = 4;
+import { openDb } from "./idb";
 
 const MAX_ATTEMPTS = 10;
 const RETRY_DELAYS_MS = [
@@ -27,14 +25,6 @@ type OutboxRecord = {
   nextAttemptAt?: number;
   ackMode?: "transport" | "e2e";
 };
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const r = indexedDB.open(DB, VER);
-    r.onerror = () => reject(r.error);
-    r.onsuccess = () => resolve(r.result);
-  });
-}
 
 function assertKey() {
   if (!hasLocalKey()) throw new Error("local_key_missing");
