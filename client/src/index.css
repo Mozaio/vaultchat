@@ -2882,6 +2882,27 @@ select:focus-visible {
   border-color: var(--border);
 }
 
+.sidebar-status-pill.reconnecting {
+  color: var(--warning, #f59e0b);
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.sidebar-status-pill.reconnecting .sidebar-status-dot {
+  animation: status-reconnect-pulse 1s ease-in-out infinite;
+}
+
+@keyframes status-reconnect-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-status-pill.reconnecting .sidebar-status-dot {
+    animation: none;
+  }
+}
+
 .sidebar-status-dot {
   display: inline-block;
   width: 6px;

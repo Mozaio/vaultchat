@@ -249,6 +249,8 @@ export function ChatShell({
   const [groupMessages, setGroupMessages] = useState<ChatMsg[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
+  // 0 = noch nie versucht, >0 = wir reconnecten gerade (für UI-State).
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [hasEverConnected, setHasEverConnected] = useState(false);
   const [wsHadError, setWsHadError] = useState(false);
   const [backupReminderVisible, setBackupReminderVisible] = useState(
@@ -1131,6 +1133,7 @@ export function ChatShell({
       setHasEverConnected(true);
       setWsHadError(false);
       setConnected(true);
+      setReconnectAttempt(0);
       void flushOutbox().catch((e: unknown) => {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("local_key_missing")) {
@@ -1165,6 +1168,7 @@ export function ChatShell({
       const attempts = reconnectAttempts.current;
       const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
       reconnectAttempts.current = attempts + 1;
+      setReconnectAttempt(attempts + 1);
       reconnectTimer.current = setTimeout(() => {
         if (disposed) return;
         // Force effect remount by creating a new WebSocket
@@ -3167,14 +3171,43 @@ export function ChatShell({
                 VaultChat
               </p>
               <div className="sidebar-status-row">
-                <span
-                  className={`sidebar-status-pill${connected ? " online" : " offline"}`}
-                  title={connected ? "Verbunden" : "Verbindung getrennt"}
-                  aria-label={connected ? "Online" : "Offline"}
-                >
-                  <span className="sidebar-status-dot" aria-hidden />
-                  {connected ? "Online" : "Offline"}
-                </span>
+                {(() => {
+                  // 3-Zustands-Anzeige: online | reconnecting | offline.
+                  // "reconnecting" ist der Fall, wenn wir nach einem Drop
+                  // einen neuen Connect-Versuch starten — vorher hieß das
+                  // einfach "Offline", was zwischen "Server schläft" und
+                  // "Mein Wifi ist weg" nicht unterschieden hat.
+                  const state =
+                    connected
+                      ? "online"
+                      : reconnectAttempt > 0
+                        ? "reconnecting"
+                        : "offline";
+                  const label =
+                    state === "online"
+                      ? "Online"
+                      : state === "reconnecting"
+                        ? `Verbinde (#${reconnectAttempt})`
+                        : "Offline";
+                  const title =
+                    state === "online"
+                      ? "Verbunden"
+                      : state === "reconnecting"
+                        ? `Reconnect-Versuch ${reconnectAttempt} — Server wacht evtl. gerade auf`
+                        : "Verbindung getrennt";
+                  return (
+                    <span
+                      className={`sidebar-status-pill ${state}`}
+                      title={title}
+                      aria-label={label}
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <span className="sidebar-status-dot" aria-hidden />
+                      {label}
+                    </span>
+                  );
+                })()}
                 {pendingCount > 0 && (
                   <span
                     className="sidebar-status-pending"
