@@ -144,6 +144,14 @@ export function App() {
     const isTransient = (msg: string) =>
       Array.from(TRANSIENT).some((m) => msg.includes(m));
 
+    // IDB-Versionsfehler entstehen, wenn ein älterer Build mit niedriger
+    // VER-Konstante eine bereits höher migrierte DB öffnen will (z.B. nach
+    // Render-Rollback oder bei stale Service-Worker-Cache). Auf die
+    // Reset-Banner wird dann zusätzlich der "DB neu erstellen"-Fix gespielt.
+    const isVersionMismatch = (msg: string) =>
+      msg.includes("VersionError") ||
+      msg.includes("less than the existing version");
+
     const onRejection = (ev: PromiseRejectionEvent) => {
       const r = ev.reason;
       const text =
@@ -156,6 +164,15 @@ export function App() {
       }
       const msg =
         r instanceof Error ? `${r.name}: ${r.message}\n${r.stack ?? ""}` : String(r);
+      if (isVersionMismatch(text)) {
+        setRuntimeError(
+          "IDB_VERSION_MISMATCH\n" +
+            msg +
+            "\n\nFix: Klick \"DB zurücksetzen\" — lokale Historie wird gelöscht und " +
+            "die DB neu angelegt. Server-Daten und dein Backup bleiben unberührt."
+        );
+        return;
+      }
       setRuntimeError(msg);
     };
     const onError = (ev: ErrorEvent) => {
@@ -167,6 +184,15 @@ export function App() {
         err instanceof Error
           ? `${err.name}: ${err.message}\n${err.stack ?? ""}`
           : `${ev.message}\n${ev.filename}:${ev.lineno}:${ev.colno}`;
+      if (isVersionMismatch(ev.message ?? "")) {
+        setRuntimeError(
+          "IDB_VERSION_MISMATCH\n" +
+            msg +
+            "\n\nFix: Klick \"DB zurücksetzen\" — lokale Historie wird gelöscht und " +
+            "die DB neu angelegt. Server-Daten und dein Backup bleiben unberührt."
+        );
+        return;
+      }
       setRuntimeError(msg);
     };
     window.addEventListener("unhandledrejection", onRejection);
@@ -175,6 +201,21 @@ export function App() {
       window.removeEventListener("unhandledrejection", onRejection);
       window.removeEventListener("error", onError);
     };
+  }, []);
+
+  /** Löscht die "vaultchat"-IDB komplett und reloadet die Seite. */
+  const resetIdb = useCallback(async () => {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const req = indexedDB.deleteDatabase("vaultchat");
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+        req.onblocked = () => resolve(); // best-effort, Reload kommt sowieso
+      });
+    } catch {
+      /* fallthrough */
+    }
+    location.reload();
   }, []);
 
   if (bootError) {
@@ -202,6 +243,39 @@ export function App() {
     return (
       <div className="flex min-h-full flex-col">
         {banner}
+        {runtimeError && (
+          <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-semibold">Runtime-Fehler (statt Black Screen)</p>
+              <div className="flex items-center gap-2">
+                {runtimeError.startsWith("IDB_VERSION_MISMATCH") && (
+                  <button
+                    type="button"
+                    className="rounded border border-amber-700 bg-amber-900/30 px-2 py-0.5 hover:bg-amber-800/40"
+                    onClick={() => void resetIdb()}
+                  >
+                    DB zurücksetzen
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="rounded border border-red-800 px-2 py-0.5 hover:bg-red-900/30"
+                  onClick={() => {
+                    setRuntimeError(null);
+                    clearToken();
+                    clearLocalIdentity();
+                    lock();
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-red-100/90">
+              {runtimeError}
+            </pre>
+          </div>
+        )}
         <AppErrorBoundary
           onReset={() => {
             setRuntimeError(null);
@@ -243,18 +317,29 @@ export function App() {
         <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
           <div className="flex items-center justify-between gap-3">
             <p className="font-semibold">Runtime-Fehler (statt Black Screen)</p>
-            <button
-              type="button"
-              className="rounded border border-red-800 px-2 py-0.5 hover:bg-red-900/30"
-              onClick={() => {
-                setRuntimeError(null);
-                clearToken();
-                clearLocalIdentity();
-                lock();
-              }}
-            >
-              Reset
-            </button>
+            <div className="flex items-center gap-2">
+              {runtimeError.startsWith("IDB_VERSION_MISMATCH") && (
+                <button
+                  type="button"
+                  className="rounded border border-amber-700 bg-amber-900/30 px-2 py-0.5 hover:bg-amber-800/40"
+                  onClick={() => void resetIdb()}
+                >
+                  DB zurücksetzen
+                </button>
+              )}
+              <button
+                type="button"
+                className="rounded border border-red-800 px-2 py-0.5 hover:bg-red-900/30"
+                onClick={() => {
+                  setRuntimeError(null);
+                  clearToken();
+                  clearLocalIdentity();
+                  lock();
+                }}
+              >
+                Reset
+              </button>
+            </div>
           </div>
           <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[11px] text-red-100/90">
             {runtimeError}
