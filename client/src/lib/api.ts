@@ -390,3 +390,65 @@ export async function uploadPreKeys(
     token,
   });
 }
+
+/**
+ * Blob-Upload für Chunked-File-Pfad (fileChunks.ts). Server endpoint:
+ *   POST /api/blobs (application/octet-stream)
+ * Foundation only — noch kein Aufrufer in der UI.
+ */
+export async function uploadBlob(
+  token: string,
+  bytes: Uint8Array
+): Promise<{ id: string; size: number; deduped: boolean }> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 60_000);
+  try {
+    const r = await fetch(`${apiBase()}/api/blobs`, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        "Content-Type": "application/octet-stream",
+        Authorization: `Bearer ${token}`,
+      },
+      body: bytes,
+    });
+    if (!r.ok) {
+      let msg = `blob_upload_${r.status}`;
+      try {
+        const j = (await r.json()) as { error?: string };
+        if (j.error) msg = j.error;
+      } catch {
+        /* keep default */
+      }
+      throw new Error(msg);
+    }
+    return r.json() as Promise<{ id: string; size: number; deduped: boolean }>;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function downloadBlob(
+  token: string,
+  id: string
+): Promise<Uint8Array> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 60_000);
+  try {
+    const r = await fetch(`${apiBase()}/api/blobs/${encodeURIComponent(id)}`, {
+      signal: ctrl.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) throw new Error(`blob_download_${r.status}`);
+    return new Uint8Array(await r.arrayBuffer());
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export async function deleteBlob(token: string, id: string): Promise<void> {
+  await fetch(`${apiBase()}/api/blobs/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
