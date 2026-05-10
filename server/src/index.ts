@@ -791,6 +791,69 @@ const wss = new WebSocketServer({
   maxPayload: WS_MAX_FRAME_BYTES,
 });
 
+// ---------------------------------------------------------------------------
+// WebSocket-Frame-Schemas (modul-level für Performance — vorher wurden sie
+// bei JEDER eingehenden Message neu kompiliert, was bei 100+ msg/s spürbar ist).
+// ---------------------------------------------------------------------------
+const WsDm = z.object({
+  type: z.literal("dm"),
+  toUserId: z.string().uuid(),
+  /** Sealed-Sender-Envelope: Server sieht weder Absender noch Inhalt. */
+  envelope: z.string().min(1).max(MAX_B64_CIPHERTEXT),
+  /** Client-generierte Envelope-ID, damit Sender Delivery-Acks zuordnen kann. */
+  cid: z.string().min(1).max(128),
+});
+const WsTypingDm = z.object({
+  type: z.literal("typing"),
+  toUserId: z.string().uuid(),
+  state: z.enum(["start", "stop"]),
+});
+const WsTypingGroup = z.object({
+  type: z.literal("typing"),
+  groupId: z.string().uuid(),
+  state: z.enum(["start", "stop"]),
+});
+const WsGroup = z.object({
+  type: z.literal("group"),
+  groupId: z.string().uuid(),
+  ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
+});
+const WsRtcPayload = z.union([
+  z.object({ type: z.literal("offer"), sdp: z.string().min(1).max(256_000) }),
+  z.object({ type: z.literal("answer"), sdp: z.string().min(1).max(256_000) }),
+  z.object({
+    type: z.literal("candidate"),
+    candidate: z
+      .object({
+        candidate: z.string().max(16_384).optional(),
+        sdpMid: z.string().max(64).nullable().optional(),
+        sdpMLineIndex: z.number().int().min(0).max(64).nullable().optional(),
+        usernameFragment: z.string().max(256).nullable().optional(),
+      })
+      .passthrough(),
+  }),
+]);
+const WsRtc = z.object({
+  type: z.literal("rtc"),
+  toUserId: z.string().uuid(),
+  payload: WsRtcPayload,
+});
+const WsPing = z.object({ type: z.literal("ping") });
+const WsMailboxAck = z.object({
+  type: z.literal("mailbox_ack"),
+  kind: z.enum(["dm", "group"]),
+  id: z.string().uuid(),
+});
+const WsFrame = z.union([
+  WsDm,
+  WsTypingDm,
+  WsTypingGroup,
+  WsGroup,
+  WsRtc,
+  WsPing,
+  WsMailboxAck,
+]);
+
 function flushMailboxToSocket(userId: string, ws: WebSocket) {
   const pending = listMailboxDms(userId);
   for (const item of pending) {
@@ -947,65 +1010,19 @@ wss.on("connection", (ws, req) => {
       return;
     }
 
-    const Dm = z.object({
-      type: z.literal("dm"),
-      toUserId: z.string().uuid(),
-      /** Sealed-Sender-Envelope: Server sieht weder Absender noch Inhalt. */
-      envelope: z.string().min(1).max(MAX_B64_CIPHERTEXT),
-      /** Client-generierte Envelope-ID, damit Sender Delivery-Acks zuordnen kann. */
-      cid: z.string().min(1).max(128),
-    });
-
-    const TypingDm = z.object({
-      type: z.literal("typing"),
-      toUserId: z.string().uuid(),
-      state: z.enum(["start", "stop"]),
-    });
-    const TypingGroup = z.object({
-      type: z.literal("typing"),
-      groupId: z.string().uuid(),
-      state: z.enum(["start", "stop"]),
-    });
-
-    const Group = z.object({
-      type: z.literal("group"),
-      groupId: z.string().uuid(),
-      ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
-    });
-
-    const RtcPayload = z.union([
-      z.object({ type: z.literal("offer"), sdp: z.string().min(1).max(256_000) }),
-      z.object({ type: z.literal("answer"), sdp: z.string().min(1).max(256_000) }),
-      z.object({
-        type: z.literal("candidate"),
-        candidate: z
-          .object({
-            candidate: z.string().max(16_384).optional(),
-            sdpMid: z.string().max(64).nullable().optional(),
-            sdpMLineIndex: z.number().int().min(0).max(64).nullable().optional(),
-            usernameFragment: z.string().max(256).nullable().optional(),
-          })
-          .passthrough(),
-      }),
-    ]);
-
-    const Rtc = z.object({
-      type: z.literal("rtc"),
-      toUserId: z.string().uuid(),
-      payload: RtcPayload,
-    });
-
-    const Ping = z.object({ type: z.literal("ping") });
-    const MailboxAck = z.object({
-      type: z.literal("mailbox_ack"),
-      kind: z.enum(["dm", "group"]),
-      id: z.string().uuid(),
-    });
-
-    const parsed = z
-      .union([Dm, TypingDm, TypingGroup, Group, Rtc, Ping, MailboxAck])
-      .safeParse(msg);
-    if (!parsed.success) return;
+    const parsed = WsFrame.safeParse(msg);
+    if (!parsed.success) {
+      // Schweigend verwerfen — könnte ein Bug oder ein Angriffsversuch sein.
+      // Auf debug-Level loggen, damit Operations das im Render-Tab sehen
+      // können, aber nicht jeden malformed Frame als prod-Warnung zählen.
+      log.debug("ws_bad_frame", {
+        userId: jwtUser!.userId,
+        sample: typeof msg === "object" && msg && "type" in msg
+          ? String((msg as { type: unknown }).type).slice(0, 32)
+          : null,
+      });
+      return;
+    }
 
     if (parsed.data.type === "ping") {
       ws.send(JSON.stringify({ type: "pong", at: Date.now() }));
