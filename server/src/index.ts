@@ -54,6 +54,13 @@ import {
 } from "./inviteStore.js";
 import { log, requestLogger } from "./logger.js";
 import { markIfNew as markEnvelopeIfNew, replayStats } from "./replayStore.js";
+import {
+  blobStats,
+  getBlob,
+  storeBlob,
+  sweepExpiredBlobs,
+  unlinkBlob,
+} from "./blobStore.js";
 
 assertRuntimeConfig();
 
@@ -195,6 +202,7 @@ app.get("/api/stats", (_req, res) => {
   const directory = getDirectoryStats();
   const prekey = getPreKeyStats();
   const replay = replayStats();
+  const blobs = blobStats();
   const memory = process.memoryUsage();
   res.json({
     uptime: Math.round(process.uptime()),
@@ -203,6 +211,7 @@ app.get("/api/stats", (_req, res) => {
     directory,
     prekey,
     replay,
+    blobs,
     memory: {
       rssMb: Math.round(memory.rss / 1024 / 1024),
       heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
@@ -389,6 +398,88 @@ app.post("/api/login", authLimiter, async (req, res) => {
       recoveryEmailConfigured: Boolean(user.recoveryEmailHash),
     },
   });
+});
+
+// ---------------------------------------------------------------------------
+// Blob-Store für Chunked-File-Upload (Foundation, kein Client-Adopter yet).
+// Verschlüsselte Ciphertext-Bytes vom Client; Server speichert lediglich
+// content-addressed unter SHA-256 mit Owner-Tag.
+// ---------------------------------------------------------------------------
+const BLOB_MAX_REQ_BYTES = 32 * 1024 * 1024 + 4096;
+app.post(
+  "/api/blobs",
+  express.raw({ type: "application/octet-stream", limit: BLOB_MAX_REQ_BYTES }),
+  (req, res) => {
+    const t = bearer(req);
+    if (!t) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const jwtUser = verifyToken(t);
+    if (!jwtUser) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const body = req.body as unknown;
+    if (!Buffer.isBuffer(body)) {
+      res.status(400).json({ error: "expected_octet_stream" });
+      return;
+    }
+    const result = storeBlob(jwtUser.userId, body);
+    if (!result.ok) {
+      res.status(result.reason === "too_large" ? 413 : 400).json({
+        error: result.reason,
+      });
+      return;
+    }
+    res.json({ id: result.id, size: result.size, deduped: result.deduped });
+  }
+);
+
+app.get("/api/blobs/:id", (req, res) => {
+  const t = bearer(req);
+  if (!t) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const jwtUser = verifyToken(t);
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const id = req.params.id ?? "";
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(id)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const bytes = getBlob(jwtUser.userId, id);
+  if (!bytes) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  res.set("Content-Type", "application/octet-stream");
+  res.set("Cache-Control", "private, max-age=0, no-store");
+  res.send(bytes);
+});
+
+app.delete("/api/blobs/:id", (req, res) => {
+  const t = bearer(req);
+  if (!t) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const jwtUser = verifyToken(t);
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const id = req.params.id ?? "";
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(id)) {
+    res.status(400).json({ error: "invalid_id" });
+    return;
+  }
+  const removed = unlinkBlob(jwtUser.userId, id);
+  res.status(removed ? 204 : 404).end();
 });
 
 app.get("/api/me", async (req, res) => {
@@ -893,6 +984,14 @@ const mailboxSweep = setInterval(() => {
   }
 }, MAILBOX_SWEEP_MS);
 mailboxSweep.unref?.();
+
+// Blob-Sweep alle 15 min: TTL ist 30 Tage default, also reicht das.
+const BLOB_SWEEP_MS = 15 * 60_000;
+const blobSweep = setInterval(() => {
+  const r = sweepExpiredBlobs();
+  if (r.removed > 0) log.info("blob_sweep", r);
+}, BLOB_SWEEP_MS);
+blobSweep.unref?.();
 
 // ---------------------------------------------------------------------------
 // WebSocket-Frame-Schemas (modul-level für Performance — vorher wurden sie
