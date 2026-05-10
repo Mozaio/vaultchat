@@ -659,6 +659,12 @@ app.post("/api/groups", groupLimiter, async (req, res) => {
     ...(parsed.data.description ? { description: parsed.data.description } : {}),
     ...(parsed.data.avatar ? { avatar: parsed.data.avatar } : {}),
   });
+  log.info("group_created", {
+    reqId: req.id,
+    groupId: g.id,
+    createdBy: jwtUser.userId,
+    memberCount: memberIds.length,
+  });
   res.json({ group: shapeGroup(g) });
 });
 
@@ -714,6 +720,13 @@ app.post("/api/groups/:id/members", groupLimiter, async (req, res) => {
     res.status(400).json({ error: "cannot_add" });
     return;
   }
+  log.info("group_member_added", {
+    reqId: req.id,
+    groupId,
+    actorId: jwtUser.userId,
+    memberId: parsed.data.memberId,
+    memberCount: g.memberIds.length,
+  });
   res.json({ group: shapeGroup(g) });
 });
 
@@ -731,6 +744,13 @@ app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) =
     res.status(400).json({ error: "cannot_remove" });
     return;
   }
+  log.info("group_member_removed", {
+    reqId: req.id,
+    groupId,
+    actorId: jwtUser.userId,
+    memberId,
+    memberCount: g.memberIds.length,
+  });
   res.json({ group: shapeGroup(g) });
 });
 
@@ -835,6 +855,12 @@ app.post("/api/groups/:id/leave", async (req, res) => {
     res.status(400).json({ error: "cannot_leave" });
     return;
   }
+  log.info("group_left", {
+    reqId: req.id,
+    groupId: req.params.id,
+    userId: jwtUser.userId,
+    remainingMembers: g.memberIds.length,
+  });
   res.json({ ok: true });
 });
 

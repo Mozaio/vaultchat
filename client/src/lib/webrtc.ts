@@ -417,8 +417,11 @@ export async function acceptCall(
             effectiveRelayOnly
           );
         }
-      } catch {
-        /* ignore single bad remote payload */
+      } catch (e) {
+        rtcDebug("accept_remote_handle_failed", {
+          payloadType: payload.type,
+          err: shortError(e),
+        });
       }
     },
     addIce: async (c: RTCIceCandidateInit) => {
@@ -435,7 +438,7 @@ export async function acceptCall(
       try {
         pc.close();
       } catch {
-        /* noop */
+        /* close() may be a no-op on an already-closed pc; harmless */
       }
       onEnd();
     },
