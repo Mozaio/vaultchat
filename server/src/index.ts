@@ -290,10 +290,22 @@ app.post("/api/register", authLimiter, async (req, res) => {
       : {}),
   });
   if (!user) {
+    log.info("auth_register_fail", {
+      username: username.slice(0, 32),
+      reason: "username_taken",
+      ip: req.ip,
+    });
     res.status(409).json({ error: "username_taken" });
     return;
   }
   redeemInviteCode(parsed.data.inviteCode);
+  log.info("auth_register_ok", {
+    userId: user.id,
+    username: user.username,
+    plan: user.plan,
+    requestedPlan: parsed.data.requestedPlan ?? null,
+    ip: req.ip,
+  });
   const token = signToken({ userId: user.id, username: user.username });
   res.json({
     token,
@@ -316,10 +328,20 @@ app.post("/api/login", authLimiter, async (req, res) => {
   const { username, password } = parsed.data;
   const user = findUserByUsername(username);
   if (!user || !(await verifyPassword(user.passwordHash, password))) {
+    log.info("auth_login_fail", {
+      username: username.slice(0, 32),
+      reason: user ? "wrong_password" : "user_not_found",
+      ip: req.ip,
+    });
     res.status(401).json({ error: "invalid_credentials" });
     return;
   }
   const token = signToken({ userId: user.id, username: user.username });
+  log.info("auth_login_ok", {
+    userId: user.id,
+    username: user.username,
+    ip: req.ip,
+  });
   res.json({
     token,
     user: {

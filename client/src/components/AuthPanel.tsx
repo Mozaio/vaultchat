@@ -91,6 +91,17 @@ function humanError(err: unknown): string {
     return "Sitzung abgelaufen. Bitte erneut einloggen.";
   if (msg === "rate_limited")
     return "Zu viele Versuche. Bitte einen Moment warten.";
+  // Backup-Restore-Codes (vom backup.ts shape-check)
+  if (msg === "backup_passphrase_wrong_or_tampered")
+    return "Backup konnte nicht entschlüsselt werden — falsche Passphrase oder beschädigte Datei.";
+  if (msg === "backup_corrupt_json")
+    return "Backup ist beschädigt (kein gültiges JSON nach Entschlüsselung).";
+  if (msg === "backup_unexpected_shape")
+    return "Backup hat ein unerwartetes Format — vermutlich aus einer inkompatiblen Version.";
+  if (msg === "backup_must_be_encrypted_v2")
+    return "Backup-Format wird nicht unterstützt. Erwartet: VaultChat-Backup v2.";
+  if (msg === "backup_passphrase_required")
+    return "Backup-Passphrase wurde nicht eingegeben.";
   return msg;
 }
 
