@@ -119,8 +119,21 @@ export function AuthPanel({
   const [importJson, setImportJson] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busySlowHint, setBusySlowHint] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [capsLockOn, setCapsLockOn] = useState(false);
+
+  // Argon2id im Worker dauert 600-1200ms. Nach 800ms zeigen wir einen
+  // erklärenden Sub-Hinweis, damit User nicht den Eindruck bekommen,
+  // die App hänge. Vorher reicht der Spinner.
+  useEffect(() => {
+    if (!busy) {
+      setBusySlowHint(false);
+      return;
+    }
+    const t = setTimeout(() => setBusySlowHint(true), 800);
+    return () => clearTimeout(t);
+  }, [busy]);
 
   function detectCaps(e: React.KeyboardEvent<HTMLInputElement>) {
     try {
@@ -406,6 +419,7 @@ export function AuthPanel({
                 onClick={() => void handleUnlock()}
                 disabled={busy || !password}
                 className="auth-button"
+                aria-describedby={busySlowHint ? "auth-busy-hint" : undefined}
               >
                 {busy ? (
                   <>
@@ -416,6 +430,16 @@ export function AuthPanel({
                   "Entsperren"
                 )}
               </button>
+              {busySlowHint && (
+                <p
+                  id="auth-busy-hint"
+                  className="auth-hint"
+                  aria-live="polite"
+                >
+                  Schlüssel werden im Worker abgeleitet (Argon2id) — kann ein
+                  paar Sekunden dauern.
+                </p>
+              )}
               <p className="auth-hint">
                 Backup &amp; Fingerprint findest du nach dem Entsperren in den
                 Einstellungen.
@@ -482,6 +506,7 @@ export function AuthPanel({
                 onClick={() => void handleLogin()}
                 disabled={busy || !username || !password}
                 className="auth-button"
+                aria-describedby={busySlowHint ? "auth-busy-hint-login" : undefined}
               >
                 {busy ? (
                   <>
@@ -492,6 +517,16 @@ export function AuthPanel({
                   "Anmelden"
                 )}
               </button>
+              {busySlowHint && (
+                <p
+                  id="auth-busy-hint-login"
+                  className="auth-hint"
+                  aria-live="polite"
+                >
+                  Schlüssel werden im Worker abgeleitet (Argon2id) — kann ein
+                  paar Sekunden dauern.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => setMode("import")}
@@ -708,6 +743,9 @@ export function AuthPanel({
                   password.length < 10
                 }
                 className="auth-button"
+                aria-describedby={
+                  busySlowHint ? "auth-busy-hint-register" : undefined
+                }
               >
                 {busy ? (
                   <>
@@ -718,6 +756,16 @@ export function AuthPanel({
                   "Konto erstellen"
                 )}
               </button>
+              {busySlowHint && (
+                <p
+                  id="auth-busy-hint-register"
+                  className="auth-hint"
+                  aria-live="polite"
+                >
+                  Schlüssel werden im Worker generiert (Argon2id + X25519 +
+                  ML-KEM-1024) — kann ein paar Sekunden dauern.
+                </p>
+              )}
             </div>
           )}
 
