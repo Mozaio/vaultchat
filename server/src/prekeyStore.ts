@@ -217,6 +217,15 @@ export function getRemainingPreKeyCount(userId: string): number {
   return bundles.get(userId)?.oneTimePreKeys.size ?? 0;
 }
 
+/**
+ * Wie viele Olm-One-Time-Keys hat der User noch publiziert? Wird vom
+ * Client beim Upload-Response zurückgegeben, damit er bei niedrigem Stand
+ * neue Keys generieren kann.
+ */
+export function getRemainingOlmKeyCount(userId: string): number {
+  return bundles.get(userId)?.olm?.oneTimeKeys.size ?? 0;
+}
+
 export function getPreKeyStats() {
   let oneTimePreKeys = 0;
   for (const bundle of bundles.values()) {

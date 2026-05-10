@@ -36,6 +36,7 @@ import {
 import {
   getPreKeyBundle,
   getPreKeyStats,
+  getRemainingOlmKeyCount,
   getRemainingPreKeyCount,
   initPreKeyBundle,
   uploadOlmKeys,
@@ -1011,7 +1012,11 @@ app.post("/api/keys", async (req, res) => {
   if (parsed.data.olm) {
     uploadOlmKeys(jwtUser.userId, parsed.data.olm);
   }
-  res.json({ ok: true, remaining: getRemainingPreKeyCount(jwtUser.userId) });
+  res.json({
+    ok: true,
+    remaining: getRemainingPreKeyCount(jwtUser.userId),
+    remainingOlm: getRemainingOlmKeyCount(jwtUser.userId),
+  });
 });
 
 const server = createServer(app);

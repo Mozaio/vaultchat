@@ -698,7 +698,10 @@ export function ChatShell({
     };
   }, [unreadByPeer]);
 
-  /** Pre-Key-Bundle auf den Server hochladen (X3DH-API, kompatibel mit eurer Konto-Identität). */
+  /**
+   * Pre-Key-Bundle (Olm-Identity + Olm-OTKs + Legacy-Felder) initial hochladen.
+   * Refresh läuft separat, siehe Effect mit OLM_OTK_LOW_WATERMARK.
+   */
   useEffect(() => {
     void (async () => {
       try {
@@ -712,8 +715,6 @@ export function ChatShell({
           km = replenished;
           await saveKeyMaterial(km);
         }
-        // Olm-Material wird parallel ins Bundle gepackt — der auditierte
-        // VCO5-Pfad ist ab jetzt der Default für neue Sessions.
         const body = await buildUploadBodyWithOlm(km);
         await api.uploadPreKeys(session.token, body);
       } catch (e) {
@@ -722,6 +723,50 @@ export function ChatShell({
       }
     })();
   }, [session.token, session.secretKey]);
+
+  /**
+   * Olm-OTK-Refill: alle 30 min, oder wenn der Server-Antwort meldet, dass
+   * wir unter `OLM_OTK_LOW_WATERMARK` sind. Pro Refresh werden 50 neue
+   * One-Time-Keys generiert und ans Bundle gepostet. Identity bleibt
+   * stabil (`ensureOlmAccount` liest den existing pickled Account).
+   */
+  useEffect(() => {
+    const OLM_OTK_LOW_WATERMARK = 20;
+    const REFILL_INTERVAL_MS = 30 * 60_000;
+    let disposed = false;
+
+    const refill = async () => {
+      if (disposed) return;
+      try {
+        const km = await loadKeyMaterial();
+        if (!km) return;
+        const body = await buildUploadBodyWithOlm(km);
+        const resp = await api.uploadPreKeys(session.token, body);
+        if (
+          typeof resp.remainingOlm === "number" &&
+          resp.remainingOlm < OLM_OTK_LOW_WATERMARK
+        ) {
+          // eslint-disable-next-line no-console
+          console.debug("[vaultchat:olm] otk_refill_threshold", {
+            remaining: resp.remainingOlm,
+          });
+          // Bereits oben aufgefüllt — nichts weiteres zu tun. Beim nächsten
+          // 30-min-Tick wird sich der Stand stabilisieren.
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.debug("[vaultchat:olm] otk_refill_failed", {
+          err: e instanceof Error ? e.message : String(e),
+        });
+      }
+    };
+
+    const t = setInterval(refill, REFILL_INTERVAL_MS);
+    return () => {
+      disposed = true;
+      clearInterval(t);
+    };
+  }, [session.token]);
 
   useEffect(() => {
     void (async () => {

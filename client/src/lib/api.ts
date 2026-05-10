@@ -390,11 +390,14 @@ export async function uploadPreKeys(
     };
   }
 ) {
-  return req<{ ok: true; remaining: number }>("/api/keys", {
-    method: "POST",
-    body: JSON.stringify(body),
-    token,
-  });
+  return req<{ ok: true; remaining: number; remainingOlm?: number }>(
+    "/api/keys",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      token,
+    }
+  );
 }
 
 /**

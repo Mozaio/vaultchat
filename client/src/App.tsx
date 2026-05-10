@@ -106,6 +106,8 @@ import {
 import { resetAllReplayProtection } from "./lib/replayProtection";
 import { shutdownCryptoWorker } from "./lib/cryptoWorkerClient";
 import { clearSearchIndex } from "./lib/searchIndex";
+import { clearOlmPickleCache } from "./lib/olmSessionStore";
+import { clearMegolmPickleCache } from "./lib/megolmSessionStore";
 
 export type { Session };
 
@@ -194,6 +196,11 @@ export function App() {
     clearVerificationKey();
     shutdownCryptoWorker();
     clearSearchIndex();
+    // Olm/Megolm pickle-Keys werden aus dem Local-Key abgeleitet — bei Lock
+    // ist der Local-Key weg, also dürfen wir auch die Cache-Kopien davon
+    // nicht weiter halten.
+    clearOlmPickleCache();
+    clearMegolmPickleCache();
     setSession(null);
   }, [session]);
 
