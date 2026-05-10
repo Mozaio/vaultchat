@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "tsx --test src/lib/cryptoCore.test.ts src/lib/backup.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/x3dh.test.ts src/lib/doubleRatchet.property.test.ts src/lib/olmAdapter.test.ts src/lib/olmSession.test.ts src/lib/megolmSession.test.ts",
+    "test": "tsx --test src/lib/backup.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/olmAdapter.test.ts src/lib/olmSession.test.ts src/lib/megolmSession.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

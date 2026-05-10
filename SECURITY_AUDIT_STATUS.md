@@ -24,16 +24,24 @@ nicht auditiert ist, steht das hier.
 | `client/src/lib/replayProtection.ts` | Client-seitiges Map-Set | Wie oben. |
 | `server/src/auth.ts` | JWT mit `jsonwebtoken`, expliziter Issuer | jsonwebtoken hat HISTORY mit algorithm-confusion CVEs — wir nutzen `verify(token, secret, { issuer })`, der parsed `algorithm`-Header ist nicht beeinflussbar weil wir mit einer einzelnen HS256-Secret-Konstante arbeiten. |
 
-## 🔴 Selbstgeschriebene Protokoll-Logik (NICHT auditiert)
+## 🔴 Selbstgeschriebene Protokoll-Logik
 
-Das ist der entscheidende Audit-Gap zu Signal/Element. Status pro Datei:
+**Phase 5 (2026-05-10) erledigt**: `doubleRatchet.ts`, `x3dh.ts`,
+`drSession.ts`, `groupCrypto.ts`, `groupCryptoV3.ts` sowie die
+zugehörigen Tests (`cryptoCore.test.ts`, `x3dh.test.ts`,
+`doubleRatchet.property.test.ts`) sind komplett aus dem Repo entfernt.
+Der gesamte DM- und Group-Krypto-Pfad läuft jetzt ausschließlich über
+Olm + Megolm.
 
-| Datei | Was | Aktueller Plan |
-|---|---|---|
-| `client/src/lib/doubleRatchet.ts` | Eigene DR v4 (XChaCha20-Poly1305 + BLAKE2b-KDF, AAD-bound Header) | **Migration zu Olm geplant** (siehe unten). Bis dahin: Memory-Hygiene (sec 6464885), Property-Tests gegen Bit-Flips/Replay/Roundtrip (96ab6a1). |
-| `client/src/lib/x3dh.ts` | X3DH + ML-KEM-Hybrid für Initial-Handshake | **Migration zu Olm-PreKey-Bundles geplant**. Olm hat eigenen Handshake (`Account.outboundSession`, OneTimeKey-basiert) — austauschbares Wire-Format. |
-| `client/src/lib/groupCrypto.ts` (v2) | Sender-Chains pro Member | **Self-Disclosed broken**: Ex-Mitglieder die den Root-Key kennen können zukünftige Chains rekonstruieren. Migration zu **Megolm** (Group-Ratchet, auditiert, semantisch ähnlich zu Signal Sender Keys) geplant. |
-| `client/src/lib/groupCryptoV3.ts` | TreeKEM/MLS Skeleton | Wird vermutlich zugunsten von Megolm gestoppt — Megolm ist auditiert + produktiv erprobt, MLS-Browser-Implementations sind noch instabil. |
+Was an selbstgeschriebenem Code bleibt (bewusst):
+- `sealedSender.ts` — 20-Zeilen `crypto_box_seal`-Wrapper, der den
+  Sender-Identifier vom Server fernhält. Tests + Memory-Hygiene da.
+- Wire-Format-Encoder/Decoder (`VCO5`, `VCG6`) — pure Byte-Packerei,
+  Property-Tests, schwer falsch zu machen.
+- `backup.ts` — Argon2id + secretbox auf serialisierte LocalIdentity.
+  Standardpattern, Tests da.
+- `replayStore.ts` / `replayProtection.ts` — Sliding-Window-Set.
+  Kein neuer Krypto-Algorithmus.
 
 ## Migrations-Plan auf auditierte Protocols
 
@@ -95,11 +103,35 @@ Fallback bleibt aktiv: existierende v4-DR-Sessions und GC2-Group-Ciphers
 werden weiter dekodiert, Sender fallen darauf nur zurück, wenn das
 Olm-Bundle fehlt.
 
-### Phase 5 — Self-rolled Code löschen (späterer Schritt)
-- `doubleRatchet.ts`, `x3dh.ts`, `groupCrypto.ts` werden gelöscht,
-  sobald sichtbar ist, dass keine v4/GC2-State-Records mehr in
-  lokalen DBs aktiv sind. Bis dahin bleibt der Fallback-Pfad als
-  Sicherheitsnetz für Bestandsdaten.
+### Phase 5 — Self-rolled Code gelöscht ✅ erledigt (2026-05-10)
+- `client/src/lib/doubleRatchet.ts` ✗ gelöscht
+- `client/src/lib/x3dh.ts` ✗ gelöscht
+- `client/src/lib/drSession.ts` ✗ gelöscht
+- `client/src/lib/groupCrypto.ts` ✗ gelöscht
+- `client/src/lib/groupCryptoV3.ts` ✗ gelöscht (Skelett, durch Megolm überholt)
+- `client/src/lib/cryptoCore.test.ts` ✗ gelöscht (testete DR + X3DH)
+- `client/src/lib/x3dh.test.ts` ✗ gelöscht
+- `client/src/lib/doubleRatchet.property.test.ts` ✗ gelöscht
+- `client/src/lib/sealedSender.test.ts` neu geschrieben (ohne DR-Abhängigkeit)
+- `incomingDm.ts` akzeptiert nur noch `VCO5`-Wire; nicht-Olm-Inner werden
+  silently verworfen.
+- `ChatShell.sendDmWire` hat keinen DR-Fallback mehr — fail-fast mit
+  `setError` wenn Empfänger kein Olm-Bundle publiziert hat.
+- `ChatShell.sendGroupWire` hat keinen GC2-Fallback mehr.
+- `ChatShell` Group-Receive akzeptiert nur noch `VCG6` (Megolm).
+- `createGroup` / `addMember` / `removeMember`: kein `randomGroupKey` /
+  `setGroupKey` / `initGroupKeyState` mehr — Megolm verwaltet seinen
+  Session-Key selbst und rotiert via `rotateForMemberRemoval`.
+
+**Audit-Footprint vorher → nachher** (Lines of self-rolled crypto code):
+- doubleRatchet.ts: 274 LOC
+- x3dh.ts: 134 LOC
+- drSession.ts: ~580 LOC
+- groupCrypto.ts: 478 LOC
+- groupCryptoV3.ts: 147 LOC
+- = **~1613 Zeilen Krypto-Code entfernt**, ersetzt durch die auditierten
+  Olm/Megolm-Pfade (Wrapper-Code: ~600 Zeilen, eigentliche Krypto
+  liegt im Olm-WASM und wird nicht von uns gepflegt).
 
 ## Was bleibt auch nach allen Phasen selbst geschrieben
 

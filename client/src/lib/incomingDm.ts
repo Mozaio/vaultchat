@@ -1,13 +1,5 @@
 import type { ApiUser } from "./api";
-import { openPayload, type PlainPayload } from "./crypto";
-import {
-  drDecryptDmBundleJson,
-  drDecryptJson,
-  drDecryptX3dhPreKeyJson,
-  isDrCiphertext,
-  isDmBundleFrame,
-  isX3dhPreKeyFrame,
-} from "./drSession";
+import { type PlainPayload } from "./crypto";
 import { isOlmCiphertext, olmDecryptJson } from "./olmSession";
 import { openSealedEnvelope } from "./sealedSender";
 import { isMessageDuplicate } from "./replayProtection";
@@ -22,19 +14,23 @@ export type DecryptedDm = {
 /**
  * Entschlüsselt eine eingehende Sealed-Sender-DM.
  *
+ * Phase 5: nur noch auditiertes Olm (`VCO5`-Wire) als gültiges Inner-Format.
+ * Die alten Pfade (DR v4, X3DH-PreKey-Bundle, DmBundle) sind entfernt.
+ * Wer noch alte Wires sendet, bekommt einen `silent crypto failure`-Log
+ * und der Frame wird verworfen — ehrlicher Bruch statt schleichender
+ * Fallback-Drift.
+ *
  * 1. Öffnet den Sealed-Envelope → extrahiert senderUserId und inneren Ciphertext
  * 2. Sucht den Peer-Record (für dessen Identity-Public-Key) in der aktuellen Liste
- * 3. Entschlüsselt den inneren Ciphertext via Double Ratchet (oder sealed-box
- *    bei Group-Key-Distribution, wenn der innere Frame kein DR-Wire ist)
- *
- * Wenn der Sender unbekannt ist (noch nicht in `knownUsers`), wird eine
- * Peer-Lookup-Routine vom Aufrufer bereitgestellt.
+ * 3. Decoded den inneren VCO5-Wire via Olm-Session
  */
 export async function decryptIncomingSealedDm(
   envelopeB64: string,
   session: Session,
   resolvePeer: (userId: string) => Promise<ApiUser | null>,
-  options: { receivedAt?: number } = {}
+  // _options ist für künftige receivedAt-Logik reserviert; aktuell nicht
+  // benutzt, weil Olm den Ratchet selbst verwaltet.
+  _options: { receivedAt?: number } = {}
 ): Promise<DecryptedDm | null> {
   let senderUserId: string;
   let innerB64: string;
@@ -55,44 +51,12 @@ export async function decryptIncomingSealedDm(
 
   let plain: PlainPayload;
   try {
-    // Olm-Wire (VCO5) zuerst — der auditierte Pfad ist Default.
-    // Falls vorhanden, geht alles andere am Sender vorbei.
-    if (isOlmCiphertext(innerB64)) {
-      const json = await olmDecryptJson(peer.id, innerB64);
-      plain = JSON.parse(json) as PlainPayload;
-    } else if (isDmBundleFrame(innerB64)) {
-      const json = await drDecryptDmBundleJson(
-        session.secretKey,
-        peer.id,
-        peer.publicKey,
-        innerB64,
-        options.receivedAt
-      );
-      plain = JSON.parse(json) as PlainPayload;
-    } else if (isDrCiphertext(innerB64)) {
-      const json = await drDecryptJson(
-        session.secretKey,
-        peer.id,
-        peer.publicKey,
-        innerB64
-      );
-      plain = JSON.parse(json) as PlainPayload;
-    } else if (isX3dhPreKeyFrame(innerB64)) {
-      const json = await drDecryptX3dhPreKeyJson(
-        session.secretKey,
-        peer.id,
-        peer.publicKey,
-        innerB64,
-        options.receivedAt
-      );
-      plain = JSON.parse(json) as PlainPayload;
-    } else {
-      plain = await openPayload(
-        innerB64,
-        session.user.publicKey,
-        session.secretKey
-      );
+    if (!isOlmCiphertext(innerB64)) {
+      // Phase 5: nicht-Olm-Inner ist legacy und nicht mehr unterstützt.
+      throw new Error("non_olm_inner_dropped");
     }
+    const json = await olmDecryptJson(peer.id, innerB64);
+    plain = JSON.parse(json) as PlainPayload;
   } catch (e) {
     logSilentCryptoFailure(e, "decryptIncomingSealedDm.inner");
     return null;
@@ -109,7 +73,6 @@ export async function decryptIncomingSealedDmWithReplayCheck(
   session: Session,
   resolvePeer: (userId: string) => Promise<ApiUser | null>
 ): Promise<DecryptedDm | null> {
-  // Erst entschlüsseln
   const result = await decryptIncomingSealedDm(envelopeB64, session, resolvePeer);
   if (!result) return null;
 
