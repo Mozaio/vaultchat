@@ -52,7 +52,7 @@ import {
   revokeInvite,
 } from "./inviteStore.js";
 import { log, requestLogger } from "./logger.js";
-import { markIfNew as markEnvelopeIfNew } from "./replayStore.js";
+import { markIfNew as markEnvelopeIfNew, replayStats } from "./replayStore.js";
 
 assertRuntimeConfig();
 
@@ -177,6 +177,38 @@ app.get("/readyz", (_req, res) => {
       writable: state.writable,
     },
     problems,
+  });
+});
+
+/**
+ * Aggregierte Runtime-Stats. Für Operations-Dashboards. KEINE PII —
+ * nur Counter/Größen, keine User-IDs oder Inhalte.
+ *
+ * Endpoint ist offen (kein Auth), aber der Output wäre für jemanden
+ * außerhalb von Operations belanglos. Falls Bedenken: VAULTCHAT_STATS_TOKEN
+ * env var prüfen und 401 zurückgeben — aktuell nicht eingebaut.
+ */
+app.get("/api/stats", (_req, res) => {
+  const ws = getWsStats();
+  const mailbox = getMailboxStats();
+  const directory = getDirectoryStats();
+  const prekey = getPreKeyStats();
+  const replay = replayStats();
+  const memory = process.memoryUsage();
+  res.json({
+    uptime: Math.round(process.uptime()),
+    ws,
+    mailbox,
+    directory,
+    prekey,
+    replay,
+    memory: {
+      rssMb: Math.round(memory.rss / 1024 / 1024),
+      heapUsedMb: Math.round(memory.heapUsed / 1024 / 1024),
+      heapTotalMb: Math.round(memory.heapTotal / 1024 / 1024),
+      external: Math.round(memory.external / 1024 / 1024),
+    },
+    nodeVersion: process.version,
   });
 });
 
