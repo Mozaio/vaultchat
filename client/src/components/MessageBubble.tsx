@@ -314,10 +314,25 @@ export function MessageBubble({
     setMenuOpen(false);
   }
 
+  // ARIA-Label für Screenreader: kurze Zusammenfassung der Bubble (Sender,
+  // Inhaltsart, Vorschau). Den vollen Body lesen Screenreader ohnehin im
+  // Inhalt, das Label ist für die Liste-Navigation gedacht.
+  const ariaLabel = (() => {
+    const who = msg.fromMe ? "Du" : peerLabel;
+    if (msg.deleted) return `${who}: gelöschte Nachricht`;
+    if (msg.plain.kind === "voice") return `${who}: Sprachnachricht`;
+    if (msg.plain.kind === "file") return `${who}: Datei ${msg.plain.fileName ?? ""}`;
+    const text = msg.plain.body ?? "";
+    const trimmed = text.length > 80 ? text.slice(0, 80) + "…" : text;
+    return `${who}: ${trimmed || "leere Nachricht"}`;
+  })();
+
   return (
     <div
       ref={bubbleRef}
       data-cid={msg.plain.cid}
+      role="article"
+      aria-label={ariaLabel}
       className={`message-wrapper group ${msg.fromMe ? "sent" : "received"}${
         isHighlighted ? " highlighted" : ""
       }`}

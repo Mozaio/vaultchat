@@ -4004,6 +4004,8 @@ export function ChatShell({
 
             <div
               ref={dmScrollRef}
+              role="log"
+              aria-label={`Direktnachrichten mit ${peer.username}`}
               className="messages-container !px-4 !py-4 relative"
               onDragOver={(e) => {
                 e.preventDefault();
@@ -4346,6 +4348,11 @@ export function ChatShell({
                 <textarea
                   ref={dmInputRef}
                   className="chat-input-textarea"
+                  aria-label={
+                    peer && peer.id !== session.user.id
+                      ? `Nachricht an ${peer.username} schreiben`
+                      : "Notiz für dich schreiben"
+                  }
                   placeholder={
                     voice.recording
                       ? `Aufnahme läuft … ${formatElapsedMs(voice.elapsedMs)}`
@@ -4872,6 +4879,8 @@ export function ChatShell({
             </header>
             <div
               ref={groupScrollRef}
+              role="log"
+              aria-label={`Gruppenchat ${group?.name ?? ""}`}
               className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 relative"
               onDragOver={(e) => {
                 e.preventDefault();
@@ -5199,6 +5208,9 @@ export function ChatShell({
                 <textarea
                   ref={groupInputRef}
                   className="chat-input-textarea"
+                  aria-label={
+                    group ? `Nachricht an Gruppe ${group.name} schreiben` : "Gruppennachricht schreiben"
+                  }
                   placeholder={
                     groupVoice.recording
                       ? `Aufnahme läuft … ${formatElapsedMs(groupVoice.elapsedMs)}`
