@@ -33,45 +33,47 @@ type PreKeyBundle = {
 };
 
 function hydrateBundle(bundle: PersistedPreKeyBundle): PreKeyBundle {
-  return {
-    ...bundle,
+  // `olm` muss vom Spread ausgeschlossen werden, weil das persisted Shape
+  // (Array) sich strukturell von der In-Memory-Form (Map) unterscheidet —
+  // sonst sieht TS das ...spread "olm" UND das explizit gesetzte als zwei
+  // mögliche Typen.
+  const { olm, oneTimePreKeys, ...rest } = bundle;
+  const hydrated: PreKeyBundle = {
+    ...rest,
     oneTimePreKeys: new Map(
-      bundle.oneTimePreKeys.map((key) => [key.keyId, key.publicKey])
+      oneTimePreKeys.map((key) => [key.keyId, key.publicKey])
     ),
-    ...(bundle.olm
-      ? {
-          olm: {
-            identityCurve25519: bundle.olm.identityCurve25519,
-            identityEd25519: bundle.olm.identityEd25519,
-            oneTimeKeys: new Map(
-              bundle.olm.oneTimeKeys.map((k) => [k.keyId, k.publicKey])
-            ),
-          },
-        }
-      : {}),
   };
+  if (olm) {
+    hydrated.olm = {
+      identityCurve25519: olm.identityCurve25519,
+      identityEd25519: olm.identityEd25519,
+      oneTimeKeys: new Map(olm.oneTimeKeys.map((k) => [k.keyId, k.publicKey])),
+    };
+  }
+  return hydrated;
 }
 
 function serializeBundle(bundle: PreKeyBundle): PersistedPreKeyBundle {
-  return {
-    ...bundle,
-    oneTimePreKeys: [...bundle.oneTimePreKeys].map(([keyId, publicKey]) => ({
+  const { olm, oneTimePreKeys, ...rest } = bundle;
+  const serialized: PersistedPreKeyBundle = {
+    ...rest,
+    oneTimePreKeys: [...oneTimePreKeys].map(([keyId, publicKey]) => ({
       keyId,
       publicKey,
     })),
-    ...(bundle.olm
-      ? {
-          olm: {
-            identityCurve25519: bundle.olm.identityCurve25519,
-            identityEd25519: bundle.olm.identityEd25519,
-            oneTimeKeys: [...bundle.olm.oneTimeKeys].map(([keyId, publicKey]) => ({
-              keyId,
-              publicKey,
-            })),
-          },
-        }
-      : {}),
   };
+  if (olm) {
+    serialized.olm = {
+      identityCurve25519: olm.identityCurve25519,
+      identityEd25519: olm.identityEd25519,
+      oneTimeKeys: [...olm.oneTimeKeys].map(([keyId, publicKey]) => ({
+        keyId,
+        publicKey,
+      })),
+    };
+  }
+  return serialized;
 }
 
 const bundles = new Map<string, PreKeyBundle>(
