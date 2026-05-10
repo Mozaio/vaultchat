@@ -72,6 +72,20 @@ export function App() {
   const [bootError, setBootError] = useState<string | null>(null);
   const [codeCheck, setCodeCheck] = useState<CodeCheck | null>(null);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
+  // Render-Free schläft nach 15 min Inaktivität ein. Erste API-Anfrage
+  // dauert 20-30s. Wir zeigen einen Hinweis-Banner sobald api.ts ein
+  // cold-start-Event feuert (>4s ein einzelner Call).
+  const [coldStart, setColdStart] = useState(false);
+  useEffect(() => {
+    const onStart = () => setColdStart(true);
+    const onDone = () => setColdStart(false);
+    window.addEventListener("vaultchat:cold-start", onStart);
+    window.addEventListener("vaultchat:cold-start-done", onDone);
+    return () => {
+      window.removeEventListener("vaultchat:cold-start", onStart);
+      window.removeEventListener("vaultchat:cold-start-done", onDone);
+    };
+  }, []);
   // Auto-lock interval, in minutes. 0 disables auto-lock entirely.
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
     loadAutoLockMinutes()
@@ -243,10 +257,25 @@ export function App() {
     <CodeIntegrityBanner check={codeCheck} onPinned={refreshCodeIntegrity} />
   ) : null;
 
+  const coldStartBanner = coldStart ? (
+    <div
+      className="cold-start-banner"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="cold-start-spinner" aria-hidden />
+      <span>
+        Server wacht auf … (Render-Free schläft bei Inaktivität, erste Anfrage
+        dauert ~20–30 s)
+      </span>
+    </div>
+  ) : null;
+
   if (!unlocked) {
     return (
       <div className="flex min-h-full flex-col">
         {banner}
+        {coldStartBanner}
         {runtimeError && (
           <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
             <div className="flex items-center justify-between gap-3">
@@ -317,6 +346,7 @@ export function App() {
   return (
     <div className="flex min-h-full flex-col">
       {banner}
+      {coldStartBanner}
       {runtimeError && (
         <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
           <div className="flex items-center justify-between gap-3">

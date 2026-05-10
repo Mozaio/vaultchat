@@ -49,6 +49,30 @@ export type ApiGroup = {
   updatedAt?: number;
 };
 
+/**
+ * Custom-Event "vaultchat:cold-start" wird gefeuert, wenn ein einzelner
+ * API-Call länger als 4 Sekunden braucht — typischerweise weil Render-Free
+ * den Server beim ersten Request nach 15 min Inaktivität aus dem Sleep
+ * holt (Cold-Start). UI-Komponenten (App.tsx) hängen sich an dieses
+ * Event und zeigen einen erklärenden Banner, damit User nicht denken,
+ * die Seite hängt.
+ */
+const COLD_START_THRESHOLD_MS = 4_000;
+function fireColdStart() {
+  try {
+    window.dispatchEvent(new CustomEvent("vaultchat:cold-start"));
+  } catch {
+    /* SSR or test env */
+  }
+}
+function fireColdStartDone() {
+  try {
+    window.dispatchEvent(new CustomEvent("vaultchat:cold-start-done"));
+  } catch {
+    /* noop */
+  }
+}
+
 async function req<T>(
   path: string,
   init?: RequestInit & { token?: string | null }
@@ -58,7 +82,8 @@ async function req<T>(
   };
   if (init?.token) headers.Authorization = `Bearer ${init.token}`;
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 20_000);
+  const t = setTimeout(() => ctrl.abort(), 30_000);
+  const coldStartTimer = setTimeout(fireColdStart, COLD_START_THRESHOLD_MS);
   let r: Response;
   try {
     r = await fetch(`${apiBase()}${path}`, {
@@ -73,6 +98,8 @@ async function req<T>(
     throw new Error("network_error_or_cors");
   } finally {
     clearTimeout(t);
+    clearTimeout(coldStartTimer);
+    fireColdStartDone();
   }
   if (!r.ok) {
     const raw = await r.text();

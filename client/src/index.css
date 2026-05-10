@@ -2760,6 +2760,39 @@ select:focus-visible {
 }
 
 /*
+ * Render-Free Cold-Start Hinweisbanner. Erscheint, sobald ein einzelner
+ * API-Call >4s braucht — typisch wenn der Server aus dem 15-min-Sleep
+ * geweckt wird. Grenzlinie zum Code-Integrity-Banner darunter.
+ */
+.cold-start-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.9rem;
+  background: rgba(217, 119, 6, 0.12);
+  border-bottom: 1px solid rgba(217, 119, 6, 0.4);
+  color: var(--warning, #d97706);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.cold-start-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: boot-spin 0.85s linear infinite;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cold-start-spinner {
+    animation: none;
+  }
+}
+
+/*
  * Suspense-Fallback für die lazy-loaded AuthPanel/ChatShell Chunks.
  * Wird in einen flex-Parent (flex flex-1 min-h-0) eingehängt — daher
  * flex:1 + min-width:100% statt min-height:100vh wie der Top-Level
