@@ -12,11 +12,39 @@
 
 const SW_URL = "/sw.js";
 
+/**
+ * Wird gefeuert, wenn nach der initialen Registration ein NEUER SW
+ * die Kontrolle übernimmt (typisch: skipWaiting+claim nach einem Deploy).
+ * App.tsx hört darauf und zeigt einen "Neue Version geladen — Reload"-Toast.
+ */
+export const SW_UPDATE_EVENT = "vaultchat:sw-update";
+
 export function registerServiceWorker(): void {
   if (!("serviceWorker" in navigator)) return;
   if (typeof window === "undefined") return;
   // SW nur in Production registrieren — sonst cached Vite dev-server-output.
   if (!isProductionLike()) return;
+
+  // Initialer Controller-State merken: ein controllerchange-Event NACH dem
+  // initialen Page-Load (also nicht der allererste Controller-Setup) heisst
+  // "Ein neuer Build hat gerade die Kontrolle übernommen → die User sieht
+  // jetzt veraltete Assets, bis sie reloadet".
+  const hadInitialController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadInitialController) {
+      // Erster Controller-Wechsel der eine page-load betrifft, ist die
+      // initiale Registration — kein Update-Toast.
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.debug("[vaultchat:sw] controllerchange — new build active");
+    try {
+      window.dispatchEvent(new CustomEvent(SW_UPDATE_EVENT));
+    } catch {
+      /* noop */
+    }
+  });
+
   // SW-Registrierung im Idle, damit der Boot-Pfad nicht blockiert.
   const run = () => {
     void navigator.serviceWorker
@@ -27,6 +55,12 @@ export function registerServiceWorker(): void {
           scope: reg.scope,
           active: !!reg.active,
         });
+        // Update-Check alle 60 min — bei langen Sessions sonst kein refresh.
+        setInterval(() => {
+          void reg.update().catch(() => {
+            /* network jitter, no harm */
+          });
+        }, 60 * 60_000);
       })
       .catch((err: unknown) => {
         // SW-Registrierung darf den Boot nicht killen — Render-Free

@@ -119,14 +119,19 @@ export function App() {
   // dauert 20-30s. Wir zeigen einen Hinweis-Banner sobald api.ts ein
   // cold-start-Event feuert (>4s ein einzelner Call).
   const [coldStart, setColdStart] = useState(false);
+  // Service Worker hat einen neuen Build übernommen — User sollte reloaden.
+  const [swUpdateReady, setSwUpdateReady] = useState(false);
   useEffect(() => {
     const onStart = () => setColdStart(true);
     const onDone = () => setColdStart(false);
+    const onSwUpdate = () => setSwUpdateReady(true);
     window.addEventListener("vaultchat:cold-start", onStart);
     window.addEventListener("vaultchat:cold-start-done", onDone);
+    window.addEventListener("vaultchat:sw-update", onSwUpdate);
     return () => {
       window.removeEventListener("vaultchat:cold-start", onStart);
       window.removeEventListener("vaultchat:cold-start-done", onDone);
+      window.removeEventListener("vaultchat:sw-update", onSwUpdate);
     };
   }, []);
   // Auto-lock interval, in minutes. 0 disables auto-lock entirely.
@@ -314,10 +319,42 @@ export function App() {
     </div>
   ) : null;
 
+  const swUpdateBanner = swUpdateReady ? (
+    <div
+      className="cold-start-banner"
+      role="status"
+      aria-live="polite"
+      style={{
+        background: "rgba(13, 148, 136, 0.12)",
+        borderBottomColor: "rgba(13, 148, 136, 0.4)",
+        color: "var(--accent, #0d9488)",
+      }}
+    >
+      <span>Neue Version verfügbar — Reload für Update.</span>
+      <button
+        type="button"
+        onClick={() => location.reload()}
+        style={{
+          marginLeft: "auto",
+          padding: "0.15rem 0.6rem",
+          borderRadius: "4px",
+          border: "1px solid currentColor",
+          background: "transparent",
+          color: "inherit",
+          fontSize: "0.75rem",
+          cursor: "pointer",
+        }}
+      >
+        Jetzt neu laden
+      </button>
+    </div>
+  ) : null;
+
   if (!unlocked) {
     return (
       <div className="flex min-h-full flex-col">
         {banner}
+        {swUpdateBanner}
         {coldStartBanner}
         {runtimeError && (
           <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
@@ -391,6 +428,7 @@ export function App() {
   return (
     <div className="flex min-h-full flex-col">
       {banner}
+      {swUpdateBanner}
       {coldStartBanner}
       {runtimeError && (
         <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
