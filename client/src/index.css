@@ -2759,6 +2759,29 @@ select:focus-visible {
   font-size: 0.85rem;
 }
 
+/*
+ * Suspense-Fallback für die lazy-loaded AuthPanel/ChatShell Chunks.
+ * Wird in einen flex-Parent (flex flex-1 min-h-0) eingehängt — daher
+ * flex:1 + min-width:100% statt min-height:100vh wie der Top-Level
+ * boot-loader. Vorher war hier .boot-loader → das Element nahm nur
+ * seine intrinsische Breite ein und klebte am linken Rand.
+ */
+.chunk-fallback {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  padding: 1.5rem;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
 .boot-loader-spinner {
   width: 32px;
   height: 32px;

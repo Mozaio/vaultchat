@@ -25,8 +25,12 @@ const ChatShell = lazy(() =>
 );
 
 function ChunkFallback({ label }: { label: string }) {
+  // chunk-fallback ist ein Flex-Kind — füllt seinen Parent (flex flex-1)
+  // komplett aus statt am linken Rand zu kleben. boot-loader (für den
+  // initial Sodium-Splash auf Top-Level) hat min-height:100vh statt flex:1
+  // und ist dafür ungeeignet.
   return (
-    <div className="boot-loader" role="status" aria-live="polite">
+    <div className="chunk-fallback" role="status" aria-live="polite">
       <div className="boot-loader-spinner" aria-hidden />
       <p>{label}</p>
     </div>
