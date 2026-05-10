@@ -51,9 +51,18 @@ import { encryptIdentityBackup } from "../lib/backup";
 import { loadLocalIdentity } from "../lib/localIdentity";
 import { previewForPayload } from "../lib/messagePreview";
 import {
+  fmtDateLabel,
+  formatElapsedMs,
+  loadStringSet,
+  newCid,
+  saveStringSet,
+  userGradient,
+} from "../lib/chatHelpers";
+import {
   MessageBubble,
   type ChatMsg,
 } from "./MessageBubble";
+import { PeerRow } from "./PeerRow";
 import {
   authoredFromDm,
   authoredFromGroup,
@@ -142,20 +151,6 @@ type SharedMediaItem = {
   at: number;
 };
 
-function loadStringSet(key: string): Set<string> {
-  try {
-    const raw = localStorage.getItem(key);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveStringSet(key: string, value: Set<string>) {
-  localStorage.setItem(key, JSON.stringify(Array.from(value)));
-}
-
 function isBackupReminderDismissed(): boolean {
   try {
     return localStorage.getItem("vaultchat.backupReminder.dismissed") === "1";
@@ -180,22 +175,6 @@ const TTL_OPTIONS: { label: string; ms: number }[] = [
   { label: "7 Tage", ms: 7 * 24 * 60 * 60_000 },
 ];
 
-function newCid(): string {
-  return (
-    (globalThis.crypto?.randomUUID?.() as string | undefined) ??
-    Math.random().toString(36).slice(2)
-  );
-}
-
-/** mm:ss for voice-recording elapsed time. Adds 🔴 prefix beyond 1 min. */
-function formatElapsedMs(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  const prefix = m >= 1 ? "🔴 " : "";
-  return `${prefix}${m}:${s.toString().padStart(2, "0")}`;
-}
-
 /** Weiterleitung als neuer DM-Frame (nur Text/Datei). */
 function buildForwardPayloadForSend(
   m: ChatMsg,
@@ -219,43 +198,6 @@ function buildForwardPayloadForSend(
   };
 }
 
-/** Discord-like deterministic avatar color from user ID */
-function userColor(userId: string): string {
-  const colors = [
-    "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#10b981",
-    "#06b6d4", "#3b82f6", "#6366f1", "#8b5cf6", "#d946ef",
-    "#f43f5e", "#14b8a6", "#0ea5e9", "#a855f7", "#ec4899",
-  ];
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const idx = Math.abs(hash) % colors.length;
-  return colors[idx];
-}
-
-function userGradient(userId: string): string {
-  const base = userColor(userId);
-  // Create a slightly darker variant for gradient
-  return `linear-gradient(135deg, ${base} 0%, ${base}dd 100%)`;
-}
-
-/** WhatsApp/Telegram style date separator label */
-function fmtDateLabel(at: number): string {
-  const d = new Date(at);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today.getTime() - 86400000);
-  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  if (msgDay.getTime() === today.getTime()) return "Heute";
-  if (msgDay.getTime() === yesterday.getTime()) return "Gestern";
-  return d.toLocaleDateString("de-DE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: d.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
-  });
-}
 
 /**
  * Liest ein Bild und gibt ein quadratisch zugeschnittenes, JPEG-komprimiertes
@@ -5725,126 +5667,6 @@ export function ChatShell({
         />
       )}
       <ToastRegion />
-    </div>
-  );
-}
-
-function PeerRow({
-  u,
-  subtitle,
-  metaRight,
-  unread,
-  isFavorite,
-  isBlocked,
-  isPinned,
-  isOnline,
-  isTyping,
-  onTogglePin,
-  selected,
-  onSelect,
-}: {
-  u: api.ApiUser;
-  subtitle?: string;
-  metaRight?: string;
-  unread?: number;
-  isFavorite?: boolean;
-  isBlocked?: boolean;
-  isPinned?: boolean;
-  isOnline?: boolean;
-  isTyping?: boolean;
-  onTogglePin?: () => void;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const [pin, setPin] = useState<PeerPin | null>(null);
-  useEffect(() => {
-    void getPin(u.id).then(setPin);
-  }, [u.id, u.publicKey]);
-  return (
-    <div className="peer-row-wrap">
-      <button
-        type="button"
-        onClick={onSelect}
-        className={`contact-item w-full ${
-          selected ? "active" : ""
-        } !mx-0 items-center justify-between`}
-      >
-        <div className="peer-avatar-wrap">
-          <div
-            className="contact-avatar !h-9 !w-9 !text-sm"
-            style={{ background: userGradient(u.id) }}
-          >
-            {u.username.slice(0, 1).toUpperCase()}
-          </div>
-          {isOnline && <span className="peer-online-dot" aria-label="Online" />}
-        </div>
-        <div className="contact-info min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="contact-name">{u.username}</span>
-            {isPinned && (
-              <span className="row-badge row-badge-pin" title="An Anfang geheftet">
-                <IconPin size={11} />
-              </span>
-            )}
-            {isFavorite && (
-              <span className="row-badge row-badge-fav" title="Favorit">
-                ★
-              </span>
-            )}
-            {isBlocked && (
-              <span className="row-badge row-badge-warning" title="Blockiert">
-                blockiert
-              </span>
-            )}
-            {pin?.state === "mismatch" && (
-              <span className="row-badge row-badge-danger" title="Schlüssel hat gewechselt">
-                ⚠
-              </span>
-            )}
-            {pin?.state === "verified" && (
-              <span className="row-badge row-badge-verified" title="Verifiziert">
-                ✓
-              </span>
-            )}
-          </div>
-          <p
-            className={`contact-preview${isTyping ? " typing" : ""}`}
-          >
-            {isTyping ? (
-              <span className="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-                schreibt
-              </span>
-            ) : (
-              subtitle ?? ""
-            )}
-          </p>
-        </div>
-        <div className="contact-meta">
-          <span className="contact-time">{metaRight ?? ""}</span>
-          {unread && unread > 0 ? (
-            <span className="unread-badge">
-              {unread > 99 ? "99+" : unread}
-            </span>
-          ) : null}
-        </div>
-      </button>
-      {onTogglePin && (
-        <button
-          type="button"
-          className={`peer-pin-toggle${isPinned ? " active" : ""}`}
-          aria-label={isPinned ? "Pin entfernen" : "An Anfang heften"}
-          title={isPinned ? "Pin entfernen" : "An Anfang heften"}
-          onClick={(e) => {
-            e.stopPropagation();
-            onTogglePin();
-          }}
-        >
-          <IconPin size={12} />
-        </button>
-      )}
     </div>
   );
 }
