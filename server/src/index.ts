@@ -919,36 +919,41 @@ app.get("/api/keys/:userId", async (req, res) => {
 });
 
 const PreKeyUploadBody = z.object({
-  signedPreKey: z.object({
-    keyId: z.number(),
-    publicKey: z.string(),
-    signature: z.string(),
-    signingPublicKey: z.string().min(1),
-  }),
+  // Phase 5: signedPreKey + OTKs + pqKem sind die Legacy-X3DH-Felder,
+  // werden auf dem Client nicht mehr generiert. Optional gemacht damit
+  // der Endpoint nur noch das Nötige fordert. Olm-Felder sind ab jetzt
+  // die einzige Pflicht.
+  signedPreKey: z
+    .object({
+      keyId: z.number(),
+      publicKey: z.string(),
+      signature: z.string(),
+      signingPublicKey: z.string().min(1),
+    })
+    .optional(),
   oneTimePreKeys: z
     .array(z.object({ keyId: z.number(), publicKey: z.string() }))
-    .max(200),
+    .max(200)
+    .optional(),
   pqKem: z
     .object({
       alg: z.literal("ML-KEM-1024"),
       publicKey: z.string().min(1).max(4096),
     })
     .optional(),
-  /** Optional: auditierte Olm-Schicht (Matrix.org). */
-  olm: z
-    .object({
-      identityCurve25519: z.string().min(1).max(256),
-      identityEd25519: z.string().min(1).max(256),
-      oneTimeKeys: z
-        .array(
-          z.object({
-            keyId: z.string().min(1).max(64),
-            publicKey: z.string().min(1).max(256),
-          })
-        )
-        .max(200),
-    })
-    .optional(),
+  /** Auditierte Olm-Schicht (Matrix.org) — alleiniger Krypto-Pfad. */
+  olm: z.object({
+    identityCurve25519: z.string().min(1).max(256),
+    identityEd25519: z.string().min(1).max(256),
+    oneTimeKeys: z
+      .array(
+        z.object({
+          keyId: z.string().min(1).max(64),
+          publicKey: z.string().min(1).max(256),
+        })
+      )
+      .max(200),
+  }),
 });
 
 const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
@@ -994,24 +999,28 @@ app.post("/api/keys", async (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
-  if (!verifySignedPreKey(parsed.data.signedPreKey)) {
-    res.status(400).json({ error: "invalid_signed_prekey_signature" });
-    return;
+  // Legacy-Felder bleiben optional verarbeitet — werden vom Olm-Client
+  // nicht mehr geliefert, aber Server schluckt sie weiter für Test-Tools.
+  if (parsed.data.signedPreKey) {
+    if (!verifySignedPreKey(parsed.data.signedPreKey)) {
+      res.status(400).json({ error: "invalid_signed_prekey_signature" });
+      return;
+    }
+    initPreKeyBundle(
+      jwtUser.userId,
+      user.publicKey,
+      parsed.data.signedPreKey.publicKey,
+      parsed.data.signedPreKey.signature,
+      parsed.data.signedPreKey.signingPublicKey,
+      parsed.data.signedPreKey.keyId,
+      parsed.data.pqKem
+    );
+    if (parsed.data.oneTimePreKeys) {
+      uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
+    }
   }
-  initPreKeyBundle(
-    jwtUser.userId,
-    user.publicKey,
-    parsed.data.signedPreKey.publicKey,
-    parsed.data.signedPreKey.signature,
-    parsed.data.signedPreKey.signingPublicKey,
-    parsed.data.signedPreKey.keyId,
-    parsed.data.pqKem
-  );
-  uploadOneTimePreKeys(jwtUser.userId, parsed.data.oneTimePreKeys);
-  // Optional: Olm-Identity + OTKs für den auditierten Krypto-Pfad.
-  if (parsed.data.olm) {
-    uploadOlmKeys(jwtUser.userId, parsed.data.olm);
-  }
+  // Hauptpfad: Olm-Identity + OTKs (auto-init wenn kein Legacy-Bundle da).
+  uploadOlmKeys(jwtUser.userId, parsed.data.olm, user.publicKey);
   res.json({
     ok: true,
     remaining: getRemainingPreKeyCount(jwtUser.userId),

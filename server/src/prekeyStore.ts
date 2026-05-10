@@ -187,6 +187,11 @@ export function getPreKeyBundle(userId: string): {
  * Olm-Schlüssel im Bundle aktualisieren — Identity (einmalig) und/oder
  * one-time keys (regelmäßig nachfüllen). Olm-OTKs sind unabhängig von
  * den Curve25519-OTKs aus dem X3DH-Pfad.
+ *
+ * Auto-init: wenn der User noch kein PreKey-Bundle hat (Phase-5-Clients
+ * publishen kein Legacy-signedPreKey mehr), wird hier ein Minimal-Bundle
+ * mit dem identityKey des Users angelegt. Caller stellt `identityKey`
+ * dafür bereit.
  */
 export function uploadOlmKeys(
   userId: string,
@@ -194,10 +199,25 @@ export function uploadOlmKeys(
     identityCurve25519?: string;
     identityEd25519?: string;
     oneTimeKeys?: { keyId: string; publicKey: string }[];
-  }
+  },
+  identityKey?: string
 ): void {
-  const b = bundles.get(userId);
-  if (!b) return;
+  let b = bundles.get(userId);
+  if (!b) {
+    if (!identityKey) return; // kein Init möglich
+    b = {
+      userId,
+      identityKey,
+      signedPreKey: {
+        keyId: 0,
+        publicKey: "",
+        signature: "",
+      },
+      oneTimePreKeys: new Map(),
+      nextKeyId: 1,
+    };
+    bundles.set(userId, b);
+  }
   if (data.identityCurve25519 && data.identityEd25519) {
     b.olm = {
       identityCurve25519: data.identityCurve25519,

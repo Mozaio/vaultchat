@@ -1,205 +1,44 @@
 /**
- * Signed Pre-Keys & One-Time Pre-Keys, gebunden an die Konto-Identität
- * (dieselbe X25519-Box-Identität wie bei Registrierung, nicht separater Random-Key).
- */
-import { base64FromUint8, uint8FromBase64 } from "./b64";
-import { metaGet, metaSet } from "./idb";
-import { getSodium, sodiumReady } from "./sodium";
-import { ml_kem1024 } from "@noble/post-quantum/ml-kem.js";
-
-const enc = new TextEncoder();
-
-const META_KEY = "keyMaterialV1";
-
-export type LocalKeyMaterial = {
-  signedPreKey: {
-    keyId: number;
-    sk: string;
-    pk: string;
-    signature: string;
-    signingPublicKey: string;
-  };
-  oneTimePreKeys: Array<{ keyId: number; sk: string; pk: string }>;
-  pqKem?: {
-    alg: "ML-KEM-1024";
-    sk: string;
-    pk: string;
-  };
-};
-
-export async function loadKeyMaterial(): Promise<LocalKeyMaterial | null> {
-  const raw = await metaGet(META_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as LocalKeyMaterial;
-  } catch {
-    return null;
-  }
-}
-
-export async function saveKeyMaterial(km: LocalKeyMaterial): Promise<void> {
-  await metaSet(META_KEY, JSON.stringify(km));
-}
-
-/**
- * Generiert/rotiert Material für `POST /api/keys` — Signatur der Signed-Pre-Key
- * via aus der Identität abgeleitetem Ed25519-Key (wie in eurer Desktop-Version).
- */
-export async function generateKeyMaterial(
-  identitySk: Uint8Array
-): Promise<LocalKeyMaterial> {
-  await sodiumReady();
-  const sodium = getSodium();
-  const signedPreKeyKp = sodium.crypto_box_keypair();
-  /** Ed25519-Seed muss exakt 32 Byte sein (nicht 64 — sonst invalid seed length). */
-  const signSeed = sodium.crypto_generichash(
-    32,
-    identitySk,
-    enc.encode("vaultchat-sign-seed")
-  );
-  const signKp = sodium.crypto_sign_seed_keypair(signSeed);
-  const signature = sodium.crypto_sign_detached(
-    signedPreKeyKp.publicKey,
-    signKp.privateKey
-  );
-  const oneTimePreKeys: LocalKeyMaterial["oneTimePreKeys"] = [];
-  for (let i = 1; i <= 100; i += 1) {
-    const kp = sodium.crypto_box_keypair();
-    oneTimePreKeys.push({
-      keyId: i,
-      sk: base64FromUint8(kp.privateKey),
-      pk: base64FromUint8(kp.publicKey),
-    });
-  }
-  const pqKem = ml_kem1024.keygen();
-  return {
-    signedPreKey: {
-      keyId: 1,
-      sk: base64FromUint8(signedPreKeyKp.privateKey),
-      pk: base64FromUint8(signedPreKeyKp.publicKey),
-      signature: base64FromUint8(signature),
-      signingPublicKey: base64FromUint8(signKp.publicKey),
-    },
-    oneTimePreKeys,
-    pqKem: {
-      alg: "ML-KEM-1024",
-      sk: base64FromUint8(pqKem.secretKey),
-      pk: base64FromUint8(pqKem.publicKey),
-    },
-  };
-}
-
-export function hasPostQuantumKem(km: LocalKeyMaterial): boolean {
-  return km.pqKem?.alg === "ML-KEM-1024" && Boolean(km.pqKem.pk && km.pqKem.sk);
-}
-
-export async function ensurePostQuantumKem(
-  km: LocalKeyMaterial
-): Promise<LocalKeyMaterial> {
-  if (hasPostQuantumKem(km)) return km;
-  const pqKem = ml_kem1024.keygen();
-  return {
-    ...km,
-    pqKem: {
-      alg: "ML-KEM-1024",
-      sk: base64FromUint8(pqKem.secretKey),
-      pk: base64FromUint8(pqKem.publicKey),
-    },
-  };
-}
-
-export async function replenishOneTimePreKeys(
-  km: LocalKeyMaterial,
-  minimum = 50,
-  target = 100
-): Promise<LocalKeyMaterial> {
-  if (km.oneTimePreKeys.length >= minimum) return km;
-  await sodiumReady();
-  const sodium = getSodium();
-  const nextStart =
-    km.oneTimePreKeys.reduce((max, key) => Math.max(max, key.keyId), 0) + 1;
-  const next = [...km.oneTimePreKeys];
-  for (let keyId = nextStart; next.length < target; keyId += 1) {
-    const kp = sodium.crypto_box_keypair();
-    next.push({
-      keyId,
-      sk: base64FromUint8(kp.privateKey),
-      pk: base64FromUint8(kp.publicKey),
-    });
-  }
-  return { ...km, oneTimePreKeys: next };
-}
-
-export function toUploadBody(km: LocalKeyMaterial) {
-  return {
-    signedPreKey: {
-      keyId: km.signedPreKey.keyId,
-      publicKey: km.signedPreKey.pk,
-      signature: km.signedPreKey.signature,
-      signingPublicKey: km.signedPreKey.signingPublicKey,
-    },
-    oneTimePreKeys: km.oneTimePreKeys.map((k) => ({
-      keyId: k.keyId,
-      publicKey: k.pk,
-    })),
-    ...(hasPostQuantumKem(km)
-      ? {
-          pqKem: {
-            alg: "ML-KEM-1024" as const,
-            publicKey: km.pqKem!.pk,
-          },
-        }
-      : {}),
-  };
-}
-
-/**
- * Erweitert das Upload-Body mit der auditierten Olm-Identity + One-Time-Keys.
- * Wird beim Boot zusätzlich zu toUploadBody aufgerufen — sender kann dann
- * den VCO5/Olm-Pfad wählen.
+ * Phase 5: VaultChat hat den selbstgeschriebenen X3DH+DR-Pfad weggeworfen
+ * und nutzt ausschließlich Olm/Megolm. Dieser Modul-Footprint ist deshalb
+ * minimal — nur `buildUploadBodyWithOlm` produziert den Bundle-Upload,
+ * dessen `olm`-Feld der einzige Krypto-Slot ist, den der Server seit
+ * Phase 5 verlangt.
  *
- * Lazy: holt Olm-Account via olmSessionStore (eigenständig persistiert).
+ * Der frühere `LocalKeyMaterial`-Speicher (signedPreKey, oneTimePreKeys,
+ * pqKem) ist entfernt; das Olm-Material lebt komplett im Olm-Account-
+ * Pickle (siehe lib/olmSessionStore.ts).
  */
-export async function buildUploadBodyWithOlm(
-  km: LocalKeyMaterial
-): Promise<ReturnType<typeof toUploadBody> & {
+
+import { getOlmPublishBundle } from "./olmSessionStore";
+
+export type UploadBody = {
   olm: {
     identityCurve25519: string;
     identityEd25519: string;
     oneTimeKeys: { keyId: string; publicKey: string }[];
   };
-}> {
-  const base = toUploadBody(km);
-  const { getOlmPublishBundle } = await import("./olmSessionStore");
+};
+
+/**
+ * Generiert den Olm-Bundle-Slot (Identity + 50 frische One-Time-Keys aus
+ * dem persistierten Olm-Account) und gibt das Upload-Body zurück, das
+ * an `/api/keys` gepostet werden soll.
+ *
+ * Identity-Keys bleiben über Aufrufe stabil (ensureOlmAccount läd aus IDB).
+ * One-Time-Keys werden frisch generiert und auf dem Olm-Account als
+ * "published" markiert — eine erneut hochgeladene Liste enthält also nur
+ * NEUE Keys, alte sind bereits beim Empfänger.
+ */
+export async function buildUploadBodyWithOlm(): Promise<UploadBody> {
   const olm = await getOlmPublishBundle(50);
   return {
-    ...base,
     olm: {
       identityCurve25519: olm.identityCurve25519,
       identityEd25519: olm.identityEd25519,
-      oneTimeKeys: Object.entries(olm.oneTimeKeys).map(([keyId, publicKey]) => ({
-        keyId,
-        publicKey,
-      })),
+      oneTimeKeys: Object.entries(olm.oneTimeKeys).map(
+        ([keyId, publicKey]) => ({ keyId, publicKey })
+      ),
     },
   };
-}
-
-export async function getOneTimePreKeySk(
-  km: LocalKeyMaterial,
-  keyId: number
-): Promise<Uint8Array | null> {
-  const otp = km.oneTimePreKeys.find((k) => k.keyId === keyId);
-  return otp ? uint8FromBase64(otp.sk) : null;
-}
-
-export async function consumeOneTimePreKey(
-  km: LocalKeyMaterial,
-  keyId: number
-): Promise<string | null> {
-  const index = km.oneTimePreKeys.findIndex((k) => k.keyId === keyId);
-  if (index < 0) return null;
-  const [otp] = km.oneTimePreKeys.splice(index, 1);
-  await saveKeyMaterial(km);
-  return otp?.sk ?? null;
 }

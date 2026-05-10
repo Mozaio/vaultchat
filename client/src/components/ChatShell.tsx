@@ -40,13 +40,7 @@ import {
 } from "../lib/outbox";
 import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import { isGroupMessageDuplicate } from "../lib/replayProtection";
-import {
-  buildUploadBodyWithOlm,
-  generateKeyMaterial,
-  loadKeyMaterial,
-  replenishOneTimePreKeys,
-  saveKeyMaterial,
-} from "../lib/keyStore";
+import { buildUploadBodyWithOlm } from "../lib/keyStore";
 import { encryptIdentityBackup } from "../lib/backup";
 import { loadLocalIdentity } from "../lib/localIdentity";
 import { previewForPayload } from "../lib/messagePreview";
@@ -699,36 +693,26 @@ export function ChatShell({
   }, [unreadByPeer]);
 
   /**
-   * Pre-Key-Bundle (Olm-Identity + Olm-OTKs + Legacy-Felder) initial hochladen.
-   * Refresh läuft separat, siehe Effect mit OLM_OTK_LOW_WATERMARK.
+   * Olm-Identity + 50 OTKs initial publishen. Phase 5: keine Legacy-
+   * X3DH-Keys mehr — `buildUploadBodyWithOlm` postet nur noch das
+   * `olm`-Feld.
    */
   useEffect(() => {
     void (async () => {
       try {
-        let km = await loadKeyMaterial();
-        if (!km) {
-          km = await generateKeyMaterial(session.secretKey);
-          await saveKeyMaterial(km);
-        }
-        const replenished = await replenishOneTimePreKeys(km);
-        if (replenished !== km) {
-          km = replenished;
-          await saveKeyMaterial(km);
-        }
-        const body = await buildUploadBodyWithOlm(km);
+        const body = await buildUploadBodyWithOlm();
         await api.uploadPreKeys(session.token, body);
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error("[vaultchat] prekey upload", e);
       }
     })();
-  }, [session.token, session.secretKey]);
+  }, [session.token]);
 
   /**
-   * Olm-OTK-Refill: alle 30 min, oder wenn der Server-Antwort meldet, dass
-   * wir unter `OLM_OTK_LOW_WATERMARK` sind. Pro Refresh werden 50 neue
-   * One-Time-Keys generiert und ans Bundle gepostet. Identity bleibt
-   * stabil (`ensureOlmAccount` liest den existing pickled Account).
+   * Olm-OTK-Refill alle 30 min. `getOlmPublishBundle(50)` generiert frisch
+   * und markiert sie auf dem persistierten Olm-Account als published —
+   * Identity-Keys bleiben stabil.
    */
   useEffect(() => {
     const OLM_OTK_LOW_WATERMARK = 20;
@@ -738,9 +722,7 @@ export function ChatShell({
     const refill = async () => {
       if (disposed) return;
       try {
-        const km = await loadKeyMaterial();
-        if (!km) return;
-        const body = await buildUploadBodyWithOlm(km);
+        const body = await buildUploadBodyWithOlm();
         const resp = await api.uploadPreKeys(session.token, body);
         if (
           typeof resp.remainingOlm === "number" &&
@@ -750,8 +732,6 @@ export function ChatShell({
           console.debug("[vaultchat:olm] otk_refill_threshold", {
             remaining: resp.remainingOlm,
           });
-          // Bereits oben aufgefüllt — nichts weiteres zu tun. Beim nächsten
-          // 30-min-Tick wird sich der Stand stabilisieren.
         }
       } catch (e) {
         // eslint-disable-next-line no-console
