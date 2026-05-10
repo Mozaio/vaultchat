@@ -52,6 +52,7 @@ import {
   revokeInvite,
 } from "./inviteStore.js";
 import { log, requestLogger } from "./logger.js";
+import { markIfNew as markEnvelopeIfNew } from "./replayStore.js";
 
 assertRuntimeConfig();
 
@@ -1072,6 +1073,15 @@ wss.on("connection", (ws, req) => {
     if (parsed.data.type === "group") {
       const g = getGroup(parsed.data.groupId);
       if (!g || !g.memberIds.includes(jwtUser!.userId)) return;
+      // Replay: identischer ciphertext vom selben Sender innerhalb 10 min → drop.
+      if (!markEnvelopeIfNew(jwtUser!.userId, parsed.data.ciphertext)) {
+        log.debug("ws_replay_drop", {
+          kind: "group",
+          userId: jwtUser!.userId,
+          groupId: g.id,
+        });
+        return;
+      }
       const id = randomUUID();
       const createdAt = Date.now();
       /**
@@ -1124,6 +1134,21 @@ wss.on("connection", (ws, req) => {
     const peer = findUserById(toUserId);
     if (!peer) {
       ws.send(JSON.stringify({ type: "dm_ack", cid, delivered: 0 }));
+      return;
+    }
+
+    // Server-side replay-protection: identische Envelopes vom selben Sender
+    // innerhalb von 10 min werden gedropt. Schützt vor JWT-Diebstahl-Replay
+    // und reduziert Bandbreite, bevor der Empfänger DR-Counter prüft.
+    if (!markEnvelopeIfNew(jwtUser!.userId, envelope)) {
+      log.debug("ws_replay_drop", {
+        kind: "dm",
+        userId: jwtUser!.userId,
+        cid,
+      });
+      ws.send(
+        JSON.stringify({ type: "dm_ack", cid, delivered: 0, reason: "replay" })
+      );
       return;
     }
 
