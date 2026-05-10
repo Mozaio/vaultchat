@@ -12,7 +12,7 @@ import {
 } from "./localKey";
 
 const DB = "vaultchat";
-const VER = 4;
+const VER = 5;
 let accountScope: string | null = null;
 
 export function setIdbAccountScope(userId: string | null) {
@@ -74,15 +74,26 @@ function openDb(): Promise<IDBDatabase> {
     r.onsuccess = () => resolve(r.result);
     r.onupgradeneeded = () => {
       const db = r.result;
-      // Re-create stores on version bump (migration). Alte Datenstrukturen werden
-      // verworfen; der Server speichert ohnehin keine Nachrichten.
-      for (const name of Array.from(db.objectStoreNames)) {
-        db.deleteObjectStore(name);
-      }
-      db.createObjectStore("dm", { keyPath: "id" });
-      db.createObjectStore("groupMsg", { keyPath: "id" });
-      db.createObjectStore("meta", { keyPath: "key" });
-      db.createObjectStore("outbox", { keyPath: "cid" });
+      // Non-destructive migration: nur fehlende Stores anlegen, vorhandene
+      // (dm/groupMsg/meta/outbox) und ihre verschlüsselten Records erhalten.
+      // Vorher-Verhalten: deleteObjectStore() bei jedem Versionsbump → kompletter
+      // History-Verlust beim Update. Das ist seit v5 nicht mehr akzeptabel.
+      const existing = new Set(Array.from(db.objectStoreNames));
+      if (!existing.has("dm")) db.createObjectStore("dm", { keyPath: "id" });
+      if (!existing.has("groupMsg"))
+        db.createObjectStore("groupMsg", { keyPath: "id" });
+      if (!existing.has("meta")) db.createObjectStore("meta", { keyPath: "key" });
+      if (!existing.has("outbox"))
+        db.createObjectStore("outbox", { keyPath: "cid" });
+      // Future schema migrations: beim nächsten Bump hier explizit
+      // ALTER-artige Schritte ergänzen (z.B. Index hinzufügen). Niemals
+      // verschlüsselte Records droppen — der Local-Key ist im
+      // onupgradeneeded-Kontext nicht erreichbar.
+    };
+    r.onblocked = () => {
+      // Anderer Tab hält noch eine ältere Version offen — ohne Reject
+      // bleibt onsuccess hängen.
+      reject(new Error("idb_blocked_by_other_tab"));
     };
   });
 }
