@@ -4,9 +4,14 @@ import {
   fingerprintFromPublicKeyB64,
   generateBoxKeypair,
   publicKeyBase64,
+} from "./crypto";
+// Argon2id läuft im Web-Worker (mit Main-Thread-Fallback bei Worker-Fail).
+// So bleibt die UI während Login/Registrierung responsiv (Spinner animiert,
+// Eingabefeld disabled aber nicht eingefroren).
+import {
   unwrapSecretKey,
   wrapSecretKey,
-} from "./crypto";
+} from "./cryptoWorkerClient";
 
 export type Session = {
   token: string;

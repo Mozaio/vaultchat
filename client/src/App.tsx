@@ -57,6 +57,7 @@ import {
   clearVerificationKey,
 } from "./lib/codeIntegrityEnhanced";
 import { resetAllReplayProtection } from "./lib/replayProtection";
+import { shutdownCryptoWorker } from "./lib/cryptoWorkerClient";
 
 export type { Session };
 
@@ -124,6 +125,7 @@ export function App() {
     stopPeriodicWipe();
     resetAllReplayProtection();
     clearVerificationKey();
+    shutdownCryptoWorker();
     setSession(null);
   }, [session]);
 
