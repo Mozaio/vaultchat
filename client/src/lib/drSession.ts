@@ -235,8 +235,22 @@ export async function ensureDrSessionWithX3dh(
 
     await metaSet(metaKey(peerId), JSON.stringify(stateWithMeta));
     return stateWithMeta;
-  } catch {
-    if (!legacyDhAllowed()) throw new Error("prekey_bundle_unavailable");
+  } catch (e) {
+    // Pre-Key-Bundle nicht verfügbar (Server kennt Peer nicht, alle OTPKs
+    // verbraucht, Network-Fail). Nur mit explicit-allowed legacy-DH fallback,
+    // sonst fail-closed.
+    if (!legacyDhAllowed()) {
+      // eslint-disable-next-line no-console
+      console.debug("[vaultchat:drSession] prekey_bundle_unavailable", {
+        peerId,
+        err: e instanceof Error ? e.message.slice(0, 120) : String(e).slice(0, 120),
+      });
+      throw new Error("prekey_bundle_unavailable");
+    }
+    // eslint-disable-next-line no-console
+    console.debug("[vaultchat:drSession] x3dh_unavailable_fallback_legacy", {
+      peerId,
+    });
     const fresh: PersistedDRState = {
       ...(await drInit(myIdentitySk, peerPublicKeyB64, peerId)),
       initMode: "legacy",
@@ -542,7 +556,15 @@ export async function drDecryptDmBundleJson(
       frame.primary,
       receivedAt
     );
-  } catch {
+  } catch (e) {
+    // Primary frame failed — common cause: receiver's signed-prekey rotated
+    // since the sender built the envelope. Fall back to the recovery frame
+    // (signed-prekey-only path). Log for diagnosis but don't block.
+    // eslint-disable-next-line no-console
+    console.debug("[vaultchat:drSession] dm_bundle_primary_fail_recovery", {
+      peerId,
+      err: e instanceof Error ? e.message.slice(0, 120) : String(e).slice(0, 120),
+    });
     return decryptInnerFrameJson(
       myIdentitySk,
       peerId,
