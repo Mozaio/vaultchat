@@ -30,6 +30,7 @@ import {
   listMailboxGroups,
   removeMailboxDm,
   removeMailboxGroup,
+  sweepExpiredMailbox,
 } from "./mailboxStore.js";
 import {
   getPreKeyBundle,
@@ -323,6 +324,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
   });
   if (!user) {
     log.info("auth_register_fail", {
+      reqId: req.id,
       username: username.slice(0, 32),
       reason: "username_taken",
       ip: req.ip,
@@ -332,6 +334,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
   }
   redeemInviteCode(parsed.data.inviteCode);
   log.info("auth_register_ok", {
+    reqId: req.id,
     userId: user.id,
     username: user.username,
     plan: user.plan,
@@ -361,6 +364,7 @@ app.post("/api/login", authLimiter, async (req, res) => {
   const user = findUserByUsername(username);
   if (!user || !(await verifyPassword(user.passwordHash, password))) {
     log.info("auth_login_fail", {
+      reqId: req.id,
       username: username.slice(0, 32),
       reason: user ? "wrong_password" : "user_not_found",
       ip: req.ip,
@@ -370,6 +374,7 @@ app.post("/api/login", authLimiter, async (req, res) => {
   }
   const token = signToken({ userId: user.id, username: user.username });
   log.info("auth_login_ok", {
+    reqId: req.id,
     userId: user.id,
     username: user.username,
     ip: req.ip,
@@ -876,6 +881,18 @@ const heartbeat = setInterval(() => {
 }, WS_HEARTBEAT_MS);
 heartbeat.unref?.();
 wss.on("close", () => clearInterval(heartbeat));
+
+// Mailbox-Sweep alle 5 min: räumt expired Einträge inaktiver Recipients
+// auf, ohne darauf zu warten dass jemand list/pop aufruft. Wichtig auf
+// Render-Free wo Memory knapp ist.
+const MAILBOX_SWEEP_MS = 5 * 60_000;
+const mailboxSweep = setInterval(() => {
+  const r = sweepExpiredMailbox();
+  if (r.removedDms + r.removedGroups > 0) {
+    log.info("mailbox_sweep", r);
+  }
+}, MAILBOX_SWEEP_MS);
+mailboxSweep.unref?.();
 
 // ---------------------------------------------------------------------------
 // WebSocket-Frame-Schemas (modul-level für Performance — vorher wurden sie

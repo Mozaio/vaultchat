@@ -142,3 +142,45 @@ export function getMailboxStats() {
     maxPerRecipient: MAX_PER_RECIPIENT,
   };
 }
+
+/**
+ * Periodischer Sweep: räumt expired Mailbox-Einträge auf, ohne darauf zu
+ * warten, dass jemand list/pop aufruft. Wichtig für inaktive Recipients,
+ * deren Lists sonst die TTL überschreiten und Speicher belegen bis der
+ * User irgendwann wiederkommt (oder nie).
+ *
+ * Returns {removed, recipientsRemoved} damit die Aufrufer-Seite das in
+ * einen sweep-Log packen kann.
+ */
+export function sweepExpiredMailbox(): {
+  removedDms: number;
+  removedGroups: number;
+  recipientsCleared: number;
+} {
+  const now = Date.now();
+  let removedDms = 0;
+  let removedGroups = 0;
+  let recipientsCleared = 0;
+
+  for (const [userId, list] of dmByRecipient) {
+    const live = list.filter((x) => x.expiresAt > now);
+    removedDms += list.length - live.length;
+    if (live.length === 0) {
+      dmByRecipient.delete(userId);
+      recipientsCleared += 1;
+    } else if (live.length < list.length) {
+      dmByRecipient.set(userId, live);
+    }
+  }
+  for (const [userId, list] of groupByRecipient) {
+    const live = list.filter((x) => x.expiresAt > now);
+    removedGroups += list.length - live.length;
+    if (live.length === 0) {
+      groupByRecipient.delete(userId);
+    } else if (live.length < list.length) {
+      groupByRecipient.set(userId, live);
+    }
+  }
+
+  return { removedDms, removedGroups, recipientsCleared };
+}
