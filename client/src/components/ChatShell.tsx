@@ -1090,7 +1090,7 @@ export function ChatShell({
       suppressLocal = false
     ): Promise<string | null> => {
       if (blockedPeers.has(toUser.id)) {
-        setError("Kontakt ist blockiert. Hebe die Blockierung auf, um zu senden.");
+        setError(t("chat.errContactBlocked"));
         return null;
       }
       // Phase 5: auditiertes Olm (Matrix.org) ist der einzige Krypto-Pfad
@@ -1109,8 +1109,8 @@ export function ChatShell({
           olmErr instanceof Error ? olmErr.message : String(olmErr);
         setError(
           reason === "no_olm_bundle"
-            ? "Empfänger hat noch keine Olm-Schlüssel publiziert (kurz warten und erneut senden)."
-            : `Olm-Verschlüsselung fehlgeschlagen: ${reason}`
+            ? t("chat.errNoOlmBundle")
+            : t("chat.errOlmFailed", { reason })
         );
         return null;
       }
@@ -1165,11 +1165,11 @@ export function ChatShell({
     if (!src) return;
     const dmPeerId = tab === "dm" && peer ? peer.id : null;
     if (forwardPick.size === 0) {
-      setError("Bitte mindestens einen Kontakt auswählen.");
+      setError(t("chat.errSelectContact"));
       return;
     }
     if (src.plain.kind !== "text" && src.plain.kind !== "file") {
-      setError("Nur Text und Dateien können weitergeleitet werden.");
+      setError(t("chat.errForwardKind"));
       setForwardTarget(null);
       setForwardPick(new Set());
       return;
@@ -1187,7 +1187,9 @@ export function ChatShell({
     }
     if (sent > 0) {
       pushToast(
-        sent === 1 ? "Nachricht weitergeleitet" : `Weitergeleitet an ${sent} Kontakte`,
+        sent === 1
+          ? t("chat.toastForwarded1")
+          : t("chat.toastForwardedN", { n: sent }),
         "success"
       );
     }
@@ -1212,7 +1214,7 @@ export function ChatShell({
     ) => {
       const ws = wsRef.current;
       if (!ws || ws.readyState !== WebSocket.OPEN) {
-        if (!quiet) setError("Keine Verbindung.");
+        if (!quiet) setError(t("chat.errNoConnection"));
         return null;
       }
       const p: PlainPayload = { ...payload, senderUserId: session.user.id };
@@ -1943,9 +1945,7 @@ export function ChatShell({
   function ensurePeerKeyTrusted(): boolean {
     if (!peer) return false;
     if (peer.id !== session.user.id && peerPin?.state === "mismatch") {
-      setError(
-        "Schlüssel dieses Peers hat gewechselt. Bitte zuerst Sicherheitsnummer prüfen."
-      );
+      setError(t("chat.errKeyChanged"));
       return false;
     }
     return true;
@@ -1994,7 +1994,7 @@ export function ChatShell({
     const maxFile = 128 * 1024 * 1024;
     if (file.size > maxFile) {
       setError(
-        `Datei zu groß: Bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB senden.`
+        t("chat.errFileTooLarge", { mb: Math.floor(maxFile / (1024 * 1024)) })
       );
       return;
     }
@@ -2030,10 +2030,7 @@ export function ChatShell({
       const rec = await voice.stop();
       if (!rec) return;
       if (voice.consumeHitLimit()) {
-        pushToast(
-          "Aufnahme-Limit erreicht. Pro: bis 5 Min — siehe Einstellungen → Plan",
-          "warning"
-        );
+        pushToast(t("chat.toastVoiceLimit"), "warning");
       }
       const payload: PlainPayload = {
         v: 2,
@@ -2053,7 +2050,7 @@ export function ChatShell({
       setViewOnceDm(false);
     } else {
       const ok = await voice.start();
-      if (!ok) setError("Mikrofon-Zugriff verweigert.");
+      if (!ok) setError(t("chat.errMicDenied"));
     }
   }
 
@@ -2088,7 +2085,7 @@ export function ChatShell({
     const maxFile = 128 * 1024 * 1024;
     if (file.size > maxFile) {
       setError(
-        `Datei zu groß: Bitte Dateien bis etwa ${Math.floor(maxFile / (1024 * 1024))} MB senden.`
+        t("chat.errFileTooLarge", { mb: Math.floor(maxFile / (1024 * 1024)) })
       );
       return;
     }
@@ -2120,10 +2117,7 @@ export function ChatShell({
       const rec = await groupVoice.stop();
       if (!rec) return;
       if (groupVoice.consumeHitLimit()) {
-        pushToast(
-          "Aufnahme-Limit erreicht. Pro: bis 5 Min — siehe Einstellungen → Plan",
-          "warning"
-        );
+        pushToast(t("chat.toastVoiceLimit"), "warning");
       }
       const payload: PlainPayload = {
         v: 2,
@@ -2139,7 +2133,7 @@ export function ChatShell({
       setViewOnceGroup(false);
     } else {
       const ok = await groupVoice.start();
-      if (!ok) setError("Mikrofon-Zugriff verweigert.");
+      if (!ok) setError(t("chat.errMicDenied"));
     }
   }
 
@@ -2299,7 +2293,7 @@ export function ChatShell({
 
   async function createGroup() {
     if (!newGroupName.trim() || newGroupMembers.length === 0) {
-      setError("Gruppe: Name und mindestens ein Mitglied.");
+      setError(t("chat.errGroupNameMembers"));
       return;
     }
     setError(null);
@@ -2307,7 +2301,7 @@ export function ChatShell({
     const memberLimit = getLimits().groupMemberMax;
     if (memberIds.length > memberLimit) {
       setError(
-        `Gruppe zu groß: ${memberIds.length}/${memberLimit} im aktuellen Plan. Pro: bis 50 Mitglieder — siehe Einstellungen → Plan & Abo.`
+        t("chat.errGroupTooLarge", { n: memberIds.length, limit: memberLimit })
       );
       return;
     }
@@ -2333,7 +2327,7 @@ export function ChatShell({
     const question = pollDm.question.trim();
     const options = pollDm.options.map((o) => o.trim()).filter(Boolean);
     if (!question || options.length < 2) {
-      setError("Bitte Frage und mindestens zwei Optionen angeben.");
+      setError(t("chat.errPollNeed"));
       return;
     }
     const payload: PlainPayload = {
@@ -2357,7 +2351,7 @@ export function ChatShell({
     const question = pollGroup.question.trim();
     const options = pollGroup.options.map((o) => o.trim()).filter(Boolean);
     if (!question || options.length < 2) {
-      setError("Bitte Frage und mindestens zwei Optionen angeben.");
+      setError(t("chat.errPollNeed"));
       return;
     }
     const payload: PlainPayload = {
@@ -2445,13 +2439,13 @@ export function ChatShell({
       setGroupInvites((prev) => [...prev, invite]);
       try {
         await navigator.clipboard?.writeText(buildInviteUrl(invite.token));
-        pushToast("Einladungslink erstellt und kopiert.", "success");
+        pushToast(t("chat.toastInviteCreatedCopied"), "success");
       } catch {
-        pushToast("Einladungslink erstellt.", "success");
+        pushToast(t("chat.toastInviteCreated"), "success");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "create_failed";
-      pushToast(`Erstellen fehlgeschlagen: ${msg}`, "danger");
+      pushToast(t("chat.toastInviteCreateFailed", { msg }), "danger");
     } finally {
       setCreatingInvite(false);
     }
@@ -2464,7 +2458,7 @@ export function ChatShell({
       setGroupInvites((prev) => prev.filter((i) => i.token !== inviteToken));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "revoke_failed";
-      pushToast(`Widerrufen fehlgeschlagen: ${msg}`, "danger");
+      pushToast(t("chat.toastInviteRevokeFailed", { msg }), "danger");
     }
   }
 
@@ -2490,7 +2484,7 @@ export function ChatShell({
           setPeer(null);
           setGroup(target);
           pushToast(
-            `Beigetreten zu „${target.name}". Warte einen Moment auf den Gruppenschlüssel.`,
+            t("chat.toastJoinedGroup", { name: target.name }),
             "success"
           );
         }
@@ -2498,14 +2492,14 @@ export function ChatShell({
         const msg = err instanceof Error ? err.message : "join_failed";
         const friendly =
           msg === "expired"
-            ? "Der Einladungslink ist abgelaufen."
+            ? t("chat.errInviteExpired")
             : msg === "exhausted"
-              ? "Der Einladungslink wurde bereits maximal oft verwendet."
+              ? t("chat.errInviteExhausted")
               : msg === "already_member"
-                ? "Du bist bereits Mitglied dieser Gruppe."
+                ? t("chat.errAlreadyMember")
                 : msg === "unknown_token"
-                  ? "Der Einladungslink ist ungültig."
-                  : `Beitritt fehlgeschlagen: ${msg}`;
+                  ? t("chat.errInviteInvalid")
+                  : t("chat.errJoinFailed", { msg });
         pushToast(friendly, "danger");
       }
     })();
@@ -2530,7 +2524,7 @@ export function ChatShell({
     const trimmedName = groupEditName.trim();
     const trimmedDesc = groupEditDescription.trim();
     if (!trimmedName) {
-      pushToast("Gruppenname darf nicht leer sein.", "danger");
+      pushToast(t("chat.errGroupNameEmpty"), "danger");
       return;
     }
     setGroupEditBusy(true);
@@ -2555,7 +2549,7 @@ export function ChatShell({
       setGroupEditMode(false);
       setGroupEditAvatar("");
       setGroupEditAvatarRemoved(false);
-      pushToast("Gruppe aktualisiert.", "success");
+      pushToast(t("chat.toastGroupUpdated"), "success");
       const changes: string[] = [];
       if (previousName !== trimmedName) {
         changes.push(`Name auf „${trimmedName}"`);
@@ -2581,8 +2575,8 @@ export function ChatShell({
       const msg = err instanceof Error ? err.message : "unknown_error";
       pushToast(
         msg === "cannot_update"
-          ? "Nur der Ersteller darf die Gruppe bearbeiten."
-          : `Aktualisierung fehlgeschlagen: ${msg}`,
+          ? t("chat.errCannotUpdateGroup")
+          : t("chat.errGroupUpdateFailed", { msg }),
         "danger"
       );
     } finally {
@@ -2687,8 +2681,8 @@ export function ChatShell({
         usersRef.current.find((u) => u.id === fromUserId)?.username ?? "Jemand";
       pushToast(
         kind === "voice_join"
-          ? `${name} ist dem Sprachraum beigetreten`
-          : `${name} hat den Sprachraum verlassen`
+          ? t("chat.toastVoiceJoined", { name })
+          : t("chat.toastVoiceLeft", { name })
       );
     }
     if (groupCallCtrlRef.current && groupCallGroupIdRef.current === gid) {
@@ -2737,7 +2731,7 @@ export function ChatShell({
       setError(
         e instanceof Error && e.message
           ? e.message
-          : "Mikrofon nicht verfügbar oder Berechtigung verweigert."
+          : t("chat.errMicUnavailable")
       );
     }
   }
@@ -3480,7 +3474,7 @@ export function ChatShell({
               /* ignore */
             }
             setBackupReminderVisible(false);
-            pushToast("Backup heruntergeladen", "success");
+            pushToast(t("chat.toastBackupDownloaded"), "success");
           }}
         />
       )}
@@ -3956,7 +3950,7 @@ export function ChatShell({
                         const url = await resizeImageToDataUrl(f);
                         setNewGroupAvatar(url);
                       } catch {
-                        pushToast("Bild konnte nicht gelesen werden.", "danger");
+                        pushToast(t("chat.toastImageReadFailed"), "danger");
                       }
                     }}
                   />
@@ -4189,9 +4183,9 @@ export function ChatShell({
                       /* ignore */
                     }
                     setBackupReminderVisible(false);
-                    pushToast("Backup heruntergeladen", "success");
+                    pushToast(t("chat.toastBackupDownloaded"), "success");
                   } catch {
-                    pushToast("Backup-Export fehlgeschlagen", "danger");
+                    pushToast(t("chat.toastBackupFailed"), "danger");
                   }
                 }}
               >
@@ -5192,7 +5186,7 @@ export function ChatShell({
                                     setGroupEditAvatar(url);
                                     setGroupEditAvatarRemoved(false);
                                   } catch {
-                                    pushToast("Bild konnte nicht gelesen werden.", "danger");
+                                    pushToast(t("chat.toastImageReadFailed"), "danger");
                                   }
                                 }}
                               />
