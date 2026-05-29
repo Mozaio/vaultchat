@@ -61,11 +61,21 @@ export async function observePeerKey(
     return pin;
   }
   if (existing.publicKey === publicKey) return existing;
+  // Key differs from what we last saw → mismatch. Crucially, anchor
+  // `previousPublicKey` to the ORIGINAL trusted key. If we're already in a
+  // mismatch state, `existing.previousPublicKey` already holds that original
+  // key — do NOT let it drift to the current (possibly attacker-supplied)
+  // key on a second swap, or the user could end up comparing safety numbers
+  // against the attacker's key instead of the one they originally trusted.
+  const originalTrusted =
+    existing.state === "mismatch"
+      ? existing.previousPublicKey ?? existing.publicKey
+      : existing.publicKey;
   const changed: PeerPin = {
     publicKey,
     state: "mismatch",
     firstSeen: existing.firstSeen,
-    previousPublicKey: existing.publicKey,
+    previousPublicKey: originalTrusted,
   };
   await putPin(userId, changed);
   return changed;
