@@ -15,10 +15,6 @@ import { parseIdentityBackup } from "../lib/backup";
 import { ThemeToggle } from "./ThemeToggle";
 import {
   IconAlertTriangle,
-  IconLock,
-  IconShieldCheck,
-  IconTimer,
-  IconBookmark,
   IconEye,
   IconEyeOff,
   IconLoader2,
@@ -261,71 +257,6 @@ export function AuthPanel({
 
   return (
     <div className="auth-split">
-      {/* ── Left: always-dark brand panel ── */}
-      <div className="auth-brand-panel" aria-hidden="true">
-        <div className="auth-brand-top">
-          <VaultChatLogo size={32} style={{ color: "var(--accent)" }} />
-          <span className="auth-brand-top-name">Umbra</span>
-        </div>
-
-        <div className="auth-brand-content">
-          <div className="auth-brand-hero">
-            <h1>
-              Kein Server kennt<br /><em>deine Nachrichten.</em>
-            </h1>
-            <p>
-              Ende-zu-Ende-verschlüsselt, Zero-Knowledge-Relay —
-              kein Konto mit E-Mail nötig.
-            </p>
-          </div>
-
-        <ul className="auth-brand-features">
-          <li>
-            <span className="auth-brand-feat-icon">
-              <IconLock size={14} />
-            </span>
-            <div>
-              <strong>Olm + Megolm (Matrix)</strong>
-              <span>Auditierte Double-Ratchet-Verschlüsselung</span>
-            </div>
-          </li>
-          <li>
-            <span className="auth-brand-feat-icon">
-              <IconShieldCheck size={14} />
-            </span>
-            <div>
-              <strong>Sealed Sender</strong>
-              <span>Absender-Metadaten nicht übertragen</span>
-            </div>
-          </li>
-          <li>
-            <span className="auth-brand-feat-icon">
-              <IconTimer size={14} />
-            </span>
-            <div>
-              <strong>Auto-Lock</strong>
-              <span>Schlüssel automatisch aus dem Speicher löschen</span>
-            </div>
-          </li>
-          <li>
-            <span className="auth-brand-feat-icon">
-              <IconBookmark size={14} />
-            </span>
-            <div>
-              <strong>E2E-Backup</strong>
-              <span>Verschlüsselter Schlüssel-Export für neue Geräte</span>
-            </div>
-          </li>
-        </ul>
-        </div>{/* end auth-brand-content */}
-
-        <p className="auth-brand-footer">
-          Web-Build. Kein auditierter Signal-Ersatz — siehe{" "}
-          <code>THREAT_MODEL.md</code>.
-        </p>
-      </div>
-
-      {/* ── Right: form panel ── */}
       <div className="auth-form-panel">
         <div className="auth-form-panel-toggle">
           <ThemeToggle />

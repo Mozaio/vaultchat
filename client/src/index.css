@@ -5982,160 +5982,22 @@ input[type="checkbox"] {
 }
 
 /* ────────────────────────────────────────────────────────────
-   Auth Split Layout v3 — Two-panel brand + form
-   Left panel: always-dark atmospheric brand story
-   Right panel: theme-aware clean form
+   Auth Layout — centered, single-column login card.
+   Theme-aware colors live in the v6 block further down; the layout
+   itself is identical in both light and dark.
    ──────────────────────────────────────────────────────────── */
 
 .auth-split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   height: 100%;
   align-self: stretch;
   overflow: hidden;
+  padding: 24px;
 }
 
-/* ── Left: always-dark brand panel ── */
-.auth-brand-panel {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  padding: 2.5rem;
-  overflow: hidden;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  background:
-    radial-gradient(ellipse 760px 560px at -8% 114%, rgba(224, 122, 82, 0.22) 0%, transparent 60%),
-    radial-gradient(ellipse 540px 380px at 114% -6%, rgba(224, 122, 82, 0.12) 0%, transparent 55%),
-    linear-gradient(155deg, #140e0a 0%, #1f1610 55%, #241813 100%);
-}
-
-.auth-brand-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: linear-gradient(to bottom right, black 15%, transparent 70%);
-  pointer-events: none;
-}
-
-.auth-brand-top {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.auth-brand-top-name {
-  font-size: 1.05rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: #c8d2e4;
-}
-
-.auth-brand-content {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2.25rem;
-  min-height: 0;
-}
-
-.auth-brand-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.auth-brand-hero h1 {
-  font-size: clamp(1.9rem, 2.5vw, 2.6rem);
-  font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1.12;
-  color: #f0f2f7;
-  margin: 0;
-}
-
-.auth-brand-hero h1 em {
-  font-style: normal;
-  color: #26d6c2;
-}
-
-.auth-brand-hero p {
-  font-size: 0.9rem;
-  line-height: 1.65;
-  color: #94a3b8;
-  max-width: 24rem;
-  margin: 0;
-}
-
-.auth-brand-features {
-  list-style: none;
-  padding: 1.5rem 0 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.auth-brand-features li {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-}
-
-.auth-brand-feat-icon {
-  width: 2.1rem;
-  height: 2.1rem;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  background: rgba(25, 198, 177, 0.15);
-  color: #34e2cf;
-  border: 1px solid rgba(25, 198, 177, 0.30);
-  box-shadow: 0 2px 8px -3px rgba(25, 198, 177, 0.40);
-}
-
-.auth-brand-features li > div {
-  display: flex;
-  flex-direction: column;
-  gap: 0.08rem;
-}
-
-.auth-brand-features li strong {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: #d8e0eb;
-  line-height: 1.3;
-}
-
-.auth-brand-features li span {
-  font-size: 0.74rem;
-  color: #8a9bb1;
-  line-height: 1.45;
-}
-
-.auth-brand-footer {
-  position: relative;
-  z-index: 1;
-  font-size: 0.7rem;
-  color: #5d6e85;
-  margin: 0;
-}
-
-.auth-brand-footer code {
-  font-family: var(--font-mono);
-  color: #7e8da3;
-}
-
-/* ── Right: form panel ── */
 .auth-form-panel {
   position: relative;
   display: flex;
@@ -6233,35 +6095,9 @@ input[type="checkbox"] {
 
 /* ── Mobile ── */
 @media (max-width: 720px) {
-  .auth-split {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-brand-panel {
-    display: none;
-  }
-
   .auth-form-panel {
     justify-content: flex-start;
     padding-top: 3.5rem;
-  }
-
-  .auth-form-panel-mobile-brand {
-    display: flex;
-  }
-}
-
-@media (min-width: 721px) and (max-width: 1050px) {
-  .auth-split {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .auth-brand-hero h1 {
-    font-size: 1.7rem;
-  }
-
-  .auth-brand-panel {
-    padding: 2rem;
   }
 }
 
@@ -7174,58 +7010,6 @@ button:focus-visible,
 *::-webkit-scrollbar-track {
   background: transparent;
 }
-/* ── Clean-Light landing / auth (scoped so the dark theme keeps its
-   atmospheric hero). Soft off-white hero with a faint teal wash, muted
-   slate copy — consistent with the light chat, easy on the eyes. ── */
-:root:not(.dark) .auth-brand-panel {
-  background:
-    radial-gradient(820px 600px at 108% -6%, rgba(243, 217, 196, 0.9), transparent 55%),
-    radial-gradient(620px 520px at -10% 112%, rgba(199, 91, 57, 0.14), transparent 58%),
-    linear-gradient(155deg, #fbf4ea 0%, #f6efe6 55%, #f1e4d6 100%);
-  border-right: 1px solid var(--border);
-}
-:root:not(.dark) .auth-brand-panel::before {
-  background-image: radial-gradient(circle, rgba(120, 80, 50, 0.05) 1px, transparent 1px);
-}
-:root:not(.dark) .auth-brand-top-name {
-  color: var(--text);
-}
-/* Serif display headline — warm, editorial, calm. */
-:root:not(.dark) .auth-brand-hero h1 {
-  color: #2e241d;
-  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-:root:not(.dark) .auth-brand-hero h1 em {
-  color: var(--accent);
-  font-style: italic;
-}
-:root:not(.dark) .auth-brand-hero p {
-  color: var(--text-secondary);
-}
-:root:not(.dark) .auth-brand-features {
-  border-top: 1px solid var(--border);
-}
-:root:not(.dark) .auth-brand-feat-icon {
-  background: rgba(199, 91, 57, 0.10);
-  color: var(--accent);
-  border: 1px solid rgba(199, 91, 57, 0.22);
-  box-shadow: none;
-}
-:root:not(.dark) .auth-brand-features li strong {
-  color: var(--text);
-}
-:root:not(.dark) .auth-brand-features li span {
-  color: var(--text-muted);
-}
-:root:not(.dark) .auth-brand-footer {
-  color: var(--text-muted);
-}
-:root:not(.dark) .auth-brand-footer code {
-  color: var(--text-secondary);
-}
-
 /* ============================================================
    VAULTCHAT v6 — Floating-panel layout + icon rail
 
@@ -7362,18 +7146,9 @@ button:focus-visible,
   }
 }
 
-/* Centered, focused login card (warm identity). The split hero is replaced
-   by a single calm card on a warm wash — Signal/WhatsApp-style focus. Dark
-   theme keeps its atmospheric split hero. */
-/* Centered, focused login card — SAME layout in BOTH themes. Toggling
-   dark/light now only changes colors, not the layout (no more "jumps to a
-   different page"). The split hero is hidden in both modes. */
-.auth-split {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
+/* Centered login card — warm wash background, theme-aware colors. The
+   centering itself lives on the base .auth-split rule above; this block
+   only paints the per-theme background and styles the card. */
 :root:not(.dark) .auth-split {
   background:
     radial-gradient(900px 700px at 50% -8%, rgba(243, 217, 196, 0.75), transparent 60%),
@@ -7383,9 +7158,6 @@ button:focus-visible,
   background:
     radial-gradient(900px 700px at 50% -8%, rgba(224, 122, 82, 0.16), transparent 60%),
     linear-gradient(160deg, #1f1610 0%, #1a130e 55%, #140e0a 100%);
-}
-.auth-brand-panel {
-  display: none;
 }
 .auth-form-panel {
   background: var(--bg-elevated);
