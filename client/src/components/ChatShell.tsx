@@ -162,13 +162,13 @@ type ReplyTarget = {
   expiresAt?: number;
 } | null;
 
-const TTL_OPTIONS: { label: string; ms: number }[] = [
-  { label: "Aus", ms: 0 },
-  { label: "30 s", ms: 30_000 },
-  { label: "5 min", ms: 5 * 60_000 },
-  { label: "1 h", ms: 60 * 60_000 },
-  { label: "1 Tag", ms: 24 * 60 * 60_000 },
-  { label: "7 Tage", ms: 7 * 24 * 60 * 60_000 },
+const TTL_OPTIONS: { labelKey: string; ms: number }[] = [
+  { labelKey: "ttl.off", ms: 0 },
+  { labelKey: "ttl.30s", ms: 30_000 },
+  { labelKey: "ttl.5min", ms: 5 * 60_000 },
+  { labelKey: "ttl.1h", ms: 60 * 60_000 },
+  { labelKey: "ttl.1day", ms: 24 * 60 * 60_000 },
+  { labelKey: "ttl.7days", ms: 7 * 24 * 60 * 60_000 },
 ];
 
 /** Weiterleitung als neuer DM-Frame (nur Text/Datei). */
@@ -2693,7 +2693,7 @@ export function ChatShell({
       (groupRef.current?.id === gid || groupCallGroupIdRef.current === gid)
     ) {
       const name =
-        usersRef.current.find((u) => u.id === fromUserId)?.username ?? "Jemand";
+        usersRef.current.find((u) => u.id === fromUserId)?.username ?? t("chat.someone");
       pushToast(
         kind === "voice_join"
           ? t("chat.toastVoiceJoined", { name })
@@ -3241,7 +3241,7 @@ export function ChatShell({
               {
                 id: row.id,
                 kind: "file" as const,
-                name: plain.fileName ?? "Datei",
+                name: plain.fileName ?? t("chat.fileFallback"),
                 href: safeMediaSrc(plain.body, "file") || "#",
                 at: row.at,
               },
@@ -3357,10 +3357,10 @@ export function ChatShell({
                     <span></span>
                     <span></span>
                     <span></span>
-                    schreibt
+                    {t("chat.typing")}
                   </span>
                 ) : (
-                  `${g.memberIds.length} Mitglieder`
+                  t("chat.memberCount", { n: g.memberIds.length })
                 )}
               </p>
             </div>
@@ -3378,8 +3378,8 @@ export function ChatShell({
             <IconBell size={16} />
           </span>
           <div className="notify-prompt-text">
-            <strong>Benachrichtigungen aktivieren?</strong>
-            <span>Umbra zeigt dir neue Nachrichten an, wenn das Fenster im Hintergrund ist.</span>
+            <strong>{t("chat.enableNotifsTitle")}</strong>
+            <span>{t("chat.notifHint")}</span>
           </div>
           <div className="notify-prompt-actions">
             <button
@@ -3512,7 +3512,7 @@ export function ChatShell({
               <button
                 type="button"
                 className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
-                aria-label="Schließen"
+                aria-label={t("common.close")}
                 onClick={() => {
                   setForwardTarget(null);
                   setForwardPick(new Set());
@@ -3531,7 +3531,7 @@ export function ChatShell({
               {previewForPayload(forwardTarget.plain)}
             </p>
             <p className="mb-2 text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
-              Kontakte auswählen (einzeln verschlüsselt per DM)
+              {t("chat.forwardPickTitle")}
             </p>
             <div
               className="max-h-56 space-y-1 overflow-y-auto rounded-lg border p-2"
@@ -3539,7 +3539,7 @@ export function ChatShell({
             >
               {users.filter((u) => !blockedPeers.has(u.id)).length === 0 ? (
                 <p className="py-4 text-center text-sm" style={{ color: "var(--text-muted)" }}>
-                  Keine Kontakte verfügbar.
+                  {t("chat.noContactsAvail")}
                 </p>
               ) : (
                 users
@@ -3698,13 +3698,13 @@ export function ChatShell({
                 aria-live="polite"
               >
                 <span className="sidebar-status-dot" aria-hidden />
-                {reconnectAttempt > 0 ? "Verbinde…" : "Offline"}
+                {reconnectAttempt > 0 ? t("chat.reconnecting") : t("chat.offline")}
               </span>
             )}
             {pendingCount > 0 && (
               <span
                 className="sidebar-status-pending"
-                title={`${pendingCount} Nachricht${pendingCount === 1 ? "" : "en"} warten auf Zustellung`}
+                title={t("chat.pendingDelivery", { n: pendingCount })}
               >
                 {pendingCount}
               </span>
@@ -3850,7 +3850,7 @@ export function ChatShell({
                     setGroup(null);
                     setPeer({
                       id: session.user.id,
-                      username: "Saved Messages",
+                      username: t("chat.savedMessages"),
                       publicKey: session.user.publicKey,
                     });
                     setInfoOpen(false);
@@ -3868,7 +3868,7 @@ export function ChatShell({
                     <IconBookmark size={16} />
                   </div>
                   <div className="contact-info min-w-0">
-                    <span className="contact-name">Saved Messages</span>
+                    <span className="contact-name">{t("chat.savedMessages")}</span>
                     <p
                       className="contact-preview"
                       style={{ color: "var(--text-muted)" }}
@@ -3891,7 +3891,7 @@ export function ChatShell({
                     <span className="u-newchat-plus" aria-hidden>
                       +
                     </span>
-                    Keine Treffer — „{query.trim()}" hinzufügen
+                    {t("chat.noMatchAdd", { query: query.trim() })}
                   </button>
                 )}
               {sidebarFilter === "star" &&
@@ -3901,7 +3901,7 @@ export function ChatShell({
                     className="px-2 py-4 text-center text-xs"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Keine DMs mit Markierungen. Unten: Gruppen mit Sternen.
+                    {t("chat.starredEmptyDm")}
                   </p>
                 )}
               {activeFolder !== null &&
@@ -3933,7 +3933,7 @@ export function ChatShell({
             ) : (
               <div className="flex h-full items-center justify-center px-6 text-center">
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                  Markiere Kontakte als Favorit, damit sie hier erscheinen.
+                  {t("chat.favEmptyHint")}
                 </p>
               </div>
             )}
@@ -4076,7 +4076,7 @@ export function ChatShell({
               activeFolder !== null) &&
               visibleGroups.length > 0 && (
               <p className="px-2 pb-1 pt-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
-                Gruppen
+                {t("chat.groups")}
               </p>
             )}
             {groupList}
@@ -4087,7 +4087,7 @@ export function ChatShell({
                   className="px-6 py-10 text-center text-sm"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Noch keine markierten Nachrichten. Sterne erscheinen hier in der Liste.
+                  {t("chat.starredEmpty")}
                 </p>
               )}
           </div>
@@ -4242,7 +4242,7 @@ export function ChatShell({
               color: "var(--text)",
             }}
           >
-            <span>Anruf von {incomingOffer.from.username}</span>
+            <span>{t("chat.callFrom", { name: incomingOffer.from.username })}</span>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -4461,7 +4461,7 @@ export function ChatShell({
                             title={t("settings.disappearing")}
                           >
                             {TTL_OPTIONS.map((o) => (
-                              <option key={o.ms} value={o.ms}>{o.label}</option>
+                              <option key={o.ms} value={o.ms}>{t(o.labelKey)}</option>
                             ))}
                           </select>
                         </label>
@@ -4544,8 +4544,7 @@ export function ChatShell({
                     color: "var(--danger)",
                   }}
                 >
-                  Der Identity-Key dieses Peers hat sich geändert. Nachrichten
-                  werden blockiert, bis du die Sicherheitsnummer neu geprüft hast.
+                  {t("chat.mismatchBanner")}
                 </div>
               )}
               {blockedPeers.has(peer.id) && (
@@ -4557,7 +4556,7 @@ export function ChatShell({
                     color: "var(--warning)",
                   }}
                 >
-                  Dieser Kontakt ist blockiert. Eingehende Nachrichten werden lokal verworfen.
+                  {t("chat.contactBlockedBanner")}
                 </div>
               )}
             </header>
@@ -4618,9 +4617,8 @@ export function ChatShell({
                 <div className="e2ee-hint" key="e2ee-hint">
                   <IconShieldCheck size={14} />
                   <span>
-                    Ende-zu-Ende verschlüsselt mit {peer.username}.
-                    {peerPin?.state !== "verified" &&
-                      " Sicherheitsnummer prüfen für maximale Vertrauenswürdigkeit."}
+                    {t("chat.e2eeWith", { name: peer.username })}
+                    {peerPin?.state !== "verified" && t("chat.verifyHint")}
                   </span>
                 </div>
               )}
@@ -4746,7 +4744,7 @@ export function ChatShell({
                     onReply={(x) =>
                       setReplyDm({
                         cid: x.plain.cid ?? "",
-                        author: x.fromMe ? "Du" : peer.username,
+                        author: x.fromMe ? t("chat.you") : peer.username,
                         text: previewForPayload(x.plain),
                         expiresAt: x.expiresAt,
                       })
@@ -5111,7 +5109,7 @@ export function ChatShell({
                     }
                     return (
                       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        E2EE symmetrisch · {group.memberIds.length} Mitglieder
+                        {t("chat.groupE2eeInfo", { n: group.memberIds.length })}
                       </p>
                     );
                   })()}
@@ -5138,7 +5136,7 @@ export function ChatShell({
                     {groupMenuOpen && (
                       <div className="chat-menu">
                         <label className="chat-menu-item cursor-default">
-                          <span>Verschwindende Nachrichten</span>
+                          <span>{t("settings.disappearing")}</span>
                           <select
                             value={ttlGroup}
                             onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
@@ -5146,7 +5144,7 @@ export function ChatShell({
                             title={t("settings.disappearing")}
                           >
                             {TTL_OPTIONS.map((o) => (
-                              <option key={o.ms} value={o.ms}>{o.label}</option>
+                              <option key={o.ms} value={o.ms}>{t(o.labelKey)}</option>
                             ))}
                           </select>
                         </label>
@@ -5301,7 +5299,7 @@ export function ChatShell({
                         className="mb-1 text-[11px] font-semibold"
                         style={{ color: "var(--text-muted)" }}
                       >
-                        Einladungslinks
+                        {t("chat.inviteLinks")}
                       </p>
                       {groupInvitesLoading ? (
                         <p
@@ -5381,14 +5379,14 @@ export function ChatShell({
                         disabled={creatingInvite}
                         className="btn btn-secondary !px-2 !py-1 !text-[10px]"
                       >
-                        {creatingInvite ? "…" : "Neuer Link (7 Tage)"}
+                        {creatingInvite ? "…" : t("chat.newLink7d")}
                       </button>
                     </div>
                   )}
                   <ul className="mb-2 space-y-1">
                     {group.memberIds.map((mid) => {
                       const u = users.find((x) => x.id === mid);
-                      const label = u?.username ?? (mid === session.user.id ? "Du" : mid.slice(0, 8));
+                      const label = u?.username ?? (mid === session.user.id ? t("chat.you") : mid.slice(0, 8));
                       const isFounder =
                         Boolean(group.createdByUserId) &&
                         mid === group.createdByUserId;
@@ -5479,7 +5477,7 @@ export function ChatShell({
             <div
               ref={groupScrollRef}
               role="log"
-              aria-label={`Gruppenchat ${group?.name ?? ""}`}
+              aria-label={t("chat.groupChatAria", { name: group?.name ?? "" })}
               className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 relative"
               onDragOver={(e) => {
                 e.preventDefault();
@@ -5501,7 +5499,7 @@ export function ChatShell({
                 <div className="absolute inset-0 z-50 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--accent)] bg-[var(--accent-soft)] backdrop-blur-sm">
                   <div className="text-center">
                     <p className="mb-2 text-2xl">📎</p>
-                    <p className="text-sm font-medium" style={{ color: "var(--accent)" }}>Dateien in die Gruppe legen</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--accent)" }}>{t("chat.dropFilesGroup")}</p>
                   </div>
                 </div>
               )}
@@ -5635,7 +5633,7 @@ export function ChatShell({
                   )}
                   onReply={(x) => {
                     const author = x.fromMe
-                      ? "Du"
+                      ? t("chat.you")
                       : users.find((u) => u.id === x.fromUserId)?.username ?? t("chat.memberFallback");
                     setReplyGroup({
                       cid: x.plain.cid ?? "",
@@ -6086,7 +6084,7 @@ export function ChatShell({
               m.fromMe
                 ? "Du"
                 : users.find((u) => u.id === m.fromUserId)?.username ?? t("chat.memberFallback")
-          : (m: ChatMsg) => (m.fromMe ? "Du" : peer!.username);
+          : (m: ChatMsg) => (m.fromMe ? t("chat.you") : peer!.username);
 
         return (
           <ThreadPanel
@@ -6282,7 +6280,7 @@ export function ChatShell({
               className="flex-1 rounded-xl px-3 py-2 text-sm font-medium transition"
               style={tab === "group" ? { background: "var(--accent)", color: "white" } : { border: "1px solid var(--border)", color: "var(--text-secondary)" }}
             >
-              Gruppen
+              {t("chat.groups")}
             </button>
           </div>
         </div>
