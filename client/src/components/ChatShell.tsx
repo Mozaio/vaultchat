@@ -609,7 +609,7 @@ export function ChatShell({
     } catch {
       /* ignore */
     }
-    const displayBody = showPreview ? body : "Neue Nachricht";
+    const displayBody = showPreview ? body : t("chat.newMessageNotif");
     if (!("Notification" in window) || document.visibilityState === "visible") return;
     if (Notification.permission === "granted") {
       new Notification(title, { body: displayBody, tag: "vaultchat-message" });
@@ -1829,7 +1829,7 @@ export function ChatShell({
               groupRef.current?.id !== gid &&
               (!mutedGroups.has(gid) || mentioned)
             ) {
-              const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? "Gruppe";
+              const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? t("chat.groupFallback");
               maybeNotify(
                 mentioned ? `${groupName} · Erwähnung` : groupName,
                 previewForPayload(plain)
@@ -2587,7 +2587,7 @@ export function ChatShell({
   async function addMember() {
     if (!group || !addMemberId) return;
     const memberLabel =
-      users.find((u) => u.id === addMemberId)?.username ?? "Mitglied";
+      users.find((u) => u.id === addMemberId)?.username ?? t("chat.memberFallback");
     try {
       const { group: g2 } = await api.addGroupMember(
         session.token,
@@ -2613,7 +2613,7 @@ export function ChatShell({
   async function removeMember(memberId: string) {
     if (!group) return;
     const memberLabel =
-      users.find((u) => u.id === memberId)?.username ?? "Mitglied";
+      users.find((u) => u.id === memberId)?.username ?? t("chat.memberFallback");
     try {
       const { group: g2 } = await api.removeGroupMember(
         session.token,
@@ -3256,12 +3256,12 @@ export function ChatShell({
       const prev = lastDmPreviewByPeer.get(u.id);
       const subtitle =
         peer?.id === u.id && typing
-          ? "schreibt…"
+          ? t("chat.typing")
           : prev
             ? prev.fromMe
-              ? `Du: ${prev.text}`
+              ? t("chat.selfPreview", { text: prev.text })
               : prev.text
-            : "Keine Nachrichten";
+            : t("chat.noMessages");
       return (
         <PeerRow
           key={u.id}
@@ -3456,7 +3456,7 @@ export function ChatShell({
             const local = loadLocalIdentity();
             if (!local) return;
             const passphrase = window.prompt(
-              "Passphrase für das verschlüsselte Backup eingeben"
+              t("chat.backupPassPrompt")
             );
             if (!passphrase) return;
             const backup = await encryptIdentityBackup(local, passphrase);
@@ -3585,8 +3585,8 @@ export function ChatShell({
           <IconWifiOff size={15} aria-hidden />
           <span>
             {hasEverConnected
-              ? "Verbindung getrennt. Erneuter Aufbau läuft automatisch. Ausgehende DMs warten in der Outbox."
-              : "Verbindung zum Server wird hergestellt …"}
+              ? t("chat.connLostBanner")
+              : t("chat.connecting")}
           </span>
         </div>
       )}
@@ -3677,7 +3677,7 @@ export function ChatShell({
                 title={
                   reconnectAttempt > 0
                     ? `Reconnect-Versuch ${reconnectAttempt} — Server wacht evtl. gerade auf`
-                    : "Verbindung getrennt"
+                    : t("chat.disconnected")
                 }
                 role="status"
                 aria-live="polite"
@@ -3736,7 +3736,7 @@ export function ChatShell({
                 onClick={() => setQuery("")}
                 className="shrink-0 rounded-full p-0.5 transition hover:bg-[var(--bg-hover)]"
                 style={{ color: "var(--text-muted)" }}
-                aria-label="Suche löschen"
+                aria-label={t("common.clearSearch")}
                 title="Löschen (Esc)"
               >
                 <IconX size={14} />
@@ -3981,7 +3981,7 @@ export function ChatShell({
                   setNewGroupDescription(e.target.value.slice(0, 280))
                 }
                 rows={2}
-                aria-label="Gruppenbeschreibung"
+                aria-label={t("group.description")}
                 style={{ resize: "none" }}
               />
               <div
@@ -4093,7 +4093,7 @@ export function ChatShell({
             onClick={() => setSecurityOpen(true)}
             className="min-w-0 flex-1 truncate text-left font-medium inline-flex items-center gap-1.5"
             style={{ color: "var(--text)" }}
-            title={myFp ? `Fingerprint: ${myFp}` : "Eigenes Profil"}
+            title={myFp ? `Fingerprint: ${myFp}` : t("chat.ownProfile")}
           >
             <span className="truncate">{session.user.username}</span>
             {isPro() && (
@@ -4161,7 +4161,7 @@ export function ChatShell({
                   const local = loadLocalIdentity();
                   if (!local) return;
                   const passphrase = window.prompt(
-                    "Passphrase für das verschlüsselte Backup eingeben"
+                    t("chat.backupPassPrompt")
                   );
                   if (!passphrase) return;
                   try {
@@ -4334,7 +4334,7 @@ export function ChatShell({
                     type="button"
                     className="header-identity"
                     onClick={() => setInfoOpen((v) => !v)}
-                    title="Profil und Details öffnen"
+                    title={t("chat.openProfile")}
                   >
                     <div className="header-avatar-wrap">
                       <div
@@ -4398,10 +4398,10 @@ export function ChatShell({
                             }}
                           />
                           {onlinePeers.has(peer.id)
-                            ? "Online"
+                            ? t("chat.online")
                             : connected
-                              ? "Zuletzt gesehen vor kurzem"
-                              : "Offline"}
+                              ? t("chat.lastSeenRecently")
+                              : t("chat.offline")}
                         </p>
                       )}
                     </div>
@@ -4443,7 +4443,7 @@ export function ChatShell({
                             value={ttlDm}
                             onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
                             className="chat-menu-select"
-                            title="Verschwindende Nachrichten"
+                            title={t("settings.disappearing")}
                           >
                             {TTL_OPTIONS.map((o) => (
                               <option key={o.ms} value={o.ms}>{o.label}</option>
@@ -4664,8 +4664,8 @@ export function ChatShell({
                       </p>
                       <p className="conversation-blank-text">
                         {isSelf
-                          ? "Nur für dich — lokal verschlüsselt auf diesem Gerät."
-                          : "Noch keine Nachrichten. Eure Unterhaltung ist Ende-zu-Ende verschlüsselt — schreib die erste Nachricht."}
+                          ? t("chat.selfNotesDesc")
+                          : t("chat.firstMessage")}
                       </p>
                     </div>
                   );
@@ -5075,7 +5075,7 @@ export function ChatShell({
                     if (ts && ts.size > 0) {
                       const names = [...ts].map(
                         (id) =>
-                          users.find((u) => u.id === id)?.username ?? "Mitglied"
+                          users.find((u) => u.id === id)?.username ?? t("chat.memberFallback")
                       );
                       const label =
                         names.length === 1
@@ -5128,7 +5128,7 @@ export function ChatShell({
                             value={ttlGroup}
                             onChange={(e) => void onChangeTtlGroup(Number(e.target.value))}
                             className="chat-menu-select"
-                            title="Verschwindende Nachrichten"
+                            title={t("settings.disappearing")}
                           >
                             {TTL_OPTIONS.map((o) => (
                               <option key={o.ms} value={o.ms}>{o.label}</option>
@@ -5160,7 +5160,7 @@ export function ChatShell({
                           <div className="flex items-center gap-2">
                             <label
                               className="group-avatar-edit cursor-pointer"
-                              title="Gruppenbild auswählen"
+                              title={t("chat.pickGroupImage")}
                             >
                               {(() => {
                                 const showAvatar = groupEditAvatarRemoved
@@ -5616,12 +5616,12 @@ export function ChatShell({
                   replyToPreview={replyPreviewForMessage(
                     groupMessages,
                     m,
-                    users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied"
+                    users.find((u) => u.id === m.fromUserId)?.username ?? t("chat.memberFallback")
                   )}
                   onReply={(x) => {
                     const author = x.fromMe
                       ? "Du"
-                      : users.find((u) => u.id === x.fromUserId)?.username ?? "Mitglied";
+                      : users.find((u) => u.id === x.fromUserId)?.username ?? t("chat.memberFallback");
                     setReplyGroup({
                       cid: x.plain.cid ?? "",
                       author,
@@ -6070,7 +6070,7 @@ export function ChatShell({
           ? (m: ChatMsg) =>
               m.fromMe
                 ? "Du"
-                : users.find((u) => u.id === m.fromUserId)?.username ?? "Mitglied"
+                : users.find((u) => u.id === m.fromUserId)?.username ?? t("chat.memberFallback")
           : (m: ChatMsg) => (m.fromMe ? "Du" : peer!.username);
 
         return (
