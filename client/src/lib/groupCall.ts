@@ -61,6 +61,8 @@ export type GroupCallPeer = {
   userId: string;
   username: string;
   stream: MediaStream | null;
+  /** This peer's incoming screen-share video stream, if they're sharing. */
+  screenStream: MediaStream | null;
   speaking: boolean;
   muted: boolean; // the REMOTE peer told us they're muted
   connectionState: RTCPeerConnectionState;
@@ -97,6 +99,10 @@ type PeerSlot = {
   /** ICE candidates received before the remote description was set. */
   pending: RTCIceCandidateInit[];
   remoteStream: MediaStream | null;
+  /** Sender for MY screen track to this peer (so we can removeTrack later). */
+  screenSender: RTCRtpSender | null;
+  /** THIS peer's incoming screen-share stream. */
+  screenStream: MediaStream | null;
   /** RAF token for speaking detection. */
   rafToken?: number;
   audioCtx?: AudioContext;
@@ -212,6 +218,7 @@ export class GroupCallController {
       return; // hard cap
     }
     let slot = this.peers.get(fromUserId);
+    const isNewSlot = !slot;
 
     // If we receive an offer from someone we don't yet have a slot
     // for, we must create the slot here (the offer-initiator side has
@@ -231,6 +238,13 @@ export class GroupCallController {
         const answer = await slot.pc.createAnswer();
         await slot.pc.setLocalDescription(answer);
         this.events.sendRtc(fromUserId, { type: "answer", sdp: answer.sdp ?? "" });
+        // A new peer connected while we're already sharing: makeSlot attached
+        // our screen track, but this answer couldn't include it (their offer
+        // had no video m-line). Renegotiate to push it. Only on a brand-new
+        // slot, so we don't bounce back another peer's share-renegotiation.
+        if (isNewSlot && this.screenStream && slot.screenSender) {
+          void this.renegotiate(slot);
+        }
       } else if (payload.type === "answer") {
         if (slot.pc.signalingState === "have-local-offer") {
           await slot.pc.setRemoteDescription({ type: "answer", sdp: payload.sdp });
@@ -298,11 +312,28 @@ export class GroupCallController {
     // The browser's own "Stop sharing" control ends the track — clean up then.
     const track = stream.getVideoTracks()[0];
     if (track) track.addEventListener("ended", () => this.stopScreenShare());
+    // Step 2: push the screen track to every connected peer + renegotiate.
+    for (const [, slot] of this.peers) {
+      this.addScreenToSlot(slot);
+      void this.renegotiate(slot);
+    }
     this.publishState();
   }
 
   stopScreenShare() {
     if (!this.screenStream) return;
+    // Remove the track from each peer and renegotiate so they drop the video.
+    for (const [, slot] of this.peers) {
+      if (slot.screenSender) {
+        try {
+          slot.pc.removeTrack(slot.screenSender);
+        } catch {
+          /* noop */
+        }
+        slot.screenSender = null;
+        void this.renegotiate(slot);
+      }
+    }
     try {
       this.screenStream.getTracks().forEach((tk) => tk.stop());
     } catch {
@@ -310,6 +341,32 @@ export class GroupCallController {
     }
     this.screenStream = null;
     this.publishState();
+  }
+
+  /** Attach our screen video track to a peer connection (idempotent). */
+  private addScreenToSlot(slot: PeerSlot) {
+    if (!this.screenStream || slot.screenSender || slot.closed) return;
+    const vt = this.screenStream.getVideoTracks()[0];
+    if (!vt) return;
+    try {
+      slot.screenSender = slot.pc.addTrack(vt, this.screenStream);
+    } catch (e) {
+      gcDebug("add_screen_failed", { peer: slot.userId, err: shortErr(e) });
+    }
+  }
+
+  /** Create + send a fresh offer for a slot (used to (de)negotiate the screen
+   *  track on an already-connected peer). Only the track-adder offers, so the
+   *  single-sharer case is glare-free. */
+  private async renegotiate(slot: PeerSlot) {
+    if (slot.closed) return;
+    try {
+      const offer = await slot.pc.createOffer();
+      await slot.pc.setLocalDescription(offer);
+      this.events.sendRtc(slot.userId, { type: "offer", sdp: offer.sdp ?? "" });
+    } catch (e) {
+      gcDebug("renegotiate_failed", { peer: slot.userId, err: shortErr(e) });
+    }
   }
 
   /** Hangup: announce, close all peers, free mic. */
@@ -362,17 +419,34 @@ export class GroupCallController {
       userId: otherUserId,
       pending: [],
       remoteStream: null,
+      screenSender: null,
+      screenStream: null,
       speakingUntil: 0,
       closed: false,
     };
 
     pc.ontrack = (ev) => {
+      const track = ev.track;
+      if (track.kind === "video") {
+        // Screen share from this peer.
+        slot.screenStream = ev.streams[0] ?? new MediaStream([track]);
+        track.addEventListener("ended", () => {
+          slot.screenStream = null;
+          this.publishState();
+        });
+        this.publishState();
+        return;
+      }
       const stream = ev.streams[0];
       if (!stream) return;
       slot.remoteStream = stream;
       this.startSpeakingDetection(slot, stream);
       this.publishState();
     };
+
+    // If we're already screen-sharing when this peer connects, attach our
+    // screen track now so it's part of the (re)negotiation.
+    if (this.screenStream) this.addScreenToSlot(slot);
 
     pc.onicecandidate = (ev) => {
       if (!ev.candidate) return;
@@ -539,6 +613,7 @@ export class GroupCallController {
         userId,
         username: u?.username ?? userId.slice(0, 8),
         stream: slot.remoteStream,
+        screenStream: slot.screenStream,
         speaking: slot.speakingUntil > now,
         muted: false, // future: peer-reported mute flag via DataChannel
         connectionState: slot.pc.connectionState,

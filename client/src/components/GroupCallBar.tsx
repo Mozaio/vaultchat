@@ -135,6 +135,17 @@ export function GroupCallBar({
           <ScreenPreview stream={screenStream} />
         </div>
       )}
+      {peerList
+        .filter((p) => p.screenStream)
+        .map((p) => (
+          <div key={`screen-${p.userId}`} className="group-call-screen">
+            <span className="group-call-screen-badge">
+              <IconScreenShare size={12} aria-hidden /> {p.username} teilt den
+              Bildschirm
+            </span>
+            <ScreenPreview stream={p.screenStream!} />
+          </div>
+        ))}
       <div className="group-call-grid" data-count={total}>
         <Tile
           label={selfUsername}
