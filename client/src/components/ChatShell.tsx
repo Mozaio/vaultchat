@@ -697,15 +697,21 @@ export function ChatShell({
    * `olm`-Feld.
    */
   useEffect(() => {
-    void (async () => {
-      try {
-        const body = await buildUploadBodyWithOlm();
-        await api.uploadPreKeys(session.token, body);
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error("[vaultchat] prekey upload", e);
-      }
-    })();
+    // Defer the Olm bundle build (WASM init + 50 one-time-key generation) so
+    // the chat UI paints first — otherwise this heavy main-thread work blocks
+    // the first frame and the app feels frozen right after unlock.
+    const run = () =>
+      void (async () => {
+        try {
+          const body = await buildUploadBodyWithOlm();
+          await api.uploadPreKeys(session.token, body);
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error("[vaultchat] prekey upload", e);
+        }
+      })();
+    const t = window.setTimeout(run, 80);
+    return () => window.clearTimeout(t);
   }, [session.token]);
 
   /**

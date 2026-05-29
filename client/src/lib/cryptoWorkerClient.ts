@@ -53,14 +53,43 @@ function getWorker(): Worker | null {
   }
 }
 
+/**
+ * Max time to wait for a worker reply. Argon2 INTERACTIVE is ~0.6–1.2s on
+ * desktop and up to ~3s on slow mobiles; 6s leaves headroom. If the worker
+ * never answers (e.g. its WASM init silently stalls), we MUST NOT hang the
+ * login forever — we reject, kill the worker, and fall back to the
+ * main-thread path (which always works, just briefly blocks the UI).
+ */
+const WORKER_CALL_TIMEOUT_MS = 6000;
+
 function call<T>(op: string, args: Record<string, unknown> = {}): Promise<T> {
   const w = getWorker();
   if (!w) return Promise.reject(new Error("crypto_worker_unavailable"));
   const id = crypto.randomUUID();
   return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (!_pending.has(id)) return;
+      _pending.delete(id);
+      // The worker is unresponsive — disable it so subsequent calls skip
+      // straight to the main-thread fallback instead of waiting again.
+      try {
+        _worker?.terminate();
+      } catch {
+        /* noop */
+      }
+      _worker = null;
+      _disabled = true;
+      reject(new Error("crypto_worker_timeout"));
+    }, WORKER_CALL_TIMEOUT_MS);
     _pending.set(id, {
-      resolve: (v) => resolve(v as T),
-      reject,
+      resolve: (v) => {
+        clearTimeout(timer);
+        resolve(v as T);
+      },
+      reject: (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
     });
     w.postMessage({ id, op, args });
   });
