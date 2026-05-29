@@ -26,6 +26,7 @@ export function SafetyNumberDialog({
   onClose: () => void;
   onTrustChanged?: (pin: PeerPin) => void;
 }) {
+  useLocale();
   const [groups, setGroups] = useState<string[]>([]);
   const [emojiSeq, setEmojiSeq] = useState<string[]>([]);
   const [pin, setPin] = useState<PeerPin | null>(null);
@@ -100,9 +101,9 @@ export function SafetyNumberDialog({
             background: 'var(--warning-soft)',
             color: 'var(--warning)'
           }}>
-            <p className="font-semibold">⚠️ Der Sicherheitsschlüssel hat sich geändert.</p>
+            <p className="font-semibold">{t("safety.changedTitle")}</p>
             <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-              Dies kann bedeuten: neues Gerät, oder möglicher MITM-Angriff.
+              {t("safety.changedHint")}
             </p>
           </div>
         )}
@@ -111,7 +112,7 @@ export function SafetyNumberDialog({
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Vergleiche diese Nummern persönlich oder über einen sicheren Kanal:
+              {t("safety.compareHint")}
             </p>
             <div className="flex items-center gap-1.5">
               {!showQr && groups.length > 0 && (
@@ -119,16 +120,16 @@ export function SafetyNumberDialog({
                   type="button"
                   onClick={copyNumber}
                   className="safety-qr-toggle"
-                  title="Sicherheitsnummer kopieren"
-                  aria-label="Sicherheitsnummer kopieren"
+                  title={t("safety.copyNumber")}
+                  aria-label={t("safety.copyNumber")}
                 >
                   {copied ? (
                     <>
-                      <IconCheck size={11} /> Kopiert
+                      <IconCheck size={11} /> {t("safety.copied")}
                     </>
                   ) : (
                     <>
-                      <IconCopy size={11} /> Kopieren
+                      <IconCopy size={11} /> {t("safety.copy")}
                     </>
                   )}
                 </button>
@@ -139,7 +140,7 @@ export function SafetyNumberDialog({
                 className="safety-qr-toggle"
                 aria-pressed={showQr}
               >
-                {showQr ? "Nummer anzeigen" : "QR-Code anzeigen"}
+                {showQr ? t("safety.showNumber") : t("safety.showQr")}
               </button>
             </div>
           </div>
@@ -147,8 +148,7 @@ export function SafetyNumberDialog({
             <div className="safety-qr-wrap">
               <QrCodeSvg digits={groups.join("")} size={232} />
               <p className="safety-qr-hint">
-                Scanne diesen Code in Umbra des Gegenübers — die Nummer
-                stimmt überein, wenn beide Seiten denselben Code anzeigen.
+                {t("safety.qrHint")}
               </p>
             </div>
           ) : (
@@ -167,7 +167,7 @@ export function SafetyNumberDialog({
         {/* Emoji grid - 4x2 */}
         <div className="mb-4">
           <p className="mb-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Emoji-Sequenz zum einfachen Abgleich:
+            {t("safety.emojiHint")}
           </p>
           <div className="emoji-grid">
             {emojiSeq.map((emoji, i) => (
@@ -182,7 +182,7 @@ export function SafetyNumberDialog({
           background: 'var(--bg-sidebar)' 
         }}>
           <div className="flex items-center gap-2">
-            <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+            <span style={{ color: 'var(--text-muted)' }}>{t("safety.status")}</span>
             <span className="font-semibold" style={{ 
               color: pin?.state === "verified" ? "var(--accent)" : 
                      pin?.state === "mismatch" ? "var(--danger)" : "var(--warning)" 
@@ -197,7 +197,7 @@ export function SafetyNumberDialog({
               className="btn-qr text-xs"
               style={{ borderColor: 'var(--warning)', color: 'var(--warning)' }}
             >
-              Schlüssel akzeptieren
+              {t("safety.acceptKey")}
             </button>
           )}
         </div>
@@ -210,23 +210,22 @@ export function SafetyNumberDialog({
             className="btn-verify"
           >
             <IconCheck size={16} />
-            <span>Als verifiziert markieren</span>
+            <span>{t("safety.markVerified")}</span>
           </button>
           <button
             type="button"
             onClick={onClose}
             className="btn-qr"
           >
-            Schließen
+            {t("common.close")}
           </button>
         </div>
 
         {/* Explanation */}
         <div className="explanation">
           <p>
-            <strong>Wie funktioniert das?</strong><br/>
-            Die Sicherheitsnummer ist eine deterministische Funktion beider 
-            Identity-Public-Keys mit BLAKE2b. Jedes Gerätepaar hat dieselbe Nummer.
+            <strong>{t("safety.howTitle")}</strong><br/>
+            {t("safety.howBody")}
           </p>
         </div>
       </div>
