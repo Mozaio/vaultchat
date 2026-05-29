@@ -4040,18 +4040,19 @@ select:focus-visible {
   flex: 1 1 auto;
   resize: none;
   overflow-y: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg-elevated);
+  /* The textarea sits INSIDE the rounded composer pill — keep it flat and
+     transparent so there's a single input surface, not a box-in-a-box with
+     two glowing borders on focus. */
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--text);
-  padding: 0.55rem 0.85rem;
+  padding: 0.4rem 0.5rem;
   font-size: 0.92rem;
   line-height: 1.4;
-  transition: border-color 0.12s ease;
 }
 
 .chat-input-textarea:focus {
-  border-color: var(--accent);
   outline: none;
 }
 
@@ -7066,8 +7067,11 @@ button:focus-visible,
 }
 .message-bubble.sent {
   background: var(--bubble-me);
+  /* Cancel the leftover v4 "vault-sheen" soft-light blend — it washed out
+     the bubble (especially over the dark gradient) and read as a 2nd layer. */
+  background-blend-mode: normal;
   border: none;
-  box-shadow: 0 3px 14px -4px var(--accent-glow);
+  box-shadow: 0 2px 8px -3px var(--accent-glow);
 }
 .message-bubble.sent.tail {
   border-bottom-right-radius: 7px;
@@ -7099,8 +7103,7 @@ button:focus-visible,
 }
 .chat-input-row:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft),
-    0 4px 14px -6px var(--accent-glow);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .chat-tool-button {
   border-radius: 12px;
@@ -7320,44 +7323,54 @@ button:focus-visible,
 /* Centered, focused login card (warm identity). The split hero is replaced
    by a single calm card on a warm wash — Signal/WhatsApp-style focus. Dark
    theme keeps its atmospheric split hero. */
-:root:not(.dark) .auth-split {
+/* Centered, focused login card — SAME layout in BOTH themes. Toggling
+   dark/light now only changes colors, not the layout (no more "jumps to a
+   different page"). The split hero is hidden in both modes. */
+.auth-split {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
+}
+:root:not(.dark) .auth-split {
   background:
     radial-gradient(900px 700px at 50% -8%, rgba(243, 217, 196, 0.75), transparent 60%),
     linear-gradient(160deg, #fbf4ea 0%, #f6efe6 55%, #f1e4d6 100%);
-  padding: 24px;
 }
-:root:not(.dark) .auth-brand-panel {
+:root.dark .auth-split {
+  background:
+    radial-gradient(900px 700px at 50% -8%, rgba(224, 122, 82, 0.16), transparent 60%),
+    linear-gradient(160deg, #1f1610 0%, #1a130e 55%, #140e0a 100%);
+}
+.auth-brand-panel {
   display: none;
 }
-:root:not(.dark) .auth-form-panel {
+.auth-form-panel {
   background: var(--bg-elevated);
   max-width: 466px;
   width: 100%;
   border-radius: 26px;
-  box-shadow: 0 34px 80px -30px rgba(80, 50, 30, 0.45);
+  box-shadow: var(--shadow-xl);
   padding: 42px 40px 36px;
   height: auto;
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   border: 1px solid var(--border);
 }
-:root:not(.dark) .auth-form-panel-mobile-brand {
+.auth-form-panel-mobile-brand {
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 11px;
   margin-bottom: 18px;
 }
-:root:not(.dark) .auth-form-panel-mobile-brand span {
+.auth-form-panel-mobile-brand span {
   font-weight: 700;
   font-size: 1.3rem;
   letter-spacing: -0.02em;
   color: var(--text);
 }
-:root:not(.dark) .auth-form-head-title {
+.auth-form-head-title {
   font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
 }
 
