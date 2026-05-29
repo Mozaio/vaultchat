@@ -653,6 +653,116 @@ const DICT: Record<string, Dict> = {
     en: "About", de: "Über", tr: "Hakkında", es: "Acerca de", fr: "À propos",
     pt: "Sobre", ru: "О приложении", ar: "حول", zh: "关于", hi: "परिचय",
   },
+
+  // ── Info / details panel ──────────────────────────────────────────
+  "info.online": {
+    en: "Online", de: "Online", tr: "Çevrimiçi", es: "En línea", fr: "En ligne",
+    pt: "Online", ru: "В сети", ar: "متصل", zh: "在线", hi: "ऑनलाइन",
+  },
+  "info.members": {
+    en: "{n} members", de: "{n} Mitglieder", tr: "{n} üye", es: "{n} miembros",
+    fr: "{n} membres", pt: "{n} membros", ru: "{n} участников",
+    ar: "{n} أعضاء", zh: "{n} 名成员", hi: "{n} सदस्य",
+  },
+  "info.favorite": {
+    en: "Favorite", de: "Favorit", tr: "Favori", es: "Favorito", fr: "Favori",
+    pt: "Favorito", ru: "Избранное", ar: "مفضّل", zh: "收藏", hi: "पसंदीदा",
+  },
+  "info.favorited": {
+    en: "Favorited", de: "Favorisiert", tr: "Favorilendi", es: "Destacado",
+    fr: "Favori ✓", pt: "Favoritado", ru: "В избранном", ar: "مُفضّل",
+    zh: "已收藏", hi: "पसंदीदा ✓",
+  },
+  "info.notifications": {
+    en: "Notifications", de: "Benachrichtigungen", tr: "Bildirimler",
+    es: "Notificaciones", fr: "Notifications", pt: "Notificações",
+    ru: "Уведомления", ar: "الإشعارات", zh: "通知", hi: "सूचनाएं",
+  },
+  "info.muted": {
+    en: "Muted", de: "Stumm", tr: "Sessiz", es: "Silenciado", fr: "Muet",
+    pt: "Silenciado", ru: "Без звука", ar: "كتم", zh: "已静音", hi: "म्यूट",
+  },
+  "info.block": {
+    en: "Block", de: "Blockieren", tr: "Engelle", es: "Bloquear",
+    fr: "Bloquer", pt: "Bloquear", ru: "Заблокировать", ar: "حظر",
+    zh: "屏蔽", hi: "ब्लॉक करें",
+  },
+  "info.blocked": {
+    en: "Blocked", de: "Blockiert", tr: "Engellendi", es: "Bloqueado",
+    fr: "Bloqué", pt: "Bloqueado", ru: "Заблокирован", ar: "محظور",
+    zh: "已屏蔽", hi: "ब्लॉक किया",
+  },
+  "info.userInfo": {
+    en: "User info", de: "Benutzerinfo", tr: "Kullanıcı bilgisi",
+    es: "Info de usuario", fr: "Infos utilisateur", pt: "Info do usuário",
+    ru: "О пользователе", ar: "معلومات المستخدم", zh: "用户信息",
+    hi: "उपयोगकर्ता जानकारी",
+  },
+  "info.security": {
+    en: "Security", de: "Sicherheit", tr: "Güvenlik", es: "Seguridad",
+    fr: "Sécurité", pt: "Segurança", ru: "Безопасность", ar: "الأمان",
+    zh: "安全", hi: "सुरक्षा",
+  },
+  "info.e2eeBlurb": {
+    en: "Messages and calls are end-to-end encrypted. The server only relays sealed data. Perfect forward secrecy is active.",
+    de: "Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server leitet nur versiegelte Daten. Perfect Forward Secrecy aktiv.",
+    tr: "Mesajlar ve aramalar uçtan uca şifrelidir. Sunucu yalnızca mühürlü verileri iletir. Perfect Forward Secrecy etkin.",
+    es: "Los mensajes y llamadas están cifrados de extremo a extremo. El servidor solo retransmite datos sellados. Perfect Forward Secrecy activo.",
+    fr: "Les messages et appels sont chiffrés de bout en bout. Le serveur ne relaie que des données scellées. Perfect Forward Secrecy actif.",
+    pt: "Mensagens e chamadas são criptografadas de ponta a ponta. O servidor só retransmite dados selados. Perfect Forward Secrecy ativo.",
+    ru: "Сообщения и звонки зашифрованы сквозным шифрованием. Сервер передаёт только запечатанные данные. Perfect Forward Secrecy активен.",
+    ar: "الرسائل والمكالمات مشفّرة من طرف إلى طرف. يمرّر الخادم البيانات المختومة فقط. السرية التامة للأمام مُفعّلة.",
+    zh: "消息和通话端到端加密。服务器只转发密封数据。已启用完美前向保密。",
+    hi: "संदेश और कॉल एंड-टू-एंड एन्क्रिप्टेड हैं। सर्वर केवल सीलबंद डेटा रिले करता है। परफेक्ट फॉरवर्ड सीक्रेसी सक्रिय है।",
+  },
+  "info.safetyNumber": {
+    en: "Safety number", de: "Sicherheitsnummer", tr: "Güvenlik numarası",
+    es: "Número de seguridad", fr: "Numéro de sécurité",
+    pt: "Número de segurança", ru: "Код безопасности", ar: "رقم الأمان",
+    zh: "安全码", hi: "सुरक्षा संख्या",
+  },
+  "info.verify": {
+    en: "Verify", de: "Verifizieren", tr: "Doğrula", es: "Verificar",
+    fr: "Vérifier", pt: "Verificar", ru: "Проверить", ar: "تحقّق",
+    zh: "验证", hi: "सत्यापित करें",
+  },
+  "info.sharedMedia": {
+    en: "Shared media", de: "Geteilte Inhalte", tr: "Paylaşılan içerik",
+    es: "Contenido compartido", fr: "Contenu partagé", pt: "Conteúdo compartilhado",
+    ru: "Общие файлы", ar: "الوسائط المشتركة", zh: "共享内容",
+    hi: "साझा सामग्री",
+  },
+  "info.noShared": {
+    en: "No files or voice notes in this chat yet.",
+    de: "Noch keine Dateien oder Sprachnotizen in diesem Chat.",
+    tr: "Bu sohbette henüz dosya veya sesli not yok.",
+    es: "Aún no hay archivos ni notas de voz en este chat.",
+    fr: "Pas encore de fichiers ni de notes vocales dans ce chat.",
+    pt: "Ainda não há arquivos ou notas de voz neste chat.",
+    ru: "В этом чате пока нет файлов или голосовых заметок.",
+    ar: "لا توجد ملفات أو ملاحظات صوتية في هذه المحادثة بعد.",
+    zh: "此聊天中还没有文件或语音备注。",
+    hi: "इस चैट में अभी कोई फ़ाइल या वॉइस नोट नहीं है।",
+  },
+  "info.clearChat": {
+    en: "Clear chat history", de: "Chat-Verlauf leeren",
+    tr: "Sohbet geçmişini temizle", es: "Borrar historial del chat",
+    fr: "Effacer l'historique", pt: "Limpar histórico do chat",
+    ru: "Очистить историю чата", ar: "مسح سجل المحادثة",
+    zh: "清除聊天记录", hi: "चैट इतिहास साफ़ करें",
+  },
+  "info.localOnly": {
+    en: "History stays local, encrypted (IndexedDB).",
+    de: "Verlauf nur lokal, verschlüsselt (IndexedDB).",
+    tr: "Geçmiş yalnızca yerel, şifreli (IndexedDB).",
+    es: "El historial queda local, cifrado (IndexedDB).",
+    fr: "L'historique reste local, chiffré (IndexedDB).",
+    pt: "O histórico fica local, criptografado (IndexedDB).",
+    ru: "История хранится локально, зашифрована (IndexedDB).",
+    ar: "يبقى السجل محليًا ومشفّرًا (IndexedDB).",
+    zh: "历史记录仅本地保存，已加密 (IndexedDB)。",
+    hi: "इतिहास केवल स्थानीय, एन्क्रिप्टेड रहता है (IndexedDB)।",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";

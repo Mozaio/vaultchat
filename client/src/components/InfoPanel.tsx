@@ -1,6 +1,7 @@
 import * as api from "../lib/api";
 import { saveStringSet, userGradient } from "../lib/chatHelpers";
 import { safeMediaSrc } from "../lib/safeMedia";
+import { t, useLocale } from "../lib/i18n";
 import {
   IconBell,
   IconFileText,
@@ -53,9 +54,13 @@ export function InfoPanel({
   onToggleBlocked: () => void;
   sharedMediaItems: SharedMediaItem[];
 }) {
+  useLocale(); // re-render on language change
   const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
   const initials = (title.slice(0, 1) || "•").toUpperCase();
-  const status = mode === "dm" ? "Online" : `${group?.memberIds.length ?? 0} Mitglieder`;
+  const status =
+    mode === "dm"
+      ? t("info.online")
+      : t("info.members", { n: group?.memberIds.length ?? 0 });
   const isMuted =
     mode === "dm" && peer
       ? mutedPeers.has(peer.id)
@@ -131,7 +136,7 @@ export function InfoPanel({
           disabled={mode !== "dm"}
         >
           <IconPin size={18} />
-          <span>{isFavorite ? "Favorisiert" : "Favorit"}</span>
+          <span>{isFavorite ? t("info.favorited") : t("info.favorite")}</span>
         </button>
         <button
           type="button"
@@ -141,7 +146,7 @@ export function InfoPanel({
         >
           <IconBell size={18} />
           <span>
-            {isMuted ? "Stumm" : "Benachrichtigungen"}
+            {isMuted ? t("info.muted") : t("info.notifications")}
           </span>
         </button>
         <button
@@ -152,7 +157,7 @@ export function InfoPanel({
           title={isBlocked ? "Kontakt entsperren" : "Kontakt blockieren"}
         >
           <IconShieldCheck size={18} />
-          <span>{isBlocked ? "Blockiert" : "Blockieren"}</span>
+          <span>{isBlocked ? t("info.blocked") : t("info.block")}</span>
         </button>
       </div>
 
@@ -161,16 +166,16 @@ export function InfoPanel({
           type="button"
           className="info-action-button !h-auto !py-3"
           onClick={onOpenSearch}
-          title="Suchen"
+          title={t("common.search")}
         >
           <IconSearch size={18} />
-          <span>Suchen</span>
+          <span>{t("common.search")}</span>
         </button>
       </div>
 
       {mode === "dm" && peer && (
         <div className="info-section">
-          <p className="info-section-title">Benutzerinfo</p>
+          <p className="info-section-title">{t("info.userInfo")}</p>
           <div className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
             <div className="flex items-center justify-between">
               <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Username</span>
@@ -194,16 +199,15 @@ export function InfoPanel({
       )}
 
       <div className="info-section !border-0 !pb-0">
-        <p className="info-section-title">Sicherheit</p>
+        <p className="info-section-title">{t("info.security")}</p>
         <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-          Nachrichten und Anrufe sind Ende-zu-Ende verschlüsselt. Der Server
-          leitet nur versiegelte Daten. Perfect Forward Secrecy aktiv.
+          {t("info.e2eeBlurb")}
         </p>
       </div>
 
       {mode === "dm" && (
         <div className="info-section">
-          <p className="info-section-title">Sicherheitsnummer</p>
+          <p className="info-section-title">{t("info.safetyNumber")}</p>
           <button
             type="button"
             onClick={onSafety}
@@ -222,7 +226,7 @@ export function InfoPanel({
               </p>
               <span className="btn btn-secondary !px-2 !py-1 !text-[11px]">
                 <IconShieldCheck size={14} />
-                Verifizieren
+                {t("info.verify")}
               </span>
             </div>
           </button>
@@ -230,10 +234,10 @@ export function InfoPanel({
       )}
 
       <div className="info-section">
-        <p className="info-section-title">Geteilte Inhalte</p>
+        <p className="info-section-title">{t("info.sharedMedia")}</p>
         {sharedMediaItems.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            Noch keine Dateien oder Sprachnotizen in diesem Chat.
+            {t("info.noShared")}
           </p>
         ) : (
           <div className="space-y-2">
@@ -261,11 +265,11 @@ export function InfoPanel({
         onClick={() => void onClearChat()}
         className="btn btn-danger w-full"
       >
-        Chat-Verlauf leeren
+        {t("info.clearChat")}
       </button>
 
       <p className="mt-auto pt-4 text-center text-[11px] app-muted">
-        Verlauf nur lokal, verschlüsselt (IndexedDB).
+        {t("info.localOnly")}
       </p>
     </div>
   );
