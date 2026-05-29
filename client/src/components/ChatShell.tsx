@@ -1431,6 +1431,34 @@ export function ChatShell({
             return;
           }
           if (
+            data.type === "group_member_removed" &&
+            typeof data.groupId === "string"
+          ) {
+            const gid = data.groupId;
+            // Refresh the group list so the removed member disappears.
+            const { groups: latest } = await api.listGroups(session.token);
+            setGroups(latest);
+            // SECURITY: forward secrecy on removal. The departed member still
+            // holds every member's OLD Megolm key, so EVERY remaining member
+            // (not just the creator) rotates their own outbound session and
+            // clears the distribution marker — the next send re-distributes a
+            // fresh key to the current member set only, excluding the removed
+            // user.
+            const updatedGroup = latest.find((x) => x.id === gid);
+            if (
+              updatedGroup &&
+              updatedGroup.memberIds.includes(session.user.id)
+            ) {
+              try {
+                await rotateForMemberRemoval(gid);
+                megolmDistributedRef.current.delete(gid);
+              } catch {
+                /* Olm not available — next group send surfaces the error */
+              }
+            }
+            return;
+          }
+          if (
             data.type === "dm" &&
             typeof data.id === "string" &&
             typeof data.envelope === "string"

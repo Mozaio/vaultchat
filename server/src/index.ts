@@ -773,6 +773,19 @@ app.delete("/api/groups/:id/members/:memberId", groupLimiter, async (req, res) =
     res.status(400).json({ error: "cannot_remove" });
     return;
   }
+  // SECURITY: notify the REMAINING members so each rotates their group key
+  // and re-distributes it to the current member set only — otherwise the
+  // removed member, who still holds everyone's old Megolm key, could keep
+  // reading their future messages (forward secrecy on membership change).
+  // The actor (admin) already rotates locally, so skip them here.
+  for (const remaining of g.memberIds) {
+    if (remaining === jwtUser.userId) continue;
+    sendToUser(remaining, {
+      type: "group_member_removed",
+      groupId,
+      memberId,
+    });
+  }
   log.info("group_member_removed", {
     reqId: req.id,
     groupId,
@@ -883,6 +896,16 @@ app.post("/api/groups/:id/leave", async (req, res) => {
   if (!g) {
     res.status(400).json({ error: "cannot_leave" });
     return;
+  }
+  // SECURITY: the leaver still holds every remaining member's Megolm key, so
+  // each remaining member must rotate + re-distribute to exclude the leaver
+  // (forward secrecy). The leaver is no longer in g.memberIds.
+  for (const remaining of g.memberIds) {
+    sendToUser(remaining, {
+      type: "group_member_removed",
+      groupId: req.params.id,
+      memberId: jwtUser.userId,
+    });
   }
   log.info("group_left", {
     reqId: req.id,
