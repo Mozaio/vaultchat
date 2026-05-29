@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IconLock, IconShieldCheck, IconUsers } from "./Icons";
 
 const ONBOARDING_KEY = "vaultchat.onboarding.pending";
@@ -45,6 +45,13 @@ type Props = {
 export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
+
+  // Mark onboarding as seen the moment it's shown. Otherwise closing/reloading
+  // the tab mid-flow leaves the "pending" flag set and the intro re-appears on
+  // every launch until a terminal button is clicked. It's a one-time intro.
+  useEffect(() => {
+    clearOnboardingPending();
+  }, []);
 
   const finish = () => {
     clearOnboardingPending();
