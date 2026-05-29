@@ -344,6 +344,12 @@ const DICT: Record<string, Dict> = {
     fr: "Exporter", pt: "Exportar", ru: "Экспорт", ar: "تصدير",
     zh: "导出", hi: "निर्यात",
   },
+  "chat.newMessages": {
+    en: "New messages", de: "Neue Nachrichten", tr: "Yeni mesajlar",
+    es: "Mensajes nuevos", fr: "Nouveaux messages", pt: "Novas mensagens",
+    ru: "Новые сообщения", ar: "رسائل جديدة", zh: "新消息",
+    hi: "नए संदेश",
+  },
   "backup.title": {
     en: "Save a backup", de: "Backup sichern", tr: "Yedek kaydet",
     es: "Guarda una copia", fr: "Sauvegardez", pt: "Salve um backup",

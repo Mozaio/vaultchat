@@ -1156,6 +1156,35 @@ select:focus-visible {
   -webkit-backdrop-filter: blur(8px);
 }
 
+/* "New messages" unread divider — a colored rule with a centered pill,
+   anchored above the first message that arrived after the chat was last
+   opened (Discord/WhatsApp style). */
+.unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.85rem 0 0.35rem;
+}
+.unread-divider::before,
+.unread-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.unread-divider span {
+  flex-shrink: 0;
+  padding: 0.18rem 0.7rem;
+  border-radius: var(--radius-full);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 @keyframes messageSlide {
   from {
     opacity: 0;

@@ -457,6 +457,13 @@ export function ChatShell({
   >(new Map());
   const seen = useRef(new Set<string>());
   /**
+   * Snapshot of the peer's `seen:dm:` timestamp captured the moment the chat
+   * is opened — BEFORE we overwrite it with `Date.now()`. Drives the
+   * "New messages" divider so it stays anchored above the first unread
+   * message for the whole time the chat stays open (Discord/WhatsApp style).
+   */
+  const dmUnreadDividerAtRef = useRef<number>(0);
+  /**
    * Buffered group ciphertexts that arrived BEFORE the group key was
    * known. We retry them once the matching `group_key` DM lands so the
    * race between `group_key` distribution and the first chat message
@@ -913,6 +920,10 @@ export function ChatShell({
     }
     seen.current = new Set();
     void (async () => {
+      // Snapshot the prior last-seen BEFORE overwriting it, so the
+      // "New messages" divider can anchor above the first unread message.
+      const prevSeenRaw = await metaGet(`seen:dm:${peer.id}`).catch(() => null);
+      dmUnreadDividerAtRef.current = prevSeenRaw ? Number(prevSeenRaw) || 0 : 0;
       await loadDmLocal(peer);
       await metaSet(`seen:dm:${peer.id}`, String(Date.now())).catch(() => {});
       setUnreadByPeer((m) => ({ ...m, [peer.id]: 0 }));
@@ -4606,6 +4617,11 @@ export function ChatShell({
                     </div>
                   );
                 }
+                const dividerAt = dmUnreadDividerAtRef.current;
+                const unreadDividerIdx =
+                  dividerAt > 0
+                    ? mainDmMsgs.findIndex((m) => m.at > dividerAt && !m.fromMe)
+                    : -1;
                 return mainDmMsgs.flatMap((m, i) => {
                 const items: JSX.Element[] = [];
                 if (
@@ -4616,6 +4632,13 @@ export function ChatShell({
                   items.push(
                     <div key={`date-${m.id}`} className="date-separator">
                       <span>{fmtDateLabel(m.at)}</span>
+                    </div>
+                  );
+                }
+                if (i === unreadDividerIdx) {
+                  items.push(
+                    <div key={`unread-${m.id}`} className="unread-divider">
+                      <span>{t("chat.newMessages")}</span>
                     </div>
                   );
                 }
