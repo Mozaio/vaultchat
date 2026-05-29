@@ -3566,8 +3566,8 @@ export function ChatShell({
         <button
           type="button"
           className="u-rail-btn"
-          title="Konto sperren (Ctrl/⌘+L)"
-          aria-label="Konto sperren"
+          title={`${t("nav.lock")} (Ctrl/⌘+L)`}
+          aria-label={t("nav.lock")}
           onClick={onLock}
         >
           <IconLock size={20} />
@@ -3575,8 +3575,8 @@ export function ChatShell({
         <button
           type="button"
           className="u-rail-btn"
-          title="Hilfe & Tastatur-Shortcuts"
-          aria-label="Hilfe"
+          title={t("nav.help")}
+          aria-label={t("nav.help")}
           onClick={() => setShortcutsHelpOpen(true)}
         >
           <IconHelpCircle size={20} />
@@ -3584,8 +3584,8 @@ export function ChatShell({
         <button
           type="button"
           className="u-rail-btn"
-          title="Einstellungen"
-          aria-label="Einstellungen"
+          title={t("nav.settings")}
+          aria-label={t("nav.settings")}
           onClick={() => setSecurityOpen(true)}
         >
           <IconSettings size={20} />
@@ -3593,8 +3593,8 @@ export function ChatShell({
         <button
           type="button"
           className="u-rail-avatar"
-          title="Konto"
-          aria-label="Konto"
+          title={t("nav.account")}
+          aria-label={t("nav.account")}
           onClick={() => setUserMenuOpen((v) => !v)}
         >
           {session.user.username.slice(0, 1).toUpperCase()}
@@ -3639,8 +3639,8 @@ export function ChatShell({
               type="button"
               onClick={() => void refreshLists()}
               className={`u-header-icon-btn ${refreshing ? "animate-spin" : ""}`}
-              title="Aktualisieren"
-              aria-label="Kontakte und Gruppen aktualisieren"
+              title={t("nav.refresh")}
+              aria-label={t("nav.refresh")}
             >
               <IconRefreshCw size={18} />
             </button>
@@ -4045,8 +4045,8 @@ export function ChatShell({
             type="button"
             onClick={() => setShortcutsHelpOpen(true)}
             className="sidebar-footer-action"
-            title="Hilfe & Tastatur-Shortcuts (drücke ? jederzeit)"
-            aria-label="Tastatur-Shortcuts anzeigen"
+            title={t("nav.help")}
+            aria-label={t("nav.help")}
           >
             <IconHelpCircle size={16} />
           </button>
@@ -4054,7 +4054,7 @@ export function ChatShell({
             type="button"
             onClick={() => setSecurityOpen(true)}
             className="sidebar-footer-action"
-            title="Einstellungen"
+            title={t("nav.settings")}
           >
             <IconSettings size={16} />
           </button>

@@ -209,6 +209,22 @@ const DICT: Record<string, Dict> = {
     fr: "Nouvelle discussion", pt: "Nova conversa", ru: "Новый чат",
     ar: "محادثة جديدة", zh: "新聊天", hi: "नई चैट",
   },
+  "nav.help": {
+    en: "Help & keyboard shortcuts", de: "Hilfe & Tastatur-Shortcuts",
+    tr: "Yardım & klavye kısayolları", es: "Ayuda y atajos de teclado",
+    fr: "Aide & raccourcis clavier", pt: "Ajuda e atalhos de teclado",
+    ru: "Помощь и горячие клавиши", ar: "المساعدة واختصارات لوحة المفاتيح",
+    zh: "帮助与快捷键", hi: "मदद और कीबोर्ड शॉर्टकट",
+  },
+  "nav.refresh": {
+    en: "Refresh", de: "Aktualisieren", tr: "Yenile", es: "Actualizar",
+    fr: "Actualiser", pt: "Atualizar", ru: "Обновить", ar: "تحديث",
+    zh: "刷新", hi: "रिफ्रेश करें",
+  },
+  "nav.account": {
+    en: "Account", de: "Konto", tr: "Hesap", es: "Cuenta", fr: "Compte",
+    pt: "Conta", ru: "Аккаунт", ar: "الحساب", zh: "账户", hi: "खाता",
+  },
   "common.cancel": {
     en: "Cancel", de: "Abbrechen", tr: "İptal", es: "Cancelar", fr: "Annuler",
     pt: "Cancelar", ru: "Отмена", ar: "إلغاء", zh: "取消", hi: "रद्द करें",
