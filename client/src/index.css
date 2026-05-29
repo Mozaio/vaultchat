@@ -6014,8 +6014,33 @@ input[type="checkbox"] {
   top: 1.25rem;
   right: 1.5rem;
   z-index: 5;
-  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  opacity: 0.7;
   transition: opacity 0.15s ease;
+}
+
+/* Language picker (auth header + settings) */
+.lang-switcher {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  max-width: 9rem;
+  transition: border-color 0.13s ease, color 0.13s ease;
+}
+.lang-switcher:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.lang-switcher:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .auth-form-panel-toggle:hover {

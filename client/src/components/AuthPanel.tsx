@@ -13,6 +13,8 @@ import * as api from "../lib/api";
 import type { Session } from "../lib/sessionHelpers";
 import { parseIdentityBackup } from "../lib/backup";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { t, useLocale } from "../lib/i18n";
 import {
   IconAlertTriangle,
   IconEye,
@@ -110,6 +112,8 @@ export function AuthPanel({
     () => Boolean(loadToken() && loadLocalIdentity()),
     []
   );
+  // Subscribe to locale changes so all t() strings below re-render live.
+  useLocale();
   const [mode, setMode] = useState<Mode>(hasLocal ? "unlock" : "login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -237,28 +241,29 @@ export function AuthPanel({
 
   const cardTitle = hasLocal
     ? mode === "unlock"
-      ? "Willkommen zurück"
-      : "Anderes Konto"
+      ? t("auth.welcomeBack")
+      : t("auth.otherAccount")
     : mode === "import"
-      ? "Backup importieren"
+      ? t("auth.importBackup")
       : mode === "register"
-        ? "Konto erstellen"
-        : "Anmelden";
+        ? t("auth.createAccount")
+        : t("auth.signIn");
 
   const cardSubtitle = hasLocal
     ? mode === "unlock"
-      ? "Lokale Schlüssel mit deinem Passwort entsperren."
-      : "Mit anderem Konto auf diesem Gerät einloggen."
+      ? t("auth.sub.unlock")
+      : t("auth.sub.other")
     : mode === "register"
-      ? "Wähle einen Benutzernamen und ein starkes Passwort. Keine E-Mail nötig."
+      ? t("auth.sub.register")
       : mode === "import"
-        ? "Importiere ein verschlüsseltes Backup, um auf diesem Gerät weiter zu chatten."
-        : "Mit Benutzername und Passwort einloggen.";
+        ? t("auth.sub.import")
+        : t("auth.sub.login");
 
   return (
     <div className="auth-split">
       <div className="auth-form-panel">
         <div className="auth-form-panel-toggle">
+          <LanguageSwitcher />
           <ThemeToggle />
         </div>
 
@@ -282,14 +287,14 @@ export function AuthPanel({
                 className={`auth-pill-tab${mode === "unlock" ? " active" : ""}`}
                 onClick={() => setMode("unlock")}
               >
-                Entsperren
+                {t("auth.unlock")}
               </button>
               <button
                 type="button"
                 className={`auth-pill-tab${mode === "login" ? " active" : ""}`}
                 onClick={() => setMode("login")}
               >
-                Anderes Konto
+                {t("auth.otherAccount")}
               </button>
             </div>
           )}
@@ -302,14 +307,14 @@ export function AuthPanel({
                 className={`auth-pill-tab${mode === "login" ? " active" : ""}`}
                 onClick={() => setMode("login")}
               >
-                Anmelden
+                {t("auth.signIn")}
               </button>
               <button
                 type="button"
                 className={`auth-pill-tab${mode === "register" ? " active" : ""}`}
                 onClick={() => setMode("register")}
               >
-                Registrieren
+                {t("auth.register")}
               </button>
             </div>
           )}
@@ -318,7 +323,7 @@ export function AuthPanel({
           {mode === "unlock" && hasLocal && (
             <div className="auth-form">
               <div className="auth-input-group">
-                <label htmlFor="auth-password">Passwort für lokale Schlüssel</label>
+                <label htmlFor="auth-password">{t("auth.passwordLocalLabel")}</label>
                 <div className="auth-password-wrap">
                   <input
                     id="auth-password"
@@ -340,10 +345,14 @@ export function AuthPanel({
                     className="auth-password-toggle"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={
-                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      showPassword
+                        ? t("auth.hidePassword")
+                        : t("auth.showPassword")
                     }
                     title={
-                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      showPassword
+                        ? t("auth.hidePassword")
+                        : t("auth.showPassword")
                     }
                     tabIndex={-1}
                   >
@@ -352,7 +361,7 @@ export function AuthPanel({
                 </div>
                 {capsLockOn && (
                   <p className="auth-capslock">
-                    <IconAlertTriangle size={12} /> Feststelltaste ist aktiv
+                    <IconAlertTriangle size={12} /> {t("auth.capsLock")}
                   </p>
                 )}
               </div>
@@ -366,10 +375,10 @@ export function AuthPanel({
                 {busy ? (
                   <>
                     <IconLoader2 size={16} className="auth-button-spinner" />
-                    <span>Entsperre …</span>
+                    <span>{t("auth.unlocking")}</span>
                   </>
                 ) : (
-                  "Entsperren"
+                  t("auth.unlock")
                 )}
               </button>
               {busySlowHint && (
@@ -427,10 +436,14 @@ export function AuthPanel({
                     className="auth-password-toggle"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={
-                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      showPassword
+                        ? t("auth.hidePassword")
+                        : t("auth.showPassword")
                     }
                     title={
-                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      showPassword
+                        ? t("auth.hidePassword")
+                        : t("auth.showPassword")
                     }
                     tabIndex={-1}
                   >
@@ -439,7 +452,7 @@ export function AuthPanel({
                 </div>
                 {capsLockOn && (
                   <p className="auth-capslock">
-                    <IconAlertTriangle size={12} /> Feststelltaste ist aktiv
+                    <IconAlertTriangle size={12} /> {t("auth.capsLock")}
                   </p>
                 )}
               </div>
@@ -540,10 +553,14 @@ export function AuthPanel({
                     className="auth-password-toggle"
                     onClick={() => setShowPassword((v) => !v)}
                     aria-label={
-                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      showPassword
+                        ? t("auth.hidePassword")
+                        : t("auth.showPassword")
                     }
                     title={
-                      showPassword ? "Passwort verbergen" : "Passwort anzeigen"
+                      showPassword
+                        ? t("auth.hidePassword")
+                        : t("auth.showPassword")
                     }
                     tabIndex={-1}
                   >
@@ -552,7 +569,7 @@ export function AuthPanel({
                 </div>
                 {capsLockOn && (
                   <p className="auth-capslock">
-                    <IconAlertTriangle size={12} /> Feststelltaste ist aktiv
+                    <IconAlertTriangle size={12} /> {t("auth.capsLock")}
                   </p>
                 )}
                 {password.length > 0 && (
