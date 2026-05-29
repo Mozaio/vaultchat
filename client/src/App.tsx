@@ -61,11 +61,10 @@ class ChunkErrorBoundary extends React.Component<
     return (
       <div className="chunk-fallback" role="alert">
         <p style={{ color: "var(--danger, #dc2626)", fontWeight: 600 }}>
-          {this.props.label} konnte nicht geladen werden.
+          {t("app.chunkFailed", { label: this.props.label })}
         </p>
         <p style={{ fontSize: "0.78rem", textAlign: "center", maxWidth: "32rem" }}>
-          Vermutlich ist die Netzwerk-Verbindung kurz weg oder ein neuer Build
-          ist gerade live. Ein Reload sollte das beheben.
+          {t("app.chunkHint")}
         </p>
         <button
           type="button"
@@ -73,7 +72,7 @@ class ChunkErrorBoundary extends React.Component<
           className="auth-button"
           style={{ maxWidth: "12rem", marginTop: "0.5rem" }}
         >
-          Neu laden
+          {t("app.reload")}
         </button>
       </div>
     );
@@ -108,10 +107,12 @@ import { shutdownCryptoWorker } from "./lib/cryptoWorkerClient";
 import { clearSearchIndex } from "./lib/searchIndex";
 import { clearOlmPickleCache } from "./lib/olmSessionStore";
 import { clearMegolmPickleCache } from "./lib/megolmSessionStore";
+import { t, useLocale } from "./lib/i18n";
 
 export type { Session };
 
 export function App() {
+  useLocale();
   const [sodiumOk, setSodiumOk] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
@@ -239,10 +240,7 @@ export function App() {
         r instanceof Error ? `${r.name}: ${r.message}\n${r.stack ?? ""}` : String(r);
       if (isVersionMismatch(text)) {
         setRuntimeError(
-          "IDB_VERSION_MISMATCH\n" +
-            msg +
-            "\n\nFix: Klick \"DB zurücksetzen\" — lokale Historie wird gelöscht und " +
-            "die DB neu angelegt. Server-Daten und dein Backup bleiben unberührt."
+          "IDB_VERSION_MISMATCH\n" + msg + t("app.idbMismatchFix")
         );
         return;
       }
@@ -259,10 +257,7 @@ export function App() {
           : `${ev.message}\n${ev.filename}:${ev.lineno}:${ev.colno}`;
       if (isVersionMismatch(ev.message ?? "")) {
         setRuntimeError(
-          "IDB_VERSION_MISMATCH\n" +
-            msg +
-            "\n\nFix: Klick \"DB zurücksetzen\" — lokale Historie wird gelöscht und " +
-            "die DB neu angelegt. Server-Daten und dein Backup bleiben unberührt."
+          "IDB_VERSION_MISMATCH\n" + msg + t("app.idbMismatchFix")
         );
         return;
       }
@@ -303,7 +298,7 @@ export function App() {
     return (
       <div className="boot-loader">
         <div className="boot-loader-spinner" aria-hidden />
-        <p>Kryptografie wird geladen …</p>
+        <p>{t("app.loadingCrypto")}</p>
       </div>
     );
   }
@@ -319,10 +314,7 @@ export function App() {
       aria-live="polite"
     >
       <span className="cold-start-spinner" aria-hidden />
-      <span>
-        Server wacht auf … (Render-Free schläft bei Inaktivität, erste Anfrage
-        dauert ~20–30 s)
-      </span>
+      <span>{t("app.coldStart")}</span>
     </div>
   ) : null;
 
@@ -337,7 +329,7 @@ export function App() {
         color: "var(--accent)",
       }}
     >
-      <span>Neue Version verfügbar — Reload für Update.</span>
+      <span>{t("app.updateReady")}</span>
       <button
         type="button"
         onClick={() => location.reload()}
@@ -352,7 +344,7 @@ export function App() {
           cursor: "pointer",
         }}
       >
-        Jetzt neu laden
+        {t("app.reloadNow")}
       </button>
     </div>
   ) : null;
@@ -366,7 +358,7 @@ export function App() {
         {runtimeError && (
           <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-semibold">Runtime-Fehler (statt Black Screen)</p>
+              <p className="font-semibold">{t("app.runtimeError")}</p>
               <div className="flex items-center gap-2">
                 {runtimeError.startsWith("IDB_VERSION_MISMATCH") && (
                   <button
@@ -374,7 +366,7 @@ export function App() {
                     className="rounded border border-amber-700 bg-amber-900/30 px-2 py-0.5 hover:bg-amber-800/40"
                     onClick={() => void resetIdb()}
                   >
-                    DB zurücksetzen
+                    {t("app.resetDb")}
                   </button>
                 )}
                 <button
@@ -387,7 +379,7 @@ export function App() {
                     lock();
                   }}
                 >
-                  Reset
+                  {t("app.reset")}
                 </button>
               </div>
             </div>
@@ -405,8 +397,8 @@ export function App() {
           }}
         >
           <div className="flex flex-1 items-center justify-center">
-            <ChunkErrorBoundary label="Login">
-            <Suspense fallback={<ChunkFallback label="Login wird geladen …" />}>
+            <ChunkErrorBoundary label={t("app.login")}>
+            <Suspense fallback={<ChunkFallback label={t("app.loadingNamed", { label: t("app.login") })} />}>
               <AuthPanel
                 onSession={async (s, local) => {
                   saveToken(s.token);
@@ -440,7 +432,7 @@ export function App() {
       {runtimeError && (
         <div className="border-b border-red-900/50 bg-red-950/40 px-4 py-2 text-xs text-red-200">
           <div className="flex items-center justify-between gap-3">
-            <p className="font-semibold">Runtime-Fehler (statt Black Screen)</p>
+            <p className="font-semibold">{t("app.runtimeError")}</p>
             <div className="flex items-center gap-2">
               {runtimeError.startsWith("IDB_VERSION_MISMATCH") && (
                 <button
@@ -448,7 +440,7 @@ export function App() {
                   className="rounded border border-amber-700 bg-amber-900/30 px-2 py-0.5 hover:bg-amber-800/40"
                   onClick={() => void resetIdb()}
                 >
-                  DB zurücksetzen
+                  {t("app.resetDb")}
                 </button>
               )}
               <button
@@ -461,7 +453,7 @@ export function App() {
                   lock();
                 }}
               >
-                Reset
+                {t("app.reset")}
               </button>
             </div>
           </div>
@@ -479,8 +471,8 @@ export function App() {
         }}
       >
         <div className="flex flex-1 min-h-0">
-          <ChunkErrorBoundary label="Chat">
-            <Suspense fallback={<ChunkFallback label="Chat wird geladen …" />}>
+          <ChunkErrorBoundary label={t("app.chat")}>
+            <Suspense fallback={<ChunkFallback label={t("app.loadingNamed", { label: t("app.chat") })} />}>
               <ChatShell
                 session={session!}
                 onLogout={() => {
@@ -519,7 +511,7 @@ class AppErrorBoundary extends React.Component<
       <div className="flex min-h-full items-center justify-center p-6">
         <div className="app-surface max-w-2xl rounded-2xl p-5">
           <p className="text-sm font-semibold text-white">
-            UI ist abgestürzt (ErrorBoundary)
+            {t("app.crashed")}
           </p>
           <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap font-mono text-[11px] app-muted">
             {this.state.err.name}: {this.state.err.message}
@@ -534,7 +526,7 @@ class AppErrorBoundary extends React.Component<
               this.props.onReset();
             }}
           >
-            Reset
+            {t("app.reset")}
           </button>
         </div>
       </div>
@@ -554,14 +546,14 @@ function CodeIntegrityBanner({
   if (check.state === "pinned_ok") {
     return (
       <div className="code-integrity-banner ok">
-        <span className="font-semibold">Build verifiziert</span>
+        <span className="font-semibold">{t("app.buildVerified")}</span>
         <span className="font-mono">SHA-384 {check.hash.slice(0, 12)}...</span>
         <button
           type="button"
           className="code-integrity-action"
           onClick={() => setDismissed(true)}
         >
-          Ausblenden
+          {t("app.hide")}
         </button>
       </div>
     );
@@ -570,7 +562,7 @@ function CodeIntegrityBanner({
     return (
       <div className="code-integrity-banner warn">
         <span className="code-integrity-copy">
-          <strong>Build noch nicht verifiziert</strong>
+          <strong>{t("app.buildUnverified")}</strong>
           <span className="font-mono" title={`SHA-384 ${check.hash}`}>
             SHA-384 {check.hash.slice(0, 16)}...
           </span>
@@ -588,7 +580,7 @@ function CodeIntegrityBanner({
           }}
           className="code-integrity-action"
         >
-          Verifizieren
+          {t("app.verify")}
         </button>
       </div>
     );
@@ -596,12 +588,15 @@ function CodeIntegrityBanner({
   return (
     <div className="code-integrity-banner danger">
       <span className="code-integrity-copy">
-        <strong>Build-Integrität geändert</strong>
+        <strong>{t("app.buildChanged")}</strong>
         <span
           className="font-mono"
           title={`Aktuell: ${check.hash}\nGepinnt: ${check.pinned}`}
         >
-          aktuell {check.hash.slice(0, 12)}… · gepinnt {check.pinned.slice(0, 12)}…
+          {t("app.currentPinned", {
+            cur: check.hash.slice(0, 12),
+            pin: check.pinned.slice(0, 12),
+          })}
         </span>
       </span>
       <button
@@ -617,14 +612,14 @@ function CodeIntegrityBanner({
         }}
         className="code-integrity-action"
       >
-        Neu verifizieren
+        {t("app.reVerify")}
       </button>
       <button
         type="button"
         onClick={() => setDismissed(true)}
         className="code-integrity-action code-integrity-dismiss"
-        aria-label="Banner ausblenden"
-        title="Ausblenden"
+        aria-label={t("app.hide")}
+        title={t("app.hide")}
       >
         ×
       </button>
