@@ -1388,7 +1388,7 @@ export function ChatShell({
     };
     ws.onerror = () => {
       setWsHadError(true);
-      setError("WebSocket-Fehler");
+      setError(t("chat.errWebsocket"));
     };
     ws.onmessage = (ev) => {
       void (async () => {
@@ -2854,7 +2854,7 @@ export function ChatShell({
     const m = list.find((x) => x.plain.cid === cid);
     if (!m) return null;
     return {
-      author: m.fromMe ? "Du" : peer?.username ?? "Peer",
+      author: m.fromMe ? t("chat.you") : peer?.username ?? t("chat.peerFallback"),
       text: previewForPayload(m.plain),
       cid,
     };
@@ -3252,7 +3252,7 @@ export function ChatShell({
               {
                 id: row.id,
                 kind: "voice" as const,
-                name: "Sprachnachricht",
+                name: t("chat.voiceMessage"),
                 href: safeMediaSrc(plain.body, "audio") || "#",
                 at: row.at,
               },
@@ -3623,8 +3623,8 @@ export function ChatShell({
         <button
           type="button"
           className="u-rail-logo"
-          title="Umbra — zu allen Chats"
-          aria-label="Zu allen Chats"
+          title={t("chat.allChatsTitle")}
+          aria-label={t("chat.allChats")}
           onClick={() => {
             setSidebarFilter("all");
             setTab("dm");
@@ -3743,7 +3743,7 @@ export function ChatShell({
               placeholder={t("search.placeholder")}
               className="w-full border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text)" }}
-              aria-label="Chats durchsuchen oder Kontakt hinzufügen"
+              aria-label={t("chat.searchAria")}
             />
             {query && (
               <button
@@ -3752,7 +3752,7 @@ export function ChatShell({
                 className="shrink-0 rounded-full p-0.5 transition hover:bg-[var(--bg-hover)]"
                 style={{ color: "var(--text-muted)" }}
                 aria-label={t("common.clearSearch")}
-                title="Löschen (Esc)"
+                title={t("chat.clearEsc")}
               >
                 <IconX size={14} />
               </button>
@@ -3821,11 +3821,11 @@ export function ChatShell({
             type="button"
             className="filter-chip filter-chip-add"
             onClick={() => setFoldersManageOpen(true)}
-            title="Ordner verwalten"
-            aria-label="Ordner verwalten"
+            title={t("folders.manage")}
+            aria-label={t("folders.manage")}
           >
             <IconPlus size={12} />
-            <span>Ordner</span>
+            <span>{t("chat.foldersTab")}</span>
           </button>
         </div>
 
@@ -4138,7 +4138,7 @@ export function ChatShell({
             type="button"
             onClick={() => setUserMenuOpen((v) => !v)}
             className="sidebar-footer-action"
-            title="Mehr"
+            title={t("chat.more")}
           >
             <IconMoreVertical size={16} />
           </button>
@@ -4276,7 +4276,7 @@ export function ChatShell({
               ) : (
                 <span
                   style={{ color: "var(--warning)" }}
-                  title="Ohne Relay-Only ist deine IP-Adresse für den Gesprächspartner sichtbar. Relay-Only kannst du in den Sicherheitseinstellungen aktivieren."
+                  title={t("chat.relayWarning")}
                 >
                   {" "}· IP für Gegenseite sichtbar
                 </span>
@@ -4339,8 +4339,8 @@ export function ChatShell({
                         setInfoOpen(false);
                       }}
                       className="header-back-btn"
-                      title="Zurück"
-                      aria-label="Zurück"
+                      title={t("common.back")}
+                      aria-label={t("common.back")}
                     >
                       ←
                     </button>
@@ -4587,7 +4587,7 @@ export function ChatShell({
                 <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-[var(--accent-soft)] backdrop-blur-sm border-2 border-dashed border-[var(--accent)] m-2">
                   <div className="text-center">
                     <p className="text-2xl mb-2">📎</p>
-                    <p className="text-sm font-medium" style={{ color: "var(--accent)" }}>Dateien hier ablegen</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--accent)" }}>{t("chat.dropFiles")}</p>
                   </div>
                 </div>
               )}
@@ -4604,7 +4604,7 @@ export function ChatShell({
                   }}
                   className="scroll-bottom-fab visible"
                   aria-label={t("chat.scrollToBottom")}
-                  title="Zum Ende"
+                  title={t("chat.scrollToBottom")}
                 >
                   <IconArrowDown size={18} />
                   {dmScrollUnread > 0 && (
@@ -4675,7 +4675,7 @@ export function ChatShell({
                         <IconShieldCheck size={26} />
                       </span>
                       <p className="conversation-blank-title">
-                        {isSelf ? "Deine Notizen" : peer.username}
+                        {isSelf ? t("chat.savedNotes") : peer.username}
                       </p>
                       <p className="conversation-blank-text">
                         {isSelf
@@ -4901,7 +4901,7 @@ export function ChatShell({
                 )}
                 <label
                   className="chat-tool-button cursor-pointer"
-                  title="Datei anhängen"
+                  title={t("composer.attach")}
                   aria-label={t("composer.attach")}
                 >
                   <IconPaperclip size={18} />
@@ -5023,7 +5023,7 @@ export function ChatShell({
                         onClick={() => voice.cancel()}
                         className="btn-send cancel"
                         aria-label={t("composer.discardRecording")}
-                        title="Aufnahme verwerfen"
+                        title={t("composer.discardRecording")}
                       >
                         <IconX size={16} />
                       </button>
@@ -5032,8 +5032,8 @@ export function ChatShell({
                       type="button"
                       onClick={() => void sendDmVoice()}
                       className={`btn-send${voice.recording ? " recording" : " mic"}`}
-                      aria-label={voice.recording ? "Aufnahme senden" : "Sprachnachricht aufnehmen"}
-                      title={voice.recording ? "Aufnahme senden" : "Sprachnachricht aufnehmen"}
+                      aria-label={voice.recording ? t("chat.sendRecording") : t("chat.recordVoice")}
+                      title={voice.recording ? t("chat.sendRecording") : t("chat.recordVoice")}
                     >
                       {voice.recording ? (
                         <span className="rec-dot" aria-hidden />
@@ -5067,7 +5067,7 @@ export function ChatShell({
                       type="button"
                       onClick={() => setGroup(null)}
                       className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-                      title="Zurück"
+                      title={t("common.back")}
                     >
                       ←
                     </button>
@@ -5345,14 +5345,14 @@ export function ChatShell({
                                     void navigator.clipboard?.writeText(url).then(
                                       () =>
                                         pushToast(
-                                          "Link kopiert.",
+                                          t("chat.linkCopied"),
                                           "success"
                                         )
                                     )
                                   }
-                                  title="Kopieren"
+                                  title={t("safety.copy")}
                                 >
-                                  Kopieren
+                                  {t("safety.copy")}
                                 </button>
                                 <button
                                   type="button"
@@ -5362,10 +5362,10 @@ export function ChatShell({
                                   }
                                   title={
                                     expired
-                                      ? "abgelaufen"
+                                      ? t("chat.expired")
                                       : exhausted
-                                        ? "verbraucht"
-                                        : "Widerrufen"
+                                        ? t("chat.exhausted")
+                                        : t("chat.revoke")
                                   }
                                 >
                                   ×
@@ -5545,7 +5545,7 @@ export function ChatShell({
                   }}
                   className="scroll-bottom-fab visible"
                   aria-label={t("chat.scrollToBottom")}
-                  title="Zum Ende"
+                  title={t("chat.scrollToBottom")}
                 >
                   <IconArrowDown size={18} />
                   {groupScrollUnread > 0 && (
@@ -5795,7 +5795,7 @@ export function ChatShell({
                 )}
                 <label
                   className="chat-tool-button cursor-pointer"
-                  title="Datei anhängen"
+                  title={t("composer.attach")}
                   aria-label={t("composer.attach")}
                 >
                   <IconPaperclip size={18} />
@@ -6036,7 +6036,7 @@ export function ChatShell({
                         onClick={() => groupVoice.cancel()}
                         className="btn-send cancel"
                         aria-label={t("composer.discardRecording")}
-                        title="Aufnahme verwerfen"
+                        title={t("composer.discardRecording")}
                       >
                         <IconX size={16} />
                       </button>
@@ -6047,13 +6047,13 @@ export function ChatShell({
                       className={`btn-send${groupVoice.recording ? " recording" : " mic"}`}
                       aria-label={
                         groupVoice.recording
-                          ? "Aufnahme senden"
-                          : "Sprachnachricht aufnehmen"
+                          ? t("chat.sendRecording")
+                          : t("chat.recordVoice")
                       }
                       title={
                         groupVoice.recording
-                          ? "Aufnahme senden"
-                          : "Sprachnachricht aufnehmen"
+                          ? t("chat.sendRecording")
+                          : t("chat.recordVoice")
                       }
                     >
                       {groupVoice.recording ? (
@@ -6197,7 +6197,7 @@ export function ChatShell({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>Details</p>
+              <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>{t("chat.details")}</p>
               <button
                 type="button"
                 onClick={() => setInfoOpen(false)}
