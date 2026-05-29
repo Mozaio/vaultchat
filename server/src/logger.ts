@@ -19,9 +19,11 @@
  *   - rohe Klartext-Bodies, DR-Wire-Bytes, Public-Keys mit mehr als 16 Zeichen
  *   - Passwörter, Tokens, Recovery-Mails (ja, der Server kennt sie kurzzeitig
  *     beim Argon2-Verify, nie loggen)
+ *   - rohe Client-IPs — stattdessen clientIpTag() (gesalzener Hash, nicht
+ *     umkehrbar). Roh nur via VAULTCHAT_LOG_RAW_IP=1 (Debug).
  *
  * OK:
- *   - userId (UUID), username, ip, route, status, ms, evt, count.
+ *   - userId (UUID), username, ipTag, route, status, ms, evt, count.
  */
 
 type Level = "info" | "warn" | "error" | "debug";
@@ -82,7 +84,24 @@ export const log = {
  * Log-Zeilen korrelieren ohne reine Zeitstempel zu raten.
  */
 import type { Request, Response, NextFunction } from "express";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomBytes, randomUUID } from "node:crypto";
+
+/**
+ * Privacy: never write raw client IPs to logs. Raw IPs linked to
+ * username+timestamp are exactly the social-graph metadata this product
+ * promises not to retain. Instead we log a short, NON-reversible,
+ * per-process-salted tag — enough to spot "many requests from one source"
+ * for abuse triage within a run, but useless as a stored identifier and
+ * not correlatable across restarts. Raw IP only if explicitly opted in.
+ */
+const IP_SALT = process.env.VAULTCHAT_LOG_IP_SALT ?? randomBytes(16).toString("hex");
+const LOG_RAW_IP = process.env.VAULTCHAT_LOG_RAW_IP === "1";
+
+export function clientIpTag(ip: string | undefined | null): string {
+  if (!ip) return "unknown";
+  if (LOG_RAW_IP) return ip;
+  return "ip_" + createHmac("sha256", IP_SALT).update(ip).digest("hex").slice(0, 10);
+}
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -112,7 +131,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
       path: req.path,
       status: res.statusCode,
       ms: Date.now() - start,
-      ip: req.ip,
+      ipTag: clientIpTag(req.ip),
     });
   });
   next();

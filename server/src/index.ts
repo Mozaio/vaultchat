@@ -57,7 +57,7 @@ import {
   redeemInvite,
   revokeInvite,
 } from "./inviteStore.js";
-import { log, requestLogger } from "./logger.js";
+import { clientIpTag, log, requestLogger } from "./logger.js";
 import {
   clearReplayState,
   markIfNew as markEnvelopeIfNew,
@@ -359,7 +359,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
       reqId: req.id,
       username: username.slice(0, 32),
       reason: "username_taken",
-      ip: req.ip,
+      ipTag: clientIpTag(req.ip),
     });
     res.status(409).json({ error: "username_taken" });
     return;
@@ -371,7 +371,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
     username: user.username,
     plan: user.plan,
     requestedPlan: parsed.data.requestedPlan ?? null,
-    ip: req.ip,
+    ipTag: clientIpTag(req.ip),
   });
   const token = signToken({ userId: user.id, username: user.username });
   res.json({
@@ -399,7 +399,7 @@ app.post("/api/login", authLimiter, async (req, res) => {
       reqId: req.id,
       username: username.slice(0, 32),
       reason: user ? "wrong_password" : "user_not_found",
-      ip: req.ip,
+      ipTag: clientIpTag(req.ip),
     });
     res.status(401).json({ error: "invalid_credentials" });
     return;
@@ -409,7 +409,7 @@ app.post("/api/login", authLimiter, async (req, res) => {
     reqId: req.id,
     userId: user.id,
     username: user.username,
-    ip: req.ip,
+    ipTag: clientIpTag(req.ip),
   });
   res.json({
     token,
@@ -545,7 +545,7 @@ app.delete("/api/me", async (req, res) => {
     reqId: req.id,
     userId: jwtUser.userId,
     username: jwtUser.username,
-    ip: req.ip,
+    ipTag: clientIpTag(req.ip),
   });
   res.status(204).end();
 });
