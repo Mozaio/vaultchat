@@ -1,4 +1,5 @@
 import { IconShieldCheck, IconX } from "./Icons";
+import { t, useLocale } from "../lib/i18n";
 
 /**
  * Backup-Erinnerungsbanner über dem Chat-Layout. Wird gerendert, solange der
@@ -15,6 +16,7 @@ export function BackupReminder({
   onExport: () => void;
   onDismiss: () => void;
 }) {
+  useLocale();
   return (
     <div className="backup-reminder mx-3 mt-2 shrink-0 md:mx-4">
       <IconShieldCheck
@@ -24,24 +26,21 @@ export function BackupReminder({
         aria-hidden
       />
       <div className="backup-reminder-text">
-        <strong>Backup sichern</strong>
-        <span>
-          {" "}— Exportiere deine Identität verschlüsselt, sonst kein Zugang
-          von einem neuen Gerät.
-        </span>
+        <strong>{t("backup.title")}</strong>
+        <span> {t("backup.text")}</span>
       </div>
       <button
         type="button"
         className="btn btn-primary !shrink-0 !px-2.5 !py-1 !text-xs"
         onClick={onExport}
       >
-        Export
+        {t("common.export")}
       </button>
       <button
         type="button"
         className="!text-[var(--text-muted)] hover:!text-[var(--text)]"
-        title="Erinnerung dauerhaft ausblenden"
-        aria-label="Erinnerung dauerhaft ausblenden"
+        title={t("backup.dismiss")}
+        aria-label={t("backup.dismiss")}
         onClick={onDismiss}
       >
         <IconX size={16} />

@@ -9,6 +9,7 @@ import {
 } from "../lib/trust";
 import { IconCheck, IconCopy, IconX } from "./Icons";
 import { QrCodeSvg } from "./QrCodeSvg";
+import { t, useLocale } from "../lib/i18n";
 
 export function SafetyNumberDialog({
   peerId,
@@ -79,14 +80,14 @@ export function SafetyNumberDialog({
         {/* Header */}
         <div className="header">
           <div>
-            <h2 id="safety-number-title" className="title">Sicherheitsnummer</h2>
-            <p className="subtitle">mit {peerLabel}</p>
+            <h2 id="safety-number-title" className="title">{t("info.safetyNumber")}</h2>
+            <p className="subtitle">{t("safety.with", { name: peerLabel })}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="close-btn"
-            aria-label="Sicherheitsnummer-Dialog schließen"
+            aria-label={t("common.close")}
           >
             <IconX size={18} />
           </button>
