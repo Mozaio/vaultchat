@@ -942,6 +942,12 @@ const DICT: Record<string, Dict> = {
     ru: "Удалить вариант {n}", ar: "إزالة الخيار {n}",
     zh: "删除选项 {n}", hi: "विकल्प {n} हटाएं",
   },
+  "poll.cancel": {
+    en: "Cancel poll", de: "Umfrage abbrechen", tr: "Anketi iptal et",
+    es: "Cancelar encuesta", fr: "Annuler le sondage", pt: "Cancelar enquete",
+    ru: "Отменить опрос", ar: "إلغاء الاستطلاع", zh: "取消投票",
+    hi: "पोल रद्द करें",
+  },
   "poll.addOption": {
     en: "+ Option", de: "+ Option", tr: "+ Seçenek", es: "+ Opción",
     fr: "+ Option", pt: "+ Opção", ru: "+ Вариант", ar: "+ خيار",
@@ -1731,6 +1737,11 @@ const DICT: Record<string, Dict> = {
     en: "More", de: "Mehr", tr: "Daha fazla", es: "Más", fr: "Plus",
     pt: "Mais", ru: "Ещё", ar: "المزيد", zh: "更多", hi: "अधिक",
   },
+  "chat.moreOptions": {
+    en: "More options", de: "Weitere Optionen", tr: "Diğer seçenekler",
+    es: "Más opciones", fr: "Plus d'options", pt: "Mais opções",
+    ru: "Больше опций", ar: "خيارات إضافية", zh: "更多选项", hi: "और विकल्प",
+  },
   "chat.showSafetyNumber": {
     en: "Show safety number", de: "Sicherheitsnummer anzeigen",
     tr: "Güvenlik numarasını göster", es: "Mostrar número de seguridad",
@@ -2386,6 +2397,12 @@ const DICT: Record<string, Dict> = {
     fr: "Disparaît à la fermeture", pt: "Desaparece ao fechar",
     ru: "Исчезает при закрытии", ar: "تختفي عند الإغلاق",
     zh: "关闭即消失", hi: "बंद करने पर गायब",
+  },
+  "msg.viewOnceOn": {
+    en: "View-once: on", de: "Einmal-Ansicht: an", tr: "Tek seferlik: açık",
+    es: "Una vez: activado", fr: "Éphémère : activé", pt: "Única: ativada",
+    ru: "Одноразовое: вкл", ar: "لمرة واحدة: مفعّل", zh: "阅后即焚：开",
+    hi: "एक-बार: चालू",
   },
   "msg.viewOnceShort": {
     en: "View once", de: "Einmal anzeigen", tr: "Bir kez göster",

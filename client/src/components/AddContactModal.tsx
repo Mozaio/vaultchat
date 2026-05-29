@@ -118,7 +118,7 @@ export function AddContactModal({
             type="button"
             onClick={handleClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
-            aria-label="Kontakt-Dialog schliessen"
+            aria-label={t("common.close")}
             style={{ color: "var(--text-muted)" }}
           >
             <IconX size={18} />

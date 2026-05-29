@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { IconBarChart, IconLock, IconPlus } from "./Icons";
+import { t, useLocale } from "../lib/i18n";
 
 /**
  * "More" overflow menu for the message composer. Keeps the niche toggles
@@ -21,6 +22,7 @@ export function ComposerToolsMenu({
   pollActive: boolean;
   onTogglePoll: () => void;
 }) {
+  useLocale();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -49,8 +51,8 @@ export function ComposerToolsMenu({
         type="button"
         className={`chat-tool-button${open || anyActive ? " active" : ""}`}
         onClick={() => setOpen((v) => !v)}
-        title="Weitere Optionen"
-        aria-label="Weitere Optionen"
+        title={t("chat.moreOptions")}
+        aria-label={t("chat.moreOptions")}
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -69,7 +71,7 @@ export function ComposerToolsMenu({
             }}
           >
             <IconLock size={16} />
-            <span>{viewOnce ? "Einmal-Ansicht: an" : "Einmal anzeigen"}</span>
+            <span>{viewOnce ? t("msg.viewOnceOn") : t("msg.viewOnceShort")}</span>
           </button>
           <button
             type="button"
@@ -82,7 +84,7 @@ export function ComposerToolsMenu({
             }}
           >
             <IconBarChart size={16} />
-            <span>{pollActive ? "Umfrage abbrechen" : "Umfrage erstellen"}</span>
+            <span>{pollActive ? t("poll.cancel") : t("poll.create")}</span>
           </button>
         </div>
       )}
