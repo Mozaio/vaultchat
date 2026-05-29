@@ -487,19 +487,17 @@ export function SecuritySettings({
                   className="mb-2 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Gerät & Schlüssel
+                  {t("settings.deviceKeys")}
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Dein Umbra-Konto ist an dieses Gerät gebunden. Ohne
-                  verschlüsseltes Backup gibt es auf einem neuen Gerät keinen
-                  Zugriff auf bestehende Chats.
+                  {t("settings.deviceKeysDesc")}
                 </p>
                 {myFingerprint && (
                   <p
                     className="mt-3 break-all font-mono text-xs"
                     style={{ color: "var(--accent)" }}
                   >
-                    Öffentlicher Fingerprint: {myFingerprint}
+                    {t("settings.publicFingerprint")} {myFingerprint}
                   </p>
                 )}
               </div>
@@ -515,7 +513,7 @@ export function SecuritySettings({
                   className="mb-2 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Datensicherung
+                  {t("settings.dataBackup")}
                 </h3>
                 <button
                   type="button"
@@ -527,7 +525,7 @@ export function SecuritySettings({
                     border: "1px solid var(--border)",
                   }}
                 >
-                  Verschlüsseltes Backup herunterladen
+                  {t("settings.downloadBackup")}
                 </button>
               </div>
             </div>
@@ -546,26 +544,25 @@ export function SecuritySettings({
                   className="mb-1 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Was sieht der Server?
+                  {t("settings.serverSeesTitle")}
                 </h3>
                 <p
                   className="mb-3 text-xs"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Ehrliche Übersicht. „Server" = die gehostete Relay-Instanz,
-                  nicht dein Gerät.
+                  {t("settings.serverSeesDesc")}
                 </p>
                 <ul className="space-y-1.5">
                   {[
-                    { ok: true, label: "Nachrichteninhalte — Ende-zu-Ende verschlüsselt" },
-                    { ok: true, label: "Sprach-/Gruppenanrufe — P2P, DTLS-SRTP" },
-                    { ok: true, label: "Wer im Sprachraum ist — verschlüsselte Signale" },
-                    { ok: true, label: "Deine IP — in Logs nur als Hash" },
-                    { ok: true, label: "E-Mail (nur Hash) & Backup-Inhalt" },
-                    { ok: false, label: "Empfänger einer DM — zur Zustellung nötig (wie bei Signal)" },
-                    { ok: false, label: "Gruppen-Mitgliederlisten — fürs Routing" },
-                    { ok: false, label: "Wer gerade online ist" },
-                    { ok: false, label: "Gruppennamen — noch im Klartext (in Arbeit)" },
+                    { ok: true, label: t("privacy.see.content") },
+                    { ok: true, label: t("privacy.see.calls") },
+                    { ok: true, label: t("privacy.see.voiceMembers") },
+                    { ok: true, label: t("privacy.see.ip") },
+                    { ok: true, label: t("privacy.see.email") },
+                    { ok: false, label: t("privacy.see.dmRecipient") },
+                    { ok: false, label: t("privacy.see.groupMembers") },
+                    { ok: false, label: t("privacy.see.online") },
+                    { ok: false, label: t("privacy.see.groupNames") },
                   ].map((row, i) => (
                     <li key={i} className="flex items-start gap-2 text-xs">
                       <span
@@ -588,7 +585,7 @@ export function SecuritySettings({
                             color: row.ok ? "var(--success)" : "var(--warning)",
                           }}
                         >
-                          {row.ok ? "Geschützt: " : "Sichtbar: "}
+                          {row.ok ? t("settings.protected") : t("settings.visible")}
                         </strong>
                         {row.label}
                       </span>
@@ -599,8 +596,7 @@ export function SecuritySettings({
                   className="mt-3 text-[11px]"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Cover-Traffic verrauscht zusätzlich, mit wem du wirklich
-                  schreibst.
+                  {t("settings.coverTrafficNote")}
                 </p>
               </div>
               <div
