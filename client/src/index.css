@@ -717,7 +717,7 @@ select:focus-visible {
 
 .code-integrity-banner.warn {
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.1);
+  background: var(--warning-soft);
 }
 
 .code-integrity-banner.danger {
@@ -2907,9 +2907,9 @@ select:focus-visible {
 }
 
 .sidebar-status-pill.reconnecting {
-  color: var(--warning, #f59e0b);
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: var(--warning);
 }
 
 .sidebar-status-pill.reconnecting .sidebar-status-dot {
@@ -3021,13 +3021,13 @@ select:focus-visible {
 .row-badge-fav {
   border-color: var(--warning);
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.08);
+  background: var(--warning-soft);
 }
 
 .row-badge-warning {
-  border-color: rgba(245, 158, 11, 0.5);
+  border-color: var(--warning);
   color: var(--warning);
-  background: rgba(245, 158, 11, 0.08);
+  background: var(--warning-soft);
 }
 
 .row-badge-danger {
@@ -4182,7 +4182,7 @@ select:focus-visible {
   flex-shrink: 0;
   border-radius: var(--radius-full);
   background: var(--warning);
-  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.12);
+  box-shadow: 0 0 0 4px var(--warning-soft);
 }
 
 .sidebar-security-strip > span.online {
