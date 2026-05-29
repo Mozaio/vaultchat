@@ -7,12 +7,15 @@ import { initAccent } from "./lib/accentStore";
 import { registerServiceWorker } from "./lib/serviceWorker";
 import { initInstallPrompt } from "./lib/installPrompt";
 import { ensureDesktopNotifyPermission } from "./lib/desktopNotify";
+import { initDesktopChrome } from "./lib/desktopChrome";
 
 initTheme();
 initAccent();
 registerServiceWorker();
 initInstallPrompt();
-// Desktop app: request OS notification permission up front (no-op in browser).
+// Desktop app: native-app feel (no browser menu/zoom) + request OS
+// notification permission up front. Both no-op in the browser.
+initDesktopChrome();
 void ensureDesktopNotifyPermission();
 
 createRoot(document.getElementById("root")!).render(
