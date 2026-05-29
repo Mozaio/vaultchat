@@ -7640,4 +7640,54 @@ button:focus-visible,
   animation: umbraSheetInRight 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Composer "More" overflow menu — keeps view-once + poll out of the
+   always-visible tool row. Anchored above the composer like the emoji
+   picker. */
+.composer-tools {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.composer-tools-menu {
+  position: absolute;
+  bottom: calc(100% + 0.55rem);
+  left: 0;
+  z-index: 60;
+  min-width: 13rem;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  animation: umbraCardIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.composer-tools-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.composer-tools-item:hover {
+  background: var(--bg-hover);
+}
+.composer-tools-item.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.composer-tools-item svg {
+  flex-shrink: 0;
+}
+
 /* End VAULTCHAT v7 */

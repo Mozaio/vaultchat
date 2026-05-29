@@ -84,6 +84,7 @@ import {
   NOTIFY_STORAGE_KEY,
 } from "./SecuritySettings";
 import { ChatEmptyState } from "./ChatEmptyState";
+import { ComposerToolsMenu } from "./ComposerToolsMenu";
 import { ThreadPanel } from "./ThreadPanel";
 import { loadThreadSeen, type ThreadSeenMap } from "../lib/threadState";
 import { isPro, loadPlan, getLimits, PLAN_LABELS } from "../lib/plan";
@@ -97,7 +98,6 @@ import { pushToast } from "../lib/toastBus";
 import {
   IconArrowDown,
   IconBan,
-  IconBarChart,
   IconBell,
   IconBookmark,
   IconCopy,
@@ -4541,34 +4541,16 @@ export function ChatShell({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setViewOnceDm((v) => !v)}
-                  className={`chat-tool-button${viewOnceDm ? " active" : ""}`}
-                  title={
-                    viewOnceDm
-                      ? "Einmal anzeigen aktiviert (klicken zum Deaktivieren)"
-                      : "Nachricht nur einmal anzeigen lassen"
-                  }
-                  aria-label="Einmal anzeigen umschalten"
-                  aria-pressed={viewOnceDm}
-                >
-                  <IconLock size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
+                <ComposerToolsMenu
+                  viewOnce={viewOnceDm}
+                  onToggleViewOnce={() => setViewOnceDm((v) => !v)}
+                  pollActive={!!pollDm}
+                  onTogglePoll={() =>
                     setPollDm((cur) =>
                       cur ? null : { question: "", options: ["", ""] }
                     )
                   }
-                  className={`chat-tool-button${pollDm ? " active" : ""}`}
-                  title={pollDm ? "Umfrage abbrechen" : "Umfrage erstellen"}
-                  aria-label="Umfrage erstellen"
-                  aria-pressed={!!pollDm}
-                >
-                  <IconBarChart size={18} />
-                </button>
+                />
                 <textarea
                   ref={dmInputRef}
                   className="chat-input-textarea"
@@ -5414,34 +5396,16 @@ export function ChatShell({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setViewOnceGroup((v) => !v)}
-                  className={`chat-tool-button${viewOnceGroup ? " active" : ""}`}
-                  title={
-                    viewOnceGroup
-                      ? "Einmal anzeigen aktiviert (klicken zum Deaktivieren)"
-                      : "Nachricht nur einmal anzeigen lassen"
-                  }
-                  aria-label="Einmal anzeigen umschalten"
-                  aria-pressed={viewOnceGroup}
-                >
-                  <IconLock size={18} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
+                <ComposerToolsMenu
+                  viewOnce={viewOnceGroup}
+                  onToggleViewOnce={() => setViewOnceGroup((v) => !v)}
+                  pollActive={!!pollGroup}
+                  onTogglePoll={() =>
                     setPollGroup((cur) =>
                       cur ? null : { question: "", options: ["", ""] }
                     )
                   }
-                  className={`chat-tool-button${pollGroup ? " active" : ""}`}
-                  title={pollGroup ? "Umfrage abbrechen" : "Umfrage erstellen"}
-                  aria-label="Umfrage erstellen"
-                  aria-pressed={!!pollGroup}
-                >
-                  <IconBarChart size={18} />
-                </button>
+                />
                 <textarea
                   ref={groupInputRef}
                   className="chat-input-textarea"
