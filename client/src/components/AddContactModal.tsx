@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { searchUsers, type ApiUser } from "../lib/api";
 import { userGradient } from "../lib/chatHelpers";
+import { t, useLocale } from "../lib/i18n";
 import { IconX } from "./Icons";
 
 const MIN_SEARCH_CHARS = 3;
@@ -20,6 +21,7 @@ export function AddContactModal({
   sessionUserId,
   onContactSelected,
 }: AddContactModalProps) {
+  useLocale(); // re-render on language change
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ApiUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -39,7 +41,7 @@ export function AddContactModal({
       const { users } = await searchUsers(sessionToken, searchQuery);
       setResults(users.filter((user) => user.id !== sessionUserId));
     } catch {
-      setError("Suche fehlgeschlagen. Bitte erneut versuchen.");
+      setError(t("addc.searchFailed"));
       setResults([]);
     } finally {
       setIsSearching(false);
@@ -106,10 +108,10 @@ export function AddContactModal({
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-              Kontakt hinzufügen
+              {t("addc.title")}
             </h2>
             <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              Nur exakter Username (Datenschutz). Keine Telefonnummer nötig.
+              {t("addc.subtitle")}
             </p>
           </div>
           <button
@@ -129,10 +131,10 @@ export function AddContactModal({
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Exakten Username eingeben…"
+              placeholder={t("addc.placeholder")}
               className="app-input w-full pr-10"
               autoFocus
-              aria-label="Kontakt per exaktem Username finden"
+              aria-label={t("addc.placeholder")}
             />
             {isSearching && (
               <span
@@ -144,8 +146,7 @@ export function AddContactModal({
             )}
           </div>
           <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Es wird nur der vollständige, exakte Username gefunden — das
-            Verzeichnis ist absichtlich nicht durchsuchbar.
+            {t("addc.hint")}
           </p>
         </div>
 
@@ -161,15 +162,15 @@ export function AddContactModal({
         <div className="max-h-64 overflow-y-auto">
           {trimmedQuery.length < MIN_SEARCH_CHARS && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-              <p className="text-sm">Gib den exakten Username der Person ein.</p>
-              <p className="mt-1 text-xs">Du musst den Namen genau kennen — es gibt keine Vorschläge.</p>
+              <p className="text-sm">{t("addc.emptyTitle")}</p>
+              <p className="mt-1 text-xs">{t("addc.emptyHint")}</p>
             </div>
           )}
 
           {trimmedQuery.length >= MIN_SEARCH_CHARS && !isSearching && results.length === 0 && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-              <p className="text-sm">Kein Nutzer mit genau diesem Username.</p>
-              <p className="mt-1 text-xs">Tippfehler? Der Username muss exakt übereinstimmen.</p>
+              <p className="text-sm">{t("addc.noResultTitle")}</p>
+              <p className="mt-1 text-xs">{t("addc.noResultHint")}</p>
             </div>
           )}
 
@@ -193,7 +194,7 @@ export function AddContactModal({
                       {user.username}
                     </p>
                     <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>
-                      Kontakt hinzufügen und Chat starten
+                      {t("addc.startChat")}
                     </p>
                   </div>
                 </button>
@@ -204,7 +205,7 @@ export function AddContactModal({
 
         <div className="mt-4 border-t pt-4" style={{ borderColor: "var(--border)" }}>
           <p className="text-center text-xs" style={{ color: "var(--text-muted)" }}>
-            Kontakte werden lokal ausgewählt. Der Server sieht keine privaten Nachrichten.
+            {t("addc.footer")}
           </p>
         </div>
       </div>
