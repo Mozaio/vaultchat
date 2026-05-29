@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
+import { TitleBar } from "./components/TitleBar";
 import { initTheme } from "./lib/themeStore";
 import { initAccent } from "./lib/accentStore";
 import { registerServiceWorker } from "./lib/serviceWorker";
@@ -20,6 +21,7 @@ void ensureDesktopNotifyPermission();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
+    <TitleBar />
     <App />
   </StrictMode>
 );

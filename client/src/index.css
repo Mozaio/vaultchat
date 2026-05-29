@@ -7672,4 +7672,73 @@ button:focus-visible,
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* ===========================================================================
+   Desktop (Tauri) custom title bar — frameless window chrome.
+   Only active under html.is-tauri (set by initDesktopChrome), so the
+   web/PWA is completely unaffected.
+   =========================================================================== */
+:root {
+  --titlebar-h: 0px;
+}
+html.is-tauri {
+  --titlebar-h: 32px;
+}
+
+/* Offset the app content below the fixed title bar. border-box + min-height
+   keeps the total at 100% (no overflow). Targets the app's outer container,
+   not the title bar itself. */
+html.is-tauri #root > div:not(.titlebar) {
+  padding-top: var(--titlebar-h);
+}
+
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--titlebar-h);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-left: 0.65rem;
+  height: 100%;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-secondary);
+}
+.titlebar-controls {
+  display: flex;
+  height: 100%;
+}
+.titlebar-btn {
+  width: 46px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.titlebar-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.titlebar-close:hover {
+  background: #e53935;
+  color: #fff;
+}
+
 /* End VAULTCHAT v7 */

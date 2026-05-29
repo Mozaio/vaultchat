@@ -83,10 +83,16 @@ Installers land in `client/src-tauri/target/release/bundle/`.
 - **Notifications:** bridged to the native `notification` plugin when running
   under Tauri (detected via `window.__TAURI__`); falls back to Web
   Notifications in the browser. See `lib/desktopNotify.ts`.
-- **Discord-class shell (done):** system tray with Show/Quit menu,
-  close-to-tray (closing hides; quit via tray), left-click tray to restore,
-  single-instance focus (second launch focuses the running window), and
-  persisted window size/position across launches.
+- **Discord-class shell (done):** frameless window with a **custom title bar**
+  (drag region + min/maximize/close), suppressed browser context-menu / zoom /
+  drag (`desktopChrome.ts`), system tray with Show/Quit menu, close-to-tray
+  (closing hides; quit via tray), left-click tray to restore, single-instance
+  focus, persisted window size/position, and unread count in the title +
+  taskbar flash.
+  - *Revert the frameless frame* if Windows resize/snap misbehaves: set
+    `app.windows[0].decorations` back to `true` in `tauri.conf.json` **and**
+    remove `<TitleBar />` from `client/src/main.tsx` (otherwise you'd get both
+    the native bar and the custom one).
 - **Planned:** deep links for invite URLs (`umbra://` + https), an in-app
   toggle for close-to-tray vs close-to-quit, and signed auto-updates (needs a
   signing keypair + update endpoint).
