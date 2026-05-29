@@ -457,12 +457,17 @@ export function ChatShell({
   >(new Map());
   const seen = useRef(new Set<string>());
   /**
-   * Snapshot of the peer's `seen:dm:` timestamp captured the moment the chat
-   * is opened — BEFORE we overwrite it with `Date.now()`. Drives the
-   * "New messages" divider so it stays anchored above the first unread
-   * message for the whole time the chat stays open (Discord/WhatsApp style).
+   * Drives the "New messages" divider (Discord/WhatsApp style). `at` is the
+   * peer's `seen:dm:` timestamp snapshotted the moment the chat opens — BEFORE
+   * we overwrite it with `Date.now()`. `cap` is that open moment: messages
+   * newer than `cap` arrive live while the chat is open and must NOT spawn a
+   * surprise divider, so the divider only spans (at, cap]. The marker stays
+   * anchored above the first message in that window for the whole session.
    */
   const dmUnreadDividerAtRef = useRef<number>(0);
+  const dmUnreadDividerCapRef = useRef<number>(0);
+  const groupUnreadDividerAtRef = useRef<number>(0);
+  const groupUnreadDividerCapRef = useRef<number>(0);
   /**
    * Buffered group ciphertexts that arrived BEFORE the group key was
    * known. We retry them once the matching `group_key` DM lands so the
@@ -924,8 +929,12 @@ export function ChatShell({
       // "New messages" divider can anchor above the first unread message.
       const prevSeenRaw = await metaGet(`seen:dm:${peer.id}`).catch(() => null);
       dmUnreadDividerAtRef.current = prevSeenRaw ? Number(prevSeenRaw) || 0 : 0;
+      dmUnreadDividerCapRef.current = Date.now();
       await loadDmLocal(peer);
-      await metaSet(`seen:dm:${peer.id}`, String(Date.now())).catch(() => {});
+      await metaSet(
+        `seen:dm:${peer.id}`,
+        String(dmUnreadDividerCapRef.current)
+      ).catch(() => {});
       setUnreadByPeer((m) => ({ ...m, [peer.id]: 0 }));
     })();
   }, [peer, session.secretKey, loadDmLocal]);
@@ -936,7 +945,21 @@ export function ChatShell({
       setReplyGroup(null);
       return;
     }
-    void loadGroupLocal(group);
+    void (async () => {
+      // Snapshot prior last-seen for the "New messages" divider, then mark read.
+      const prevSeenRaw = await metaGet(`seen:group:${group.id}`).catch(
+        () => null
+      );
+      groupUnreadDividerAtRef.current = prevSeenRaw
+        ? Number(prevSeenRaw) || 0
+        : 0;
+      groupUnreadDividerCapRef.current = Date.now();
+      await loadGroupLocal(group);
+      await metaSet(
+        `seen:group:${group.id}`,
+        String(groupUnreadDividerCapRef.current)
+      ).catch(() => {});
+    })();
   }, [group, loadGroupLocal]);
 
   // Auto-scroll: nur wenn der User bereits unten war ODER neue Nachricht reinkommt
@@ -4618,9 +4641,13 @@ export function ChatShell({
                   );
                 }
                 const dividerAt = dmUnreadDividerAtRef.current;
+                const dividerCap = dmUnreadDividerCapRef.current;
                 const unreadDividerIdx =
                   dividerAt > 0
-                    ? mainDmMsgs.findIndex((m) => m.at > dividerAt && !m.fromMe)
+                    ? mainDmMsgs.findIndex(
+                        (m) =>
+                          m.at > dividerAt && m.at <= dividerCap && !m.fromMe
+                      )
                     : -1;
                 return mainDmMsgs.flatMap((m, i) => {
                 const items: JSX.Element[] = [];
@@ -5496,7 +5523,25 @@ export function ChatShell({
                 const mainMsgs = groupMessages.filter(
                   (m) => !m.plain.threadParentCid
                 );
-                return mainMsgs.map((m, i) => (
+                const gDividerAt = groupUnreadDividerAtRef.current;
+                const gDividerCap = groupUnreadDividerCapRef.current;
+                const gUnreadDividerIdx =
+                  gDividerAt > 0
+                    ? mainMsgs.findIndex(
+                        (m) =>
+                          m.at > gDividerAt && m.at <= gDividerCap && !m.fromMe
+                      )
+                    : -1;
+                return mainMsgs.flatMap((m, i) => {
+                const items: JSX.Element[] = [];
+                if (i === gUnreadDividerIdx) {
+                  items.push(
+                    <div key={`gunread-${m.id}`} className="unread-divider">
+                      <span>{t("chat.newMessages")}</span>
+                    </div>
+                  );
+                }
+                items.push(
                 <MessageBubble
                   key={m.plain.cid ?? m.id}
                   msg={m}
@@ -5563,7 +5608,9 @@ export function ChatShell({
                   onToggleStar={toggleStar}
                   onTogglePin={(x) => togglePinMessage(`group:${group.id}`, x)}
                 />
-              ));
+                );
+                return items;
+              });
               })()}
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
