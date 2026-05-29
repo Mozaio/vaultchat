@@ -3870,7 +3870,7 @@ export function ChatShell({
               <div className="flex items-center gap-3">
                 <label
                   className="group-avatar-edit cursor-pointer"
-                  title="Gruppenbild auswählen"
+                  title={t("group.pickAvatar")}
                 >
                   {newGroupAvatar ? (
                     <img src={newGroupAvatar} alt="Vorschau" />
@@ -3896,10 +3896,10 @@ export function ChatShell({
                 </label>
                 <input
                   className="app-input flex-1 !py-2 text-sm"
-                  placeholder="Gruppenname"
+                  placeholder={t("group.name")}
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
-                  aria-label="Gruppenname"
+                  aria-label={t("group.name")}
                 />
               </div>
               {newGroupAvatar && (
@@ -3909,12 +3909,12 @@ export function ChatShell({
                   style={{ color: "var(--text-muted)" }}
                   onClick={() => setNewGroupAvatar("")}
                 >
-                  Bild entfernen
+                  {t("group.removeImage")}
                 </button>
               )}
               <textarea
                 className="app-input w-full !py-2 text-xs"
-                placeholder="Beschreibung (optional, max. 280 Zeichen)"
+                placeholder={t("group.description")}
                 value={newGroupDescription}
                 onChange={(e) =>
                   setNewGroupDescription(e.target.value.slice(0, 280))
@@ -3927,14 +3927,14 @@ export function ChatShell({
                 className="max-h-40 space-y-0.5 overflow-y-auto rounded-lg border p-1"
                 style={{ borderColor: "var(--border)" }}
                 role="group"
-                aria-label="Mitglieder auswählen"
+                aria-label={t("group.selectMembers")}
               >
                 {users.length === 0 ? (
                   <p
                     className="py-3 text-center text-xs"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Noch keine Kontakte. Füge zuerst Kontakte hinzu.
+                    {t("group.noContacts")}
                   </p>
                 ) : (
                   users.map((u) => {
@@ -3975,7 +3975,7 @@ export function ChatShell({
               </div>
               {newGroupMembers.length > 0 && (
                 <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {newGroupMembers.length} ausgewählt
+                  {t("group.selectedCount", { n: newGroupMembers.length })}
                 </p>
               )}
               <button
@@ -3984,7 +3984,7 @@ export function ChatShell({
                 disabled={!newGroupName.trim() || newGroupMembers.length === 0}
                 className="btn btn-primary w-full"
               >
-                Gruppe erstellen
+                {t("group.create")}
               </button>
             </div>
           </>

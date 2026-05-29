@@ -763,6 +763,68 @@ const DICT: Record<string, Dict> = {
     zh: "历史记录仅本地保存，已加密 (IndexedDB)。",
     hi: "इतिहास केवल स्थानीय, एन्क्रिप्टेड रहता है (IndexedDB)।",
   },
+
+  // ── Group creation form ───────────────────────────────────────────
+  "group.name": {
+    en: "Group name", de: "Gruppenname", tr: "Grup adı",
+    es: "Nombre del grupo", fr: "Nom du groupe", pt: "Nome do grupo",
+    ru: "Название группы", ar: "اسم المجموعة", zh: "群组名称",
+    hi: "समूह का नाम",
+  },
+  "group.description": {
+    en: "Description (optional, max 280 chars)",
+    de: "Beschreibung (optional, max. 280 Zeichen)",
+    tr: "Açıklama (isteğe bağlı, en fazla 280 karakter)",
+    es: "Descripción (opcional, máx. 280 caracteres)",
+    fr: "Description (facultatif, max 280 caractères)",
+    pt: "Descrição (opcional, máx. 280 caracteres)",
+    ru: "Описание (необязательно, до 280 символов)",
+    ar: "وصف (اختياري، 280 حرفًا كحد أقصى)",
+    zh: "描述（可选，最多 280 字符）",
+    hi: "विवरण (वैकल्पिक, अधिकतम 280 अक्षर)",
+  },
+  "group.create": {
+    en: "Create group", de: "Gruppe erstellen", tr: "Grup oluştur",
+    es: "Crear grupo", fr: "Créer le groupe", pt: "Criar grupo",
+    ru: "Создать группу", ar: "إنشاء مجموعة", zh: "创建群组",
+    hi: "समूह बनाएं",
+  },
+  "group.selectMembers": {
+    en: "Select members", de: "Mitglieder auswählen", tr: "Üye seç",
+    es: "Seleccionar miembros", fr: "Sélectionner les membres",
+    pt: "Selecionar membros", ru: "Выбрать участников", ar: "اختيار الأعضاء",
+    zh: "选择成员", hi: "सदस्य चुनें",
+  },
+  "group.noContacts": {
+    en: "No contacts yet. Add a contact first.",
+    de: "Noch keine Kontakte. Füge zuerst Kontakte hinzu.",
+    tr: "Henüz kişi yok. Önce bir kişi ekle.",
+    es: "Aún no hay contactos. Añade un contacto primero.",
+    fr: "Pas encore de contacts. Ajoutez d'abord un contact.",
+    pt: "Ainda não há contatos. Adicione um contato primeiro.",
+    ru: "Контактов пока нет. Сначала добавьте контакт.",
+    ar: "لا توجد جهات اتصال بعد. أضف جهة اتصال أولًا.",
+    zh: "还没有联系人。请先添加联系人。",
+    hi: "अभी कोई संपर्क नहीं। पहले एक संपर्क जोड़ें।",
+  },
+  "group.selectedCount": {
+    en: "{n} selected", de: "{n} ausgewählt", tr: "{n} seçildi",
+    es: "{n} seleccionados", fr: "{n} sélectionné(s)", pt: "{n} selecionados",
+    ru: "Выбрано: {n}", ar: "{n} محدد", zh: "已选 {n}", hi: "{n} चयनित",
+  },
+  "group.pickAvatar": {
+    en: "Choose group image", de: "Gruppenbild auswählen",
+    tr: "Grup resmi seç", es: "Elegir imagen del grupo",
+    fr: "Choisir une image de groupe", pt: "Escolher imagem do grupo",
+    ru: "Выбрать изображение группы", ar: "اختيار صورة المجموعة",
+    zh: "选择群组图片", hi: "समूह छवि चुनें",
+  },
+  "group.removeImage": {
+    en: "Remove image", de: "Bild entfernen", tr: "Resmi kaldır",
+    es: "Quitar imagen", fr: "Retirer l'image", pt: "Remover imagem",
+    ru: "Удалить изображение", ar: "إزالة الصورة", zh: "移除图片",
+    hi: "छवि हटाएं",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";
