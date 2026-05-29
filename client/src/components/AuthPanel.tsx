@@ -27,17 +27,17 @@ type Mode = "unlock" | "login" | "register" | "import";
 type ProductPlanId = "personal" | "pro" | "team";
 
 function validateUsername(username: string): { valid: boolean; error?: string } {
-  if (!username) return { valid: false, error: "Benutzername erforderlich" };
-  if (username.length < 2) return { valid: false, error: "Mindestens 2 Zeichen" };
-  if (username.length > 32) return { valid: false, error: "Maximal 32 Zeichen" };
+  if (!username) return { valid: false, error: t("auth.valid.required") };
+  if (username.length < 2) return { valid: false, error: t("auth.valid.min2") };
+  if (username.length > 32) return { valid: false, error: t("auth.valid.max32") };
   if (!/^[a-zA-Z0-9_-]+$/.test(username))
-    return { valid: false, error: "Nur Buchstaben, Zahlen, _ und -" };
+    return { valid: false, error: t("auth.valid.charset") };
   if (!/^[a-zA-Z]/.test(username))
-    return { valid: false, error: "Muss mit einem Buchstaben beginnen" };
+    return { valid: false, error: t("auth.valid.startLetter") };
   if (/^[_-]|[_-]$/.test(username))
-    return { valid: false, error: "Darf nicht mit _ oder - beginnen/enden" };
+    return { valid: false, error: t("auth.valid.noEdgeSep") };
   if (/__|--|-_|_-/.test(username))
-    return { valid: false, error: "Keine doppelten Trennzeichen" };
+    return { valid: false, error: t("auth.valid.noDoubleSep") };
   if (
     [
       "admin",
@@ -49,7 +49,7 @@ function validateUsername(username: string): { valid: boolean; error?: string } 
       "discord",
     ].includes(username.toLowerCase())
   )
-    return { valid: false, error: "Dieser Name ist reserviert" };
+    return { valid: false, error: t("auth.valid.reserved") };
   return { valid: true };
 }
 
@@ -65,41 +65,30 @@ function humanError(err: unknown): string {
   const msg = err instanceof Error ? err.message : "unknown_error";
   if (msg.startsWith("api_base_misconfigured:")) {
     const b = msg.slice("api_base_misconfigured:".length);
-    return `API-Server falsch konfiguriert. Aktuelle API-Basis: ${b}.`;
+    return t("auth.err.apiMisconfigured", { base: b });
   }
-  if (msg === "network_error_or_cors")
-    return "Netzwerk- oder CORS-Fehler. Server vielleicht nicht erreichbar.";
-  if (msg === "api_timeout")
-    return "Server antwortet nicht (Timeout). Render Free schläft evtl. — in 20-30 Sekunden erneut versuchen.";
-  if (msg === "username_taken") return "Benutzername bereits vergeben.";
-  if (msg === "invite_required")
-    return "Registrierung erfordert einen Einladungscode.";
-  if (msg === "invalid_invite") return "Einladungscode ist ungültig.";
-  if (msg === "registration_closed")
-    return "Registrierung ist aktuell geschlossen.";
-  if (msg === "invalid_body")
-    return "Eingaben ungültig. Prüfe Benutzername und Passwort.";
-  if (msg === "invalid_credentials")
-    return "Benutzername oder Passwort falsch.";
+  if (msg === "network_error_or_cors") return t("auth.err.network");
+  if (msg === "api_timeout") return t("auth.err.timeout");
+  if (msg === "username_taken") return t("auth.err.usernameTaken");
+  if (msg === "invite_required") return t("auth.err.inviteRequired");
+  if (msg === "invalid_invite") return t("auth.err.invalidInvite");
+  if (msg === "registration_closed") return t("auth.err.registrationClosed");
+  if (msg === "invalid_body") return t("auth.err.invalidBody");
+  if (msg === "invalid_credentials") return t("auth.err.invalidCredentials");
   if (msg === "not_found" || msg === "user_not_found")
-    return "Konto nicht gefunden. Der Server wurde evtl. neu gestartet (Render Free) — bitte neu registrieren oder das Backup importieren.";
-  if (msg === "session_missing")
-    return "Lokale Sitzung verloren. Bitte über „Anderes Konto“ einloggen.";
+    return t("auth.err.notFound");
+  if (msg === "session_missing") return t("auth.err.sessionMissing");
   if (msg === "unauthorized" || msg === "token_expired")
-    return "Sitzung abgelaufen. Bitte erneut einloggen.";
-  if (msg === "rate_limited")
-    return "Zu viele Versuche. Bitte einen Moment warten.";
+    return t("auth.err.unauthorized");
+  if (msg === "rate_limited") return t("auth.err.rateLimited");
   // Backup-Restore-Codes (vom backup.ts shape-check)
   if (msg === "backup_passphrase_wrong_or_tampered")
-    return "Backup konnte nicht entschlüsselt werden — falsche Passphrase oder beschädigte Datei.";
-  if (msg === "backup_corrupt_json")
-    return "Backup ist beschädigt (kein gültiges JSON nach Entschlüsselung).";
-  if (msg === "backup_unexpected_shape")
-    return "Backup hat ein unerwartetes Format — vermutlich aus einer inkompatiblen Version.";
-  if (msg === "backup_must_be_encrypted_v2")
-    return "Backup-Format wird nicht unterstützt. Erwartet: Umbra-Backup v2.";
+    return t("auth.err.backupWrongPass");
+  if (msg === "backup_corrupt_json") return t("auth.err.backupCorruptJson");
+  if (msg === "backup_unexpected_shape") return t("auth.err.backupShape");
+  if (msg === "backup_must_be_encrypted_v2") return t("auth.err.backupMustV2");
   if (msg === "backup_passphrase_required")
-    return "Backup-Passphrase wurde nicht eingegeben.";
+    return t("auth.err.backupPassRequired");
   return msg;
 }
 
@@ -192,16 +181,14 @@ export function AuthPanel({
       let local: LocalIdentity | null = null;
       if (importJson.trim()) {
         local = await parseIdentityBackup(importJson, () =>
-          window.prompt("Backup-Passphrase eingeben")
+          window.prompt(t("auth.enterBackupPass"))
         );
         saveLocalIdentity(local);
       } else {
         local = loadLocalIdentity();
       }
       if (!local || local.username !== username) {
-        throw new Error(
-          "Für dieses Gerät fehlt ein Schlüssel-Backup oder der Benutzername passt nicht."
-        );
+        throw new Error(t("auth.deviceMismatch"));
       }
       const session = await buildSessionFromLogin(username, password, local);
       await onSession(session, local);
@@ -402,7 +389,7 @@ export function AuthPanel({
           {mode === "login" && (
             <div className="auth-form">
               <div className="auth-input-group">
-                <label htmlFor="auth-username">Benutzername</label>
+                <label htmlFor="auth-username">{t("auth.username")}</label>
                 <input
                   id="auth-username"
                   className="auth-input"
@@ -415,7 +402,7 @@ export function AuthPanel({
                 />
               </div>
               <div className="auth-input-group">
-                <label htmlFor="auth-password-login">Passwort</label>
+                <label htmlFor="auth-password-login">{t("auth.password")}</label>
                 <div className="auth-password-wrap">
                   <input
                     id="auth-password-login"
@@ -466,10 +453,10 @@ export function AuthPanel({
                 {busy ? (
                   <>
                     <IconLoader2 size={16} className="auth-button-spinner" />
-                    <span>Anmeldung läuft …</span>
+                    <span>{t("auth.signingIn")}</span>
                   </>
                 ) : (
-                  "Anmelden"
+                  t("auth.signIn")
                 )}
               </button>
               {busySlowHint && (
@@ -478,8 +465,7 @@ export function AuthPanel({
                   className="auth-hint"
                   aria-live="polite"
                 >
-                  Schlüssel werden im Worker abgeleitet (Argon2id) — kann ein
-                  paar Sekunden dauern.
+                  {t("auth.busyHint")}
                 </p>
               )}
               <button
@@ -487,7 +473,7 @@ export function AuthPanel({
                 onClick={() => setMode("import")}
                 className="auth-link"
               >
-                Neues Gerät? Backup importieren
+                {t("auth.newDeviceImport")}
               </button>
             </div>
           )}
@@ -497,8 +483,8 @@ export function AuthPanel({
             <div className="auth-form">
               <div className="auth-input-group">
                 <label htmlFor="auth-username-reg">
-                  <span>Benutzername</span>
-                  <span className="auth-label-hint">2–32 Zeichen</span>
+                  <span>{t("auth.username")}</span>
+                  <span className="auth-label-hint">{t("auth.usernameHint")}</span>
                 </label>
                 <input
                   id="auth-username-reg"
@@ -513,27 +499,27 @@ export function AuthPanel({
                   <div className="auth-checks">
                     <span>
                       <CheckIcon valid={username.length >= 2 && username.length <= 32} />
-                      2–32 Zeichen
+                      {t("auth.usernameHint")}
                     </span>
                     <span>
                       <CheckIcon valid={/^[a-zA-Z0-9_-]+$/.test(username)} />
-                      Nur a–z, 0–9, _, -
+                      {t("auth.check.charset")}
                     </span>
                     <span>
                       <CheckIcon valid={/^[a-zA-Z]/.test(username)} />
-                      Beginnt mit Buchstabe
+                      {t("auth.check.startLetter")}
                     </span>
                     <span>
                       <CheckIcon valid={!/[_-]$/.test(username)} />
-                      Endet nicht mit _ oder -
+                      {t("auth.check.noEndSep")}
                     </span>
                   </div>
                 )}
               </div>
               <div className="auth-input-group">
                 <label htmlFor="auth-password-reg">
-                  <span>Passwort</span>
-                  <span className="auth-label-hint">min. 10 Zeichen</span>
+                  <span>{t("auth.password")}</span>
+                  <span className="auth-label-hint">{t("auth.passwordHint")}</span>
                 </label>
                 <div className="auth-password-wrap">
                   <input
@@ -576,26 +562,26 @@ export function AuthPanel({
                   <div className="auth-checks">
                     <span>
                       <CheckIcon valid={password.length >= 10} />
-                      Mindestens 10 Zeichen
+                      {t("auth.check.min10")}
                     </span>
                     <span>
                       <CheckIcon
                         valid={/[A-Z]/.test(password) && /[a-z]/.test(password)}
                       />
-                      Groß- und Kleinbuchstaben
+                      {t("auth.check.case")}
                     </span>
                     <span>
                       <CheckIcon
                         valid={/\d/.test(password) || /[^a-zA-Z0-9]/.test(password)}
                       />
-                      Zahl oder Sonderzeichen
+                      {t("auth.check.digitSpecial")}
                     </span>
                   </div>
                 )}
               </div>
               {registrationMode !== "open" && (
                 <div className="auth-input-group">
-                  <label htmlFor="auth-invite">Einladungscode</label>
+                  <label htmlFor="auth-invite">{t("auth.inviteCode")}</label>
                   <input
                     id="auth-invite"
                     type="password"
@@ -608,8 +594,8 @@ export function AuthPanel({
                   />
                   <p className="auth-hint">
                     {registrationMode === "closed"
-                      ? "Registrierung ist derzeit geschlossen."
-                      : "Dieser Server nimmt neue Konten nur mit Einladung an."}
+                      ? t("auth.regClosed")
+                      : t("auth.regInviteOnly")}
                   </p>
                 </div>
               )}
@@ -618,15 +604,13 @@ export function AuthPanel({
                 className="auth-link"
                 onClick={() => setShowAdvancedAuth((v) => !v)}
               >
-                {showAdvancedAuth
-                  ? "Erweiterte Optionen ausblenden"
-                  : "Recovery & Plan optional einstellen"}
+                {showAdvancedAuth ? t("auth.advHide") : t("auth.advShow")}
               </button>
               {showAdvancedAuth && (
                 <div className="auth-advanced">
                   <div className="auth-input-group">
                     <label htmlFor="auth-recovery">
-                      Recovery-E-Mail (optional)
+                      {t("auth.recoveryEmail")}
                     </label>
                     <input
                       id="auth-recovery"
@@ -638,8 +622,7 @@ export function AuthPanel({
                       placeholder="name@example.com"
                     />
                     <p className="auth-hint">
-                      Server speichert nur HMAC-Hash. Backup bleibt für neue
-                      Geräte trotzdem nötig.
+                      {t("auth.recoveryHint")}
                     </p>
                   </div>
                   <div className="auth-plans">
@@ -675,18 +658,19 @@ export function AuthPanel({
                         <span className="auth-plan-name">{plan.name}</span>
                         <span className="auth-plan-price">
                           {plan.priceEurMonthly === 0
-                            ? "Free"
-                            : `${plan.priceEurMonthly} €/Monat`}
+                            ? t("auth.planFree")
+                            : t("auth.perMonth", {
+                                price: plan.priceEurMonthly,
+                              })}
                         </span>
                         <span className="auth-plan-audience">
-                          {plan.audience}
+                          {t(`auth.audience.${plan.id}`)}
                         </span>
                       </button>
                     ))}
                   </div>
                   <p className="auth-hint">
-                    Payment ist noch nicht aktiv — Auswahl bereitet Pricing
-                    und spätere Abrechnung vor.
+                    {t("auth.paymentHint")}
                   </p>
                 </div>
               )}
@@ -709,10 +693,10 @@ export function AuthPanel({
                 {busy ? (
                   <>
                     <IconLoader2 size={16} className="auth-button-spinner" />
-                    <span>Konto wird erstellt …</span>
+                    <span>{t("auth.creatingAccount")}</span>
                   </>
                 ) : (
-                  "Konto erstellen"
+                  t("auth.createAccount")
                 )}
               </button>
               {busySlowHint && (
@@ -721,8 +705,7 @@ export function AuthPanel({
                   className="auth-hint"
                   aria-live="polite"
                 >
-                  Schlüssel werden im Worker generiert (Argon2id + X25519 +
-                  Olm) — kann ein paar Sekunden dauern.
+                  {t("auth.busyHintRegister")}
                 </p>
               )}
             </div>
@@ -736,14 +719,14 @@ export function AuthPanel({
                   className="text-sm font-semibold"
                   style={{ color: "var(--text)" }}
                 >
-                  Backup-JSON
+                  {t("auth.backupJson")}
                 </p>
                 <button
                   type="button"
                   onClick={() => setMode("login")}
                   className="auth-link"
                 >
-                  Zurück
+                  {t("common.back")}
                 </button>
               </div>
               <textarea
@@ -753,7 +736,7 @@ export function AuthPanel({
                 placeholder='{"userId":"…","username":"…",…}'
               />
               <p className="auth-hint">
-                Danach mit Benutzername und Passwort anmelden.
+                {t("auth.afterImportHint")}
               </p>
               <button
                 type="button"
@@ -764,10 +747,10 @@ export function AuthPanel({
                 {busy ? (
                   <>
                     <IconLoader2 size={16} className="auth-button-spinner" />
-                    <span>Import läuft …</span>
+                    <span>{t("auth.importing")}</span>
                   </>
                 ) : (
-                  "Importieren & anmelden"
+                  t("auth.importAndSignIn")
                 )}
               </button>
             </div>
