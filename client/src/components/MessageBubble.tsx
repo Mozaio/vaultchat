@@ -18,6 +18,7 @@ import {
   IconForward,
   IconImage,
   IconLock,
+  IconMessageSquare,
   IconPause,
   IconPin,
   IconPlay,
@@ -717,7 +718,7 @@ export function MessageBubble({
                     setMenuOpen(false);
                   }}
                 >
-                  💬 Im Thread antworten
+                  <IconMessageSquare size={14} /> Im Thread antworten
                 </button>
               )}
               {onForward && msg.plain.kind !== "voice" && (
@@ -888,7 +889,9 @@ export function MessageBubble({
                 : ""
             } öffnen`}
           >
-            <span className="thread-indicator-icon">💬</span>
+            <span className="thread-indicator-icon">
+              <IconMessageSquare size={13} />
+            </span>
             <span>
               {threadReplyCount}{" "}
               {threadReplyCount === 1 ? "Antwort" : "Antworten"}

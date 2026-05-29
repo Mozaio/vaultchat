@@ -2466,6 +2466,8 @@ select:focus-visible {
 
 .thread-indicator-icon {
   font-size: 0.85rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 .thread-indicator-arrow {
