@@ -93,6 +93,12 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
     if (p.kind === "edit" && p.refCid) {
       const prev = byCid.get(p.refCid);
       if (!prev) continue;
+      // Integrity: only the ORIGINAL author may edit their own message.
+      // Frames are E2EE-authenticated to their sender, so reject an edit
+      // whose sender differs from the target's author — otherwise a group
+      // member (or a DM peer) could rewrite someone else's message.
+      const prevAuthorKey = prev.fromMe ? "__me__" : prev.fromUserId ?? "peer";
+      if (prevAuthorKey !== authorKey) continue;
       const originalPlain = prev.plain;
       const edited: PlainPayload = {
         ...originalPlain,
@@ -106,6 +112,10 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
     if (p.kind === "delete" && p.refCid) {
       const prev = byCid.get(p.refCid);
       if (!prev) continue;
+      // Integrity: only the original author may delete their own message
+      // (see edit above). Block forged deletes of others' messages.
+      const prevAuthorKey = prev.fromMe ? "__me__" : prev.fromUserId ?? "peer";
+      if (prevAuthorKey !== authorKey) continue;
       prev.deleted = true;
       continue;
     }
