@@ -336,6 +336,39 @@ const DICT: Record<string, Dict> = {
     zh: "+ 选项", hi: "+ विकल्प",
   },
 
+  // ── Reply banner + composer controls ─────────────────────────────
+  "reply.to": {
+    en: "Reply to {author}:", de: "Antwort an {author}:",
+    tr: "{author} kişisine yanıt:", es: "Responder a {author}:",
+    fr: "Répondre à {author} :", pt: "Responder a {author}:",
+    ru: "Ответ {author}:", ar: "ردّ على {author}:",
+    zh: "回复 {author}：", hi: "{author} को उत्तर:",
+  },
+  "composer.emoji": {
+    en: "Insert emoji", de: "Emoji einfügen", tr: "Emoji ekle",
+    es: "Insertar emoji", fr: "Insérer un emoji", pt: "Inserir emoji",
+    ru: "Вставить эмодзи", ar: "إدراج رمز تعبيري", zh: "插入表情",
+    hi: "इमोजी डालें",
+  },
+  "composer.attach": {
+    en: "Attach file", de: "Datei anhängen", tr: "Dosya ekle",
+    es: "Adjuntar archivo", fr: "Joindre un fichier", pt: "Anexar arquivo",
+    ru: "Прикрепить файл", ar: "إرفاق ملف", zh: "附加文件",
+    hi: "फ़ाइल संलग्न करें",
+  },
+  "composer.discardRecording": {
+    en: "Discard recording", de: "Aufnahme verwerfen",
+    tr: "Kaydı sil", es: "Descartar grabación", fr: "Annuler l'enregistrement",
+    pt: "Descartar gravação", ru: "Отменить запись", ar: "تجاهل التسجيل",
+    zh: "丢弃录音", hi: "रिकॉर्डिंग छोड़ें",
+  },
+  "chat.scrollToBottom": {
+    en: "Scroll to bottom", de: "Zum Ende scrollen",
+    tr: "En alta kaydır", es: "Ir al final", fr: "Aller en bas",
+    pt: "Ir para o fim", ru: "Прокрутить вниз", ar: "انتقل إلى الأسفل",
+    zh: "滚动到底部", hi: "नीचे स्क्रॉल करें",
+  },
+
   // ── Pinned-message banner ────────────────────────────────────────
   "pinned.label": {
     en: "Pinned", de: "Angeheftet", tr: "Sabitlenmiş", es: "Fijado",

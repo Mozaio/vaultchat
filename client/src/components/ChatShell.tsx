@@ -4594,7 +4594,7 @@ export function ChatShell({
                     setDmScrollUnread(0);
                   }}
                   className="scroll-bottom-fab visible"
-                  aria-label="Zum Ende scrollen"
+                  aria-label={t("chat.scrollToBottom")}
                   title="Zum Ende"
                 >
                   <IconArrowDown size={18} />
@@ -4848,7 +4848,7 @@ export function ChatShell({
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
                     <span style={{ color: "var(--accent)" }}>
-                      Antwort an {replyDm.author}:
+                      {t("reply.to", { author: replyDm.author })}
                     </span>{" "}
                     {replyDm.text.slice(0, 120)}
                   </span>
@@ -4868,7 +4868,7 @@ export function ChatShell({
                   onClick={() => setEmojiOpen((v) => !v)}
                   className={`chat-tool-button${emojiOpen ? " active" : ""}`}
                   title="Emoji"
-                  aria-label="Emoji einfügen"
+                  aria-label={t("composer.emoji")}
                 >
                   <IconSmile size={18} />
                 </button>
@@ -4893,7 +4893,7 @@ export function ChatShell({
                 <label
                   className="chat-tool-button cursor-pointer"
                   title="Datei anhängen"
-                  aria-label="Datei anhängen"
+                  aria-label={t("composer.attach")}
                 >
                   <IconPaperclip size={18} />
                   <input
@@ -5001,8 +5001,8 @@ export function ChatShell({
                     onClick={() => void sendDmText()}
                     disabled={voice.recording}
                     className="btn-send"
-                    aria-label="Senden"
-                    title="Senden (Enter)"
+                    aria-label={t("common.send")}
+                    title={t("common.send")}
                   >
                     <IconSend size={16} />
                   </button>
@@ -5013,7 +5013,7 @@ export function ChatShell({
                         type="button"
                         onClick={() => voice.cancel()}
                         className="btn-send cancel"
-                        aria-label="Aufnahme verwerfen"
+                        aria-label={t("composer.discardRecording")}
                         title="Aufnahme verwerfen"
                       >
                         <IconX size={16} />
@@ -5535,7 +5535,7 @@ export function ChatShell({
                     setGroupScrollUnread(0);
                   }}
                   className="scroll-bottom-fab visible"
-                  aria-label="Zum Ende scrollen"
+                  aria-label={t("chat.scrollToBottom")}
                   title="Zum Ende"
                 >
                   <IconArrowDown size={18} />
@@ -5742,7 +5742,7 @@ export function ChatShell({
                 <div className="mb-2 flex items-center justify-between rounded-lg border-l-2 px-3 py-1 text-xs" style={{ borderColor: "var(--accent)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
                   <span>
                     <span style={{ color: "var(--accent)" }}>
-                      Antwort an {replyGroup.author}:
+                      {t("reply.to", { author: replyGroup.author })}
                     </span>{" "}
                     {replyGroup.text.slice(0, 120)}
                   </span>
@@ -5762,7 +5762,7 @@ export function ChatShell({
                   onClick={() => setGroupEmojiOpen((v) => !v)}
                   className={`chat-tool-button${groupEmojiOpen ? " active" : ""}`}
                   title="Emoji"
-                  aria-label="Emoji einfügen"
+                  aria-label={t("composer.emoji")}
                 >
                   <IconSmile size={18} />
                 </button>
@@ -5787,7 +5787,7 @@ export function ChatShell({
                 <label
                   className="chat-tool-button cursor-pointer"
                   title="Datei anhängen"
-                  aria-label="Datei anhängen"
+                  aria-label={t("composer.attach")}
                 >
                   <IconPaperclip size={18} />
                   <input
@@ -6014,8 +6014,8 @@ export function ChatShell({
                     onClick={() => void sendGroupText()}
                     disabled={groupVoice.recording}
                     className="btn-send"
-                    aria-label="Senden"
-                    title="Senden"
+                    aria-label={t("common.send")}
+                    title={t("common.send")}
                   >
                     <IconSend size={16} />
                   </button>
@@ -6026,7 +6026,7 @@ export function ChatShell({
                         type="button"
                         onClick={() => groupVoice.cancel()}
                         className="btn-send cancel"
-                        aria-label="Aufnahme verwerfen"
+                        aria-label={t("composer.discardRecording")}
                         title="Aufnahme verwerfen"
                       >
                         <IconX size={16} />
