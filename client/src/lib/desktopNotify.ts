@@ -53,6 +53,39 @@ export async function sendDesktopNotification(
 }
 
 /**
+ * Reflect the total unread count in the window/tab title (Discord-style
+ * "(3) Umbra"). Updates the browser tab title everywhere, and additionally
+ * the native window title + taskbar badge under Tauri. Best-effort.
+ */
+export async function setUnreadBadge(count: number): Promise<void> {
+  const base = "Umbra";
+  const title = count > 0 ? `(${count > 99 ? "99+" : count}) ${base}` : base;
+  try {
+    document.title = title;
+  } catch {
+    /* ignore */
+  }
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const w = getCurrentWindow();
+    await w.setTitle(title);
+    // Numeric taskbar/dock badge — supported on macOS/Linux; harmless no-op
+    // (or unsupported) on Windows, hence the inner guard.
+    try {
+      const setBadge = (w as unknown as {
+        setBadgeCount?: (n?: number) => Promise<void>;
+      }).setBadgeCount;
+      if (setBadge) await setBadge.call(w, count > 0 ? count : undefined);
+    } catch {
+      /* badge unsupported on this platform */
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * Proactively ensure notification permission under Tauri (called once at
  * startup). Browser permission is requested lazily via the in-app prompt, so
  * this is a no-op outside Tauri.

@@ -103,7 +103,11 @@ import { VaultChatLogo } from "./Logo";
 import { FoldersManageModal } from "./FoldersManageModal";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 import { pushToast } from "../lib/toastBus";
-import { isTauri, sendDesktopNotification } from "../lib/desktopNotify";
+import {
+  isTauri,
+  sendDesktopNotification,
+  setUnreadBadge,
+} from "../lib/desktopNotify";
 import {
   IconArrowDown,
   IconBan,
@@ -1050,6 +1054,24 @@ export function ChatShell({
   useEffect(() => {
     setGroupScrollUnread(0);
   }, [group?.id]);
+
+  // Reflect total unread in the window/tab title + taskbar badge
+  // (Discord-style "(3) Umbra"). Browser tab everywhere, native window/badge
+  // under Tauri.
+  useEffect(() => {
+    const total = Object.values(unreadByPeer).reduce(
+      (a, b) => a + (b || 0),
+      0
+    );
+    void setUnreadBadge(total);
+  }, [unreadByPeer]);
+
+  // Clear the title badge when the chat unmounts (logout / lock).
+  useEffect(() => {
+    return () => {
+      void setUnreadBadge(0);
+    };
+  }, []);
 
   // Scroll event handler für DM
   const handleDmScroll = useCallback(() => {
