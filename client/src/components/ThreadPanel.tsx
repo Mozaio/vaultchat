@@ -4,6 +4,7 @@ import { previewForPayload } from "../lib/messagePreview";
 import { markThreadSeen } from "../lib/threadState";
 import { IconX, IconSend, IconMessageSquare } from "./Icons";
 import { MessageBubble } from "./MessageBubble";
+import { t, useLocale } from "../lib/i18n";
 
 export function ThreadPanel({
   parent,
@@ -32,6 +33,7 @@ export function ThreadPanel({
   onForward: (m: ChatMsg) => void;
   onJumpToCid?: (cid: string) => void;
 }) {
+  useLocale();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -92,7 +94,8 @@ export function ThreadPanel({
           <div>
             <p className="thread-panel-title-main">Thread</p>
             <p className="thread-panel-title-sub">
-              {replies.length} {replies.length === 1 ? "Antwort" : "Antworten"}
+              {replies.length}{" "}
+              {replies.length === 1 ? t("msg.replyCount1") : t("msg.replyCountN")}
             </p>
           </div>
         </div>
@@ -100,7 +103,7 @@ export function ThreadPanel({
           type="button"
           className="thread-panel-close"
           onClick={onClose}
-          aria-label="Thread schließen"
+          aria-label={t("chat.closeThread")}
         >
           <IconX size={18} />
         </button>
@@ -120,7 +123,7 @@ export function ThreadPanel({
               style={{ opacity: 0.45, marginBottom: 8 }}
             />
             <p style={{ margin: 0 }}>
-              Noch keine Antworten — starte den Thread mit einer Nachricht.
+              {t("chat.threadEmpty")}
             </p>
           </div>
         ) : (
@@ -172,9 +175,9 @@ export function ThreadPanel({
               }
             }}
             placeholder={
-              parentAuthor === "Du"
-                ? "Im Thread antworten …"
-                : `Antwort an ${parentAuthor} …`
+              parent.fromMe
+                ? t("chat.replyInThread")
+                : t("chat.replyToName", { name: parentAuthor })
             }
             rows={1}
             maxLength={4000}
@@ -200,8 +203,8 @@ export function ThreadPanel({
           onClick={() => void handleSend()}
           disabled={busy || !text.trim()}
           className="thread-panel-send"
-          aria-label="Antwort senden"
-          title="Antwort senden (Enter)"
+          aria-label={t("chat.sendReply")}
+          title={t("chat.sendReply")}
         >
           <IconSend size={16} />
         </button>

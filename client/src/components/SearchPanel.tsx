@@ -11,6 +11,7 @@ import {
   search as searchIndex,
 } from "../lib/searchIndex";
 import { IconSearch, IconX } from "./Icons";
+import { t, useLocale } from "../lib/i18n";
 
 /**
  * Wrap each occurrence of a query term in <mark> so matches stand out in
@@ -60,6 +61,7 @@ export function SearchPanel({
   onSelect: (type: "dm" | "group", id: string, cid?: string) => void;
   onClose: () => void;
 }) {
+  useLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
@@ -90,7 +92,7 @@ export function SearchPanel({
             key: `dm:${doc.id}`,
             type: "dm",
             peerId: doc.scopeId,
-            title: peer?.username ?? "Unbekannt",
+            title: peer?.username ?? t("search.unknown"),
             preview: doc.body.slice(0, 140),
             timestamp: doc.at,
             cid: doc.cid,
@@ -104,7 +106,7 @@ export function SearchPanel({
           key: `group:${doc.id}`,
           type: "group",
           groupId: doc.scopeId,
-          title: `${group?.name ?? "Gruppe"} — ${sender?.username ?? "Unbekannt"}`,
+          title: `${group?.name ?? t("chat.groupFallback")} — ${sender?.username ?? t("search.unknown")}`,
           preview: doc.body.slice(0, 140),
           timestamp: doc.at,
           cid: doc.cid,
@@ -137,7 +139,7 @@ export function SearchPanel({
             ref={inputRef}
             autoFocus
             type="text"
-            placeholder="Nachrichten durchsuchen…"
+            placeholder={t("search.messages")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -148,8 +150,8 @@ export function SearchPanel({
             onClick={() => void performSearch()}
             disabled={searching}
             className="theme-toggle"
-            title="Suchen"
-            aria-label="Suchen"
+            title={t("search.search")}
+            aria-label={t("search.search")}
           >
             {searching ? <span aria-hidden>…</span> : <IconSearch size={18} />}
           </button>
@@ -157,8 +159,8 @@ export function SearchPanel({
             type="button"
             onClick={onClose}
             className="theme-toggle"
-            title="Schließen"
-            aria-label="Suche schließen"
+            title={t("common.close")}
+            aria-label={t("search.close")}
           >
             <IconX size={18} />
           </button>
@@ -168,15 +170,14 @@ export function SearchPanel({
           {!query.trim() && (
             <div className="search-empty">
               <IconSearch size={26} aria-hidden />
-              <p className="search-empty-title">Nachrichten durchsuchen</p>
+              <p className="search-empty-title">{t("search.title")}</p>
               <p className="search-empty-hint">
-                Tippe ein Stichwort — die Suche läuft komplett lokal auf
-                deinem Gerät.
+                {t("search.localHint")}
               </p>
             </div>
           )}
           {results.length === 0 && query.trim() && !searching && (
-            <div className="search-empty">Keine Ergebnisse</div>
+            <div className="search-empty">{t("search.noResults")}</div>
           )}
           {results.map((hit) => (
             <button
