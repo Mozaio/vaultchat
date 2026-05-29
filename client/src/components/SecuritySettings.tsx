@@ -476,6 +476,74 @@ export function SecuritySettings({
                   className="mb-1 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
+                  Was sieht der Server?
+                </h3>
+                <p
+                  className="mb-3 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Ehrliche Übersicht. „Server" = die gehostete Relay-Instanz,
+                  nicht dein Gerät.
+                </p>
+                <ul className="space-y-1.5">
+                  {[
+                    { ok: true, label: "Nachrichteninhalte — Ende-zu-Ende verschlüsselt" },
+                    { ok: true, label: "Sprach-/Gruppenanrufe — P2P, DTLS-SRTP" },
+                    { ok: true, label: "Wer im Sprachraum ist — verschlüsselte Signale" },
+                    { ok: true, label: "Deine IP — in Logs nur als Hash" },
+                    { ok: true, label: "E-Mail (nur Hash) & Backup-Inhalt" },
+                    { ok: false, label: "Empfänger einer DM — zur Zustellung nötig (wie bei Signal)" },
+                    { ok: false, label: "Gruppen-Mitgliederlisten — fürs Routing" },
+                    { ok: false, label: "Wer gerade online ist" },
+                    { ok: false, label: "Gruppennamen — noch im Klartext (in Arbeit)" },
+                  ].map((row, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs">
+                      <span
+                        aria-hidden
+                        style={{
+                          color: row.ok ? "var(--success)" : "var(--warning)",
+                          flexShrink: 0,
+                          marginTop: 1,
+                        }}
+                      >
+                        {row.ok ? (
+                          <IconShieldCheck size={14} />
+                        ) : (
+                          <IconAlertTriangle size={14} />
+                        )}
+                      </span>
+                      <span style={{ color: "var(--text-secondary)" }}>
+                        <strong
+                          style={{
+                            color: row.ok ? "var(--success)" : "var(--warning)",
+                          }}
+                        >
+                          {row.ok ? "Geschützt: " : "Sichtbar: "}
+                        </strong>
+                        {row.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p
+                  className="mt-3 text-[11px]"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  Cover-Traffic verrauscht zusätzlich, mit wem du wirklich
+                  schreibst.
+                </p>
+              </div>
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-1 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
                   Verschwindende Nachrichten
                 </h3>
                 <p
