@@ -107,13 +107,17 @@ export async function ensureOlmSession(
       olm?: {
         identityCurve25519?: string;
         identityEd25519?: string;
-        oneTimeKey?: string;
+        // Der Server liefert den One-Time-Key als Objekt {keyId, publicKey},
+        // nicht als blanken String. create_outbound erwartet den base64-
+        // String — sonst wirft Olm `OLM.INVALID_BASE64`.
+        oneTimeKey?: { keyId: string; publicKey: string } | null;
       };
     }).olm;
     if (
       !olmBundle ||
       !olmBundle.identityCurve25519 ||
-      !olmBundle.oneTimeKey
+      !olmBundle.oneTimeKey ||
+      !olmBundle.oneTimeKey.publicKey
     ) {
       throw new Error("no_olm_bundle");
     }
@@ -121,7 +125,7 @@ export async function ensureOlmSession(
     session.create_outbound(
       account,
       olmBundle.identityCurve25519,
-      olmBundle.oneTimeKey
+      olmBundle.oneTimeKey.publicKey
     );
     await saveOlmAccount(account);
     await saveOlmSession(peerId, session);
