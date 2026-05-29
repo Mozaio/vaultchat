@@ -7,17 +7,24 @@
     "dev": "vite",
     "build": "vite build",
     "test": "tsx --test src/lib/backup.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/olmAdapter.test.ts src/lib/olmSession.test.ts src/lib/megolmSession.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:icon": "tauri icon src-tauri/app-icon.svg",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@matrix-org/olm": "^3.2.15",
     "@noble/post-quantum": "^0.6.1",
+    "@tauri-apps/api": "^2.0.0",
+    "@tauri-apps/plugin-notification": "^2.0.0",
     "libsodium-wrappers-sumo": "^0.7.15",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",
+    "@tauri-apps/cli": "^2.0.0",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",

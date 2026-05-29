@@ -17,6 +17,14 @@ export function vaultchatSri(): Plugin {
     name: "vaultchat-sri",
     apply: "build",
     closeBundle() {
+      // Tauri serves the bundle from a custom WebView origin; if SRI ever
+      // trips up that loader, the desktop build can opt out with
+      // VITE_DISABLE_SRI=1 (the web/Render build keeps SRI on).
+      if (process.env.VITE_DISABLE_SRI === "1") {
+        // eslint-disable-next-line no-console
+        console.log("[vaultchat-sri] skipped (VITE_DISABLE_SRI=1)");
+        return;
+      }
       const outDir = join(process.cwd(), "dist");
       const indexPath = join(outDir, "index.html");
       if (!existsSync(indexPath)) return;

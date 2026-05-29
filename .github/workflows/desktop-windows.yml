@@ -1,0 +1,60 @@
+name: Desktop (Windows)
+
+# Builds the Umbra Tauri desktop app into a Windows installer (.exe / .msi)
+# on a GitHub-hosted Windows runner — no local Rust/Node toolchain needed.
+# Trigger manually, or automatically on a v* tag.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+# The hosted backend the packaged app talks to. Override via repo
+# Variables (Settings → Secrets and variables → Actions → Variables) if the
+# Render URL changes.
+env:
+  VITE_API_BASE: ${{ vars.VITE_API_BASE || 'https://vaultchat-server-g0p2.onrender.com' }}
+  VITE_WS_URL: ${{ vars.VITE_WS_URL || 'wss://vaultchat-server-g0p2.onrender.com' }}
+  # The desktop app ships as one signed artifact, so per-asset SRI adds
+  # little and can trip up the WebView loader — disable it for this target.
+  VITE_DISABLE_SRI: "1"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: client/src-tauri
+
+      - name: Install web deps
+        working-directory: client
+        run: npm install
+
+      - name: Generate app icons
+        working-directory: client
+        run: npm run tauri:icon
+
+      - name: Build desktop app
+        working-directory: client
+        run: npm run tauri:build
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: umbra-windows-installers
+          path: |
+            client/src-tauri/target/release/bundle/nsis/*.exe
+            client/src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: error

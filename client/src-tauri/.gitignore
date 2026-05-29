@@ -1,0 +1,9 @@
+# Rust build output
+/target
+
+# Tauri-generated schemas / platform projects
+/gen/schemas
+
+# Generated app icons — produced from app-icon.svg via `tauri icon`
+# (run `npm run tauri:icon` before building; CI does this automatically).
+/icons
