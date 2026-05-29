@@ -80,13 +80,16 @@ Installers land in `client/src-tauri/target/release/bundle/`.
 
 - **Screen share** works on desktop (unlike iOS Safari/WebView, which has no
   `getDisplayMedia`).
-- **Notifications:** the web client currently uses the Web Notifications API.
-  A follow-up bridges this to the native `notification` plugin when running
-  under Tauri (detected via `window.__TAURI__`), so background notifications
-  behave like a native desktop app.
-- **Planned Discord-class niceties:** system tray + minimize-to-tray,
-  single-instance focus, window-state persistence, deep links for invite
-  URLs, and signed auto-updates.
+- **Notifications:** bridged to the native `notification` plugin when running
+  under Tauri (detected via `window.__TAURI__`); falls back to Web
+  Notifications in the browser. See `lib/desktopNotify.ts`.
+- **Discord-class shell (done):** system tray with Show/Quit menu,
+  close-to-tray (closing hides; quit via tray), left-click tray to restore,
+  single-instance focus (second launch focuses the running window), and
+  persisted window size/position across launches.
+- **Planned:** deep links for invite URLs (`umbra://` + https), an in-app
+  toggle for close-to-tray vs close-to-quit, and signed auto-updates (needs a
+  signing keypair + update endpoint).
 
 ## Relationship to mobile
 
