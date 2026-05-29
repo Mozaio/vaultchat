@@ -1275,6 +1275,25 @@ export function ChatShell({
         try {
           const data = JSON.parse(String(ev.data)) as Record<string, unknown>;
 
+          // Offline-Mailbox quittieren: der Server hält geflushte Frames vor,
+          // bis wir sie acken. Ohne Ack würde jeder Reconnect/Reload dieselben
+          // Nachrichten erneut zustellen und der Server-Mailbox-Speicher bis
+          // zum 7-Tage-TTL anwachsen. Wir acken beim Empfang (die Bytes sind
+          // bereits da) für dm- und group-Frames inklusive Session-Keys.
+          if (
+            data.mailbox === true &&
+            typeof data.id === "string" &&
+            (data.type === "dm" || data.type === "group")
+          ) {
+            wsRef.current?.send(
+              JSON.stringify({
+                type: "mailbox_ack",
+                kind: data.type === "group" ? "group" : "dm",
+                id: data.id,
+              })
+            );
+          }
+
           if (data.type === "auth_ok") {
             reconnectAttempts.current = 0;
             return;
