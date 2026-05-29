@@ -1747,13 +1747,26 @@ export function ChatShell({
     sendReadReceipts,
   ]);
 
+  /**
+   * Guard every outbound DM path against a SILENT key change. If the peer's
+   * identity key changed (TOFU "mismatch") and the user hasn't re-verified,
+   * we refuse to send — otherwise an attacker who swapped the key could read
+   * the message. Returns false (and surfaces an error) when blocked.
+   */
+  function ensurePeerKeyTrusted(): boolean {
+    if (!peer) return false;
+    if (peer.id !== session.user.id && peerPin?.state === "mismatch") {
+      setError(
+        "Schlüssel dieses Peers hat gewechselt. Bitte zuerst Sicherheitsnummer prüfen."
+      );
+      return false;
+    }
+    return true;
+  }
+
   async function sendDmText() {
     if (!peer || !text.trim()) return;
-    const isSelf = peer.id === session.user.id;
-    if (!isSelf && peerPin?.state === "mismatch") {
-      setError("Schlüssel dieses Peers hat gewechselt. Bitte zuerst Sicherheitsnummer prüfen.");
-      return;
-    }
+    if (!ensurePeerKeyTrusted()) return;
     setError(null);
     const cid = newCid();
     const payload: PlainPayload = {
@@ -1785,6 +1798,7 @@ export function ChatShell({
 
   async function sendDmFile(file: File) {
     if (!peer) return;
+    if (!ensurePeerKeyTrusted()) return;
     /**
      * Ziel: echte Dateien bis ca. 128 MiB. Data-URL, JSON, Padding,
      * Double-Ratchet-Wire und Sealed-Sender-Envelope wachsen deutlich darüber;
@@ -1824,6 +1838,7 @@ export function ChatShell({
 
   async function sendDmVoice() {
     if (!peer) return;
+    if (!ensurePeerKeyTrusted()) return;
     if (voice.recording) {
       const rec = await voice.stop();
       if (!rec) return;
