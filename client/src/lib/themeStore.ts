@@ -14,7 +14,9 @@ function getStoredTheme(): Theme {
   } catch {
     /* ignore */
   }
-  return "system";
+  // Default to the polished "Clean Light" experience. Users can still pick
+  // dark or system from the theme toggle.
+  return "light";
 }
 
 export function getTheme(): Theme {

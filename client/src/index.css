@@ -52,19 +52,21 @@ body,
      borders and clean spacing instead.
    ──────────────────────────────────────────────────────────── */
 
-/* ── Light theme (default) ── */
+/* ── Light theme (default) — "Clean Light": soft, low-glare, easy on the
+   eyes. Off-white surfaces instead of pure white, muted slate text instead
+   of black, gentle borders and shadows. Calm for long sessions. ── */
 :root {
-  --bg: #f6f7f9;
+  --bg: #eceff4;
   --bg-elevated: #ffffff;
-  --bg-sidebar: #f0f2f5;
-  --bg-chat: #f3f4f7;
-  --bg-hover: #e7eaef;
-  --bg-active: #dde7e3;
-  --bg-glass: #ffffff;
+  --bg-sidebar: #f7f9fc;
+  --bg-chat: #eceff4;
+  --bg-hover: #f0f3f7;
+  --bg-active: #ebf7f5;
+  --bg-glass: #f7f9fc;
 
-  --text: #0f172a;
-  --text-secondary: #4b5563;
-  --text-muted: #6b7280;
+  --text: #2a3142;
+  --text-secondary: #5b6472;
+  --text-muted: #828b99;
   --text-on-accent: #ffffff;
 
   /* Brand: muted teal-emerald — clear without being neon. */
@@ -79,21 +81,26 @@ body,
   --success: #16a34a;
   --warning: #d97706;
 
-  --border: #e5e7eb;
-  --border-strong: #d1d5db;
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
-  --shadow: 0 1px 2px 0 rgb(15 23 42 / 0.06);
-  --shadow-md: 0 2px 6px -1px rgb(15 23 42 / 0.08);
-  --shadow-lg: 0 6px 14px -4px rgb(15 23 42 / 0.10);
-  --shadow-xl: 0 14px 26px -8px rgb(15 23 42 / 0.12);
+  --border: #e3e7ee;
+  --border-strong: #d4dae3;
+  --shadow-sm: 0 1px 2px 0 rgb(20 30 55 / 0.05);
+  --shadow: 0 1px 2px 0 rgb(20 30 55 / 0.06);
+  --shadow-md: 0 2px 6px -1px rgb(20 30 55 / 0.08);
+  --shadow-lg: 0 6px 14px -4px rgb(20 30 55 / 0.10);
+  --shadow-xl: 0 14px 26px -8px rgb(20 30 55 / 0.12);
   --shadow-accent: none;
 
-  --bubble-me: var(--accent);
+  /* Solid, slightly lighter-than-accent teal — friendly, not harsh. */
+  --bubble-me: #13a99a;
   --bubble-me-text: #ffffff;
   --bubble-peer: #ffffff;
-  --bubble-peer-text: #0f172a;
-  --bubble-peer-border: #e5e7eb;
-  --bubble-peer-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
+  --bubble-peer-text: #2a3142;
+  --bubble-peer-border: #e8ebf1;
+  --bubble-peer-shadow: 0 1px 2px rgb(20 30 55 / 0.05);
+
+  /* theme-aware redesign hooks (consumed by the v5 block) */
+  --bubble-shadow: 0 1px 2px rgb(20 30 55 / 0.05);
+  --chat-glow: transparent;
 
   /* No decorative chat wallpaper by default — content stands on its own. */
   --chat-wallpaper: none;
@@ -143,12 +150,17 @@ body,
   --shadow-xl: 0 22px 48px -12px rgb(0 0 0 / 0.62);
   --shadow-accent: none;
 
-  --bubble-me: var(--accent);
+  --bubble-me: linear-gradient(165deg, #22d3c0, #0f9c8b);
   --bubble-me-text: #ffffff;
   --bubble-peer: #1a1e27;
   --bubble-peer-text: #eceef2;
   --bubble-peer-border: #262b35;
   --bubble-peer-shadow: none;
+
+  /* theme-aware redesign hooks (consumed by the v5 block) */
+  --bubble-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.4);
+  --chat-glow: var(--accent-soft);
+  --input-bg: var(--bg-elevated);
 
   --chat-wallpaper: none;
 }
@@ -192,7 +204,7 @@ select:focus-visible {
   --bubble-them-bg: var(--bubble-peer);
   --bubble-them-border: var(--bubble-peer-border);
   --bubble-them-fg: var(--bubble-peer-text);
-  --input-bg: var(--bg-elevated);
+  --input-bg: #eef1f6;
   --input-fg: var(--text);
   --input-placeholder: var(--text-muted);
 }
@@ -7035,7 +7047,7 @@ button:focus-visible,
 /* ── Messages area — quiet depth + roomier bubbles ── */
 .messages-container {
   background:
-    radial-gradient(1100px 520px at 50% -8%, var(--accent-soft), transparent 62%),
+    radial-gradient(1100px 520px at 50% -8%, var(--chat-glow), transparent 62%),
     var(--bg-chat);
 }
 .message-wrapper {
@@ -7051,10 +7063,10 @@ button:focus-visible,
 .message-bubble.received {
   background: var(--bubble-peer);
   border: 1px solid var(--bubble-peer-border);
-  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--bubble-shadow);
 }
 .message-bubble.sent {
-  background: linear-gradient(165deg, #22d3c0, #0f9c8b);
+  background: var(--bubble-me);
   border: none;
   box-shadow: 0 3px 14px -4px var(--accent-glow);
 }
@@ -7079,11 +7091,11 @@ button:focus-visible,
   background: var(--bg-sidebar);
 }
 .chat-input-row {
-  background: var(--bg-elevated);
+  background: var(--input-bg);
   border: 1px solid var(--border);
   border-radius: 20px;
   padding: 0.35rem 0.5rem;
-  box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .chat-input-row:focus-within {
@@ -7118,4 +7130,51 @@ button:focus-visible,
 *::-webkit-scrollbar-track {
   background: transparent;
 }
+/* ── Clean-Light landing / auth (scoped so the dark theme keeps its
+   atmospheric hero). Soft off-white hero with a faint teal wash, muted
+   slate copy — consistent with the light chat, easy on the eyes. ── */
+:root:not(.dark) .auth-brand-panel {
+  background:
+    radial-gradient(760px 560px at -8% 114%, rgba(13, 148, 136, 0.12), transparent 60%),
+    radial-gradient(540px 380px at 114% -6%, rgba(13, 148, 136, 0.07), transparent 55%),
+    linear-gradient(155deg, #f7f9fc 0%, #eef3f2 55%, #e8f4f1 100%);
+  border-right: 1px solid var(--border);
+}
+:root:not(.dark) .auth-brand-panel::before {
+  background-image: radial-gradient(circle, rgba(20, 30, 55, 0.04) 1px, transparent 1px);
+}
+:root:not(.dark) .auth-brand-top-name {
+  color: #222a39;
+}
+:root:not(.dark) .auth-brand-hero h1 {
+  color: #222a39;
+}
+:root:not(.dark) .auth-brand-hero h1 em {
+  color: var(--accent);
+}
+:root:not(.dark) .auth-brand-hero p {
+  color: var(--text-secondary);
+}
+:root:not(.dark) .auth-brand-features {
+  border-top: 1px solid var(--border);
+}
+:root:not(.dark) .auth-brand-feat-icon {
+  background: rgba(13, 148, 136, 0.10);
+  color: var(--accent);
+  border: 1px solid rgba(13, 148, 136, 0.22);
+  box-shadow: none;
+}
+:root:not(.dark) .auth-brand-features li strong {
+  color: var(--text);
+}
+:root:not(.dark) .auth-brand-features li span {
+  color: var(--text-muted);
+}
+:root:not(.dark) .auth-brand-footer {
+  color: #9aa3b2;
+}
+:root:not(.dark) .auth-brand-footer code {
+  color: var(--text-secondary);
+}
+
 /* End VAULTCHAT v5 */
