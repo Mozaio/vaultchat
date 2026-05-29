@@ -6986,3 +6986,136 @@ button:focus-visible,
 }
 
 /* End VAULTCHAT v4 */
+
+/* ============================================================
+   VAULTCHAT v5 — Chat redesign (Signal/Telegram/Discord-tier)
+
+   A cohesive visual overhaul layered on top of the v4 design system.
+   Kept as one appended block so it reads (and reverts) as a unit.
+   Everything is variable-driven where possible, so both themes follow.
+   ============================================================ */
+
+/* ── Sidebar & conversation list ── */
+.contact-item {
+  padding: 0.6rem 0.7rem;
+  border-radius: 14px;
+  gap: 0.75rem;
+}
+.contact-item.active {
+  background: linear-gradient(90deg, var(--accent-soft), transparent 92%);
+}
+.contact-avatar {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.05),
+    0 3px 8px -2px rgba(0, 0, 0, 0.45);
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.contact-name {
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+.unread-badge {
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  box-shadow: 0 2px 8px -2px var(--accent-glow);
+  height: 1.3rem;
+  min-width: 1.3rem;
+}
+.peer-online-dot {
+  box-shadow: 0 0 0 2.5px var(--bg-sidebar);
+}
+
+/* ── Chat header — subtle glass ── */
+.chat-header {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elevated) 78%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+/* ── Messages area — quiet depth + roomier bubbles ── */
+.messages-container {
+  background:
+    radial-gradient(1100px 520px at 50% -8%, var(--accent-soft), transparent 62%),
+    var(--bg-chat);
+}
+.message-wrapper {
+  margin-block: 1px;
+}
+.message-bubble {
+  border-radius: 20px;
+  padding: 0.62rem 0.9rem 0.46rem;
+  font-size: 0.93rem;
+  max-width: 74%;
+  box-shadow: none;
+}
+.message-bubble.received {
+  background: var(--bubble-peer);
+  border: 1px solid var(--bubble-peer-border);
+  box-shadow: 0 2px 8px -4px rgba(0, 0, 0, 0.4);
+}
+.message-bubble.sent {
+  background: linear-gradient(165deg, #22d3c0, #0f9c8b);
+  border: none;
+  box-shadow: 0 3px 14px -4px var(--accent-glow);
+}
+.message-bubble.sent.tail {
+  border-bottom-right-radius: 7px;
+}
+.message-bubble.received.tail {
+  border-bottom-left-radius: 7px;
+}
+.message-wrapper:hover
+  .message-bubble:not(.is-deleted):not(.system-message) {
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.5);
+}
+.bubble-meta {
+  font-size: 0.66rem;
+  margin-top: 0.3rem;
+}
+
+/* ── Composer — a defined, elevated input bar ── */
+.chat-input-area {
+  border-top: 1px solid var(--border);
+  background: var(--bg-sidebar);
+}
+.chat-input-row {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.35rem 0.5rem;
+  box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.chat-input-row:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft),
+    0 4px 14px -6px var(--accent-glow);
+}
+.chat-tool-button {
+  border-radius: 12px;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.chat-tool-button:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
+/* ── Thin, quiet scrollbars ── */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* End VAULTCHAT v5 */
