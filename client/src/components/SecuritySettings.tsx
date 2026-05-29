@@ -1010,7 +1010,7 @@ function AccountDangerZone() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const requiredPhrase = "ACCOUNT LÖSCHEN";
+  const requiredPhrase = t("settings.deletePhrase");
 
   async function handleDelete() {
     setError(null);
@@ -1070,12 +1070,13 @@ function AccountDangerZone() {
           style={{ background: "var(--danger-soft)", color: "var(--danger)", border: "1px solid var(--danger)" }}
           onClick={() => setConfirming(true)}
         >
-          Account löschen …
+          {t("settings.deleteAccount")}
         </button>
       ) : (
         <div className="mt-3 space-y-2">
           <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Tippe <code style={{ color: "var(--danger)" }}>{requiredPhrase}</code> um zu bestätigen:
+            {t("settings.deleteConfirmPrompt")}{" "}
+            <code style={{ color: "var(--danger)" }}>{requiredPhrase}</code>
           </p>
           <input
             type="text"
@@ -1093,7 +1094,7 @@ function AccountDangerZone() {
           />
           {error && (
             <p className="text-xs" style={{ color: "var(--danger)" }}>
-              Fehler: {error}
+              {t("common.error")}: {error}
             </p>
           )}
           <div className="flex gap-2">
@@ -1108,7 +1109,7 @@ function AccountDangerZone() {
               }}
               disabled={busy}
             >
-              Abbrechen
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -1117,7 +1118,7 @@ function AccountDangerZone() {
               onClick={() => void handleDelete()}
               disabled={busy || typed !== requiredPhrase}
             >
-              {busy ? "Lösche …" : "Endgültig löschen"}
+              {busy ? t("settings.deleting") : t("settings.deleteForever")}
             </button>
           </div>
         </div>
@@ -1127,6 +1128,7 @@ function AccountDangerZone() {
 }
 
 function EmojiSettingsTab() {
+  useLocale();
   const [emojis, setEmojis] = useState<CustomEmoji[]>(() => loadCustomEmojis());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1146,10 +1148,10 @@ function EmojiSettingsTab() {
       const code = err instanceof Error ? err.message : "emoji_failed";
       setError(
         code === "emoji_invalid_type"
-          ? "Bitte ein Bild (PNG, JPEG, WebP, GIF) auswählen."
+          ? t("emoji.errType")
           : code === "emoji_too_large"
-            ? "Bild zu groß — versuche ein kleineres Motiv."
-            : "Konnte den Emoji nicht hinzufügen."
+            ? t("emoji.errTooLarge")
+            : t("emoji.errGeneric")
       );
     } finally {
       setBusy(false);
@@ -1165,15 +1167,13 @@ function EmojiSettingsTab() {
     <div className="space-y-4">
       <div>
         <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
-          Eigene Emojis
+          {t("emoji.custom")}
         </p>
         <p
           className="mt-1 text-xs leading-relaxed"
           style={{ color: "var(--text-muted)" }}
         >
-          Lade Bilder hoch und nutze sie als Reaktionen. Sie liegen nur lokal
-          auf deinem Gerät; beim Reagieren wird das Bild als data-URL
-          mit dem verschlüsselten Frame mitgesendet — der Server sieht nichts.
+          {t("emoji.settings.desc")}
         </p>
       </div>
 
@@ -1184,7 +1184,7 @@ function EmojiSettingsTab() {
         disabled={busy}
         style={{ width: "100%" }}
       >
-        {busy ? "Lade …" : "+ Eigenes Emoji hinzufügen"}
+        {busy ? t("emoji.uploading") : t("emoji.settings.addBtn")}
       </button>
       <input
         ref={fileRef}
@@ -1211,8 +1211,7 @@ function EmojiSettingsTab() {
             color: "var(--text-muted)",
           }}
         >
-          Noch keine eigenen Emojis. Lade dein erstes hoch — z. B. ein Logo,
-          Sticker oder Inside-Joke-Bild.
+          {t("emoji.settings.empty")}
         </p>
       ) : (
         <div
@@ -1231,8 +1230,8 @@ function EmojiSettingsTab() {
                 type="button"
                 onClick={() => handleRemove(e.id)}
                 className="emoji-settings-remove"
-                aria-label={`„${e.name}“ entfernen`}
-                title="Entfernen"
+                aria-label={t("emoji.remove", { name: e.name })}
+                title={t("common.remove")}
               >
                 <IconX size={11} />
               </button>
@@ -1251,7 +1250,11 @@ function EmojiSettingsTab() {
       >
         <div className="flex items-center justify-between text-xs mb-1.5">
           <span style={{ color: "var(--text-secondary)" }}>
-            {emojis.length} / {limit} im {PLAN_LABELS[plan]}-Plan
+            {t("emoji.settings.usage", {
+              used: emojis.length,
+              limit,
+              plan: PLAN_LABELS[plan],
+            })}
           </span>
           <span
             style={{
@@ -1260,8 +1263,8 @@ function EmojiSettingsTab() {
             }}
           >
             {remaining === 0
-              ? "Limit erreicht"
-              : `Noch ${remaining} möglich`}
+              ? t("emoji.settings.limitReached")
+              : t("emoji.settings.remaining", { n: remaining })}
           </span>
         </div>
         <div
@@ -1282,14 +1285,13 @@ function EmojiSettingsTab() {
             className="mt-2 text-xs"
             style={{ color: "var(--text-secondary)" }}
           >
-            Mit <strong style={{ color: "var(--accent)" }}>Pro</strong> sind 50
-            eigene Emojis möglich. Tab „Plan & Abo" zum Upgrade.
+            {t("emoji.settings.proUpsell")}
           </p>
         )}
       </div>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        Bilder werden auf 48×48 verkleinert (~2 KB) und bleiben lokal.
+        {t("emoji.settings.sizeNote")}
       </p>
     </div>
   );
