@@ -362,13 +362,13 @@ export function SecuritySettings({
                       className="text-sm font-medium"
                       style={{ color: "var(--text)" }}
                     >
-                      Produktstatus
+                      {t("settings.productStatus")}
                     </h3>
                     <p
                       className="mt-0.5 text-xs"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Server- und Datenschutz-Gates für den produktiven Betrieb.
+                      {t("settings.productStatusDesc")}
                     </p>
                   </div>
                   {serverStatus ? (
@@ -386,7 +386,7 @@ export function SecuritySettings({
                       ) : (
                         <IconAlertTriangle size={14} />
                       )}
-                      {productionReady ? "Produktionsbereit" : "Härtung offen"}
+                      {productionReady ? t("settings.prodReady") : t("settings.hardeningOpen")}
                     </span>
                   ) : (
                     <span
@@ -394,7 +394,7 @@ export function SecuritySettings({
                       style={{ color: "var(--text-muted)" }}
                     >
                       <IconRefreshCw size={14} />
-                      Prüfe
+                      {t("settings.checking")}
                     </span>
                   )}
                 </div>
@@ -402,7 +402,7 @@ export function SecuritySettings({
                   <div className="space-y-2">
                     <StatusRow
                       ok={serverStatus.profile === "production"}
-                      label="Profil"
+                      label={t("settings.label.profile")}
                       value={serverStatus.profile}
                     />
                     <StatusRow
@@ -410,34 +410,34 @@ export function SecuritySettings({
                         serverStatus.state.mode === "persistent" &&
                         serverStatus.state.writable
                       }
-                      label="Server-State"
+                      label={t("settings.label.serverState")}
                       value={
                         serverStatus.state.mode === "persistent"
                           ? "persistent"
-                          : "flüchtig"
+                          : t("settings.val.ephemeral")
                       }
                     />
                     <StatusRow
                       ok={serverStatus.registration.mode !== "open"}
-                      label="Registrierung"
+                      label={t("settings.label.registration")}
                       value={serverStatus.registration.mode}
                     />
                     <StatusRow
                       ok={!serverStatus.privacy.urlTokenAuthEnabled}
-                      label="WebSocket-Token"
+                      label={t("settings.label.wsToken")}
                       value={
                         serverStatus.privacy.urlTokenAuthEnabled
-                          ? "URL erlaubt"
-                          : "nur Auth-Frame"
+                          ? t("settings.val.urlAllowed")
+                          : t("settings.val.authFrameOnly")
                       }
                     />
                     <StatusRow
                       ok={!serverStatus.privacy.messageContentPersistentOnServer}
-                      label="Server-Nachrichteninhalt"
+                      label={t("settings.label.serverMsgContent")}
                       value={
                         serverStatus.privacy.messageContentPersistentOnServer
-                          ? "persistiert"
-                          : "nicht persistiert"
+                          ? t("settings.val.persisted")
+                          : t("settings.val.notPersisted")
                       }
                     />
                   </div>
@@ -449,8 +449,8 @@ export function SecuritySettings({
                     }}
                   >
                     {serverStatusError
-                      ? `Status nicht verfügbar: ${serverStatusError}`
-                      : "Status wird geladen."}
+                      ? t("settings.statusUnavailable", { err: serverStatusError })
+                      : t("settings.statusLoading")}
                   </p>
                 )}
               </div>
@@ -466,11 +466,11 @@ export function SecuritySettings({
                   className="mb-2 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Erscheinungsbild
+                  {t("settings.appearance")}
                 </h3>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    Hell- / Dunkelmodus
+                    {t("settings.lightDark")}
                   </span>
                   <ThemeToggle />
                 </div>
@@ -905,7 +905,7 @@ export function SecuritySettings({
                     color: "var(--text-secondary)",
                   }}
                 >
-                  Jetzt sensiblen Arbeitsspeicher wischen
+                  {t("settings.wipeNow")}
                 </button>
 
                 <button
@@ -917,7 +917,7 @@ export function SecuritySettings({
                     color: "var(--text-secondary)",
                   }}
                 >
-                  Replay-Schutz zurücksetzen
+                  {t("settings.resetReplay")}
                 </button>
               </div>
 
@@ -929,11 +929,11 @@ export function SecuritySettings({
                   className="mb-2 text-sm font-medium"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  Status
+                  {t("settings.statusHeading")}
                 </h3>
                 <div className="space-y-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                  <p>Replay-Cache: {replayStats.stored} Einträge</p>
-                  <p>Zeitfenster: {(replayStats.windowMs / 60000).toFixed(0)} Min.</p>
+                  <p>{t("settings.replayCache", { n: replayStats.stored })}</p>
+                  <p>{t("settings.timeWindow", { n: (replayStats.windowMs / 60000).toFixed(0) })}</p>
                 </div>
               </div>
 
@@ -946,7 +946,7 @@ export function SecuritySettings({
                   }}
                 >
                   <p className="text-xs" style={{ color: "var(--danger)" }}>
-                    Extrem-Modus kann die Performance beeinträchtigen.
+                    {t("settings.extremePerf")}
                   </p>
                 </div>
               )}
