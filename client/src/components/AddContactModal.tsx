@@ -109,7 +109,7 @@ export function AddContactModal({
               Kontakt hinzufügen
             </h2>
             <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-              Suche nur nach Username. Keine Telefonnummer nötig.
+              Nur exakter Username (Datenschutz). Keine Telefonnummer nötig.
             </p>
           </div>
           <button
@@ -129,10 +129,10 @@ export function AddContactModal({
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Username suchen..."
+              placeholder="Exakten Username eingeben…"
               className="app-input w-full pr-10"
               autoFocus
-              aria-label="Kontakt nach Username suchen"
+              aria-label="Kontakt per exaktem Username finden"
             />
             {isSearching && (
               <span
@@ -144,7 +144,8 @@ export function AddContactModal({
             )}
           </div>
           <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
-            Mindestens {MIN_SEARCH_CHARS} Zeichen für die Suche eingeben.
+            Es wird nur der vollständige, exakte Username gefunden — das
+            Verzeichnis ist absichtlich nicht durchsuchbar.
           </p>
         </div>
 
@@ -160,15 +161,15 @@ export function AddContactModal({
         <div className="max-h-64 overflow-y-auto">
           {trimmedQuery.length < MIN_SEARCH_CHARS && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-              <p className="text-sm">Tippe mindestens {MIN_SEARCH_CHARS} Zeichen, um zu suchen.</p>
-              <p className="mt-1 text-xs">Registrierte Nutzer können direkt hinzugefügt werden.</p>
+              <p className="text-sm">Gib den exakten Username der Person ein.</p>
+              <p className="mt-1 text-xs">Du musst den Namen genau kennen — es gibt keine Vorschläge.</p>
             </div>
           )}
 
           {trimmedQuery.length >= MIN_SEARCH_CHARS && !isSearching && results.length === 0 && (
             <div className="py-8 text-center" style={{ color: "var(--text-muted)" }}>
-              <p className="text-sm">Keine Ergebnisse gefunden.</p>
-              <p className="mt-1 text-xs">Eigene Accounts werden nicht als Kontakt angezeigt.</p>
+              <p className="text-sm">Kein Nutzer mit genau diesem Username.</p>
+              <p className="mt-1 text-xs">Tippfehler? Der Username muss exakt übereinstimmen.</p>
             </div>
           )}
 

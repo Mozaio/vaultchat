@@ -635,7 +635,12 @@ app.get("/api/users", async (req, res) => {
   res.json({ users });
 });
 
-// Username-Suche: Nur Ergebnisse bei Mindestlänge 3, kein globales Directory.
+// Username-Suche: EXAKTER Match only (privacy by design, Signal/Session-Stil).
+// Kein Substring/Prefix-Browsing des Verzeichnisses — man muss den exakten
+// Username bereits kennen. Das verhindert Enumeration/Scraping des gesamten
+// Nutzerverzeichnisses (inkl. Public Keys). Da Usernames eindeutig sind,
+// liefert der exakte Match höchstens einen Treffer; dessen Public-Key
+// herauszugeben ist unkritisch, weil der Anfragende den Namen schon kannte.
 app.get("/api/users/search", searchLimiter, async (req, res) => {
   const t = bearer(req);
   if (!t || !verifyToken(t)) {
@@ -644,20 +649,16 @@ app.get("/api/users/search", searchLimiter, async (req, res) => {
   }
   const query = (req.query.q as string | undefined)?.trim().toLowerCase() ?? "";
   const currentUser = verifyToken(t);
-  
-  if (!query || query.length < 3) {
+
+  if (!query) {
     res.json({ users: [] });
     return;
   }
-  
-  // Suche nach Prefix-Match, max 10 Ergebnisse
-  const results = listUsersSafe()
-    .filter((u) => 
-      u.username.toLowerCase().includes(query) && 
-      u.id !== currentUser?.userId
-    )
-    .slice(0, 10);
-  
+
+  const results = listUsersSafe().filter(
+    (u) => u.username.toLowerCase() === query && u.id !== currentUser?.userId
+  );
+
   res.json({ users: results });
 });
 
