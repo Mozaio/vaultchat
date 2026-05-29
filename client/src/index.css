@@ -3073,6 +3073,68 @@ select:focus-visible {
   background: var(--accent-soft);
 }
 
+.row-badge-request {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-transform: none;
+}
+
+/*
+ * Avatar-Verpixelung für unbekannte / noch nicht akzeptierte Absender
+ * (Signal-Style "blur unknown sender avatars"). Da Umbra keine
+ * Profilfotos hat, verschleiern wir Gradient + Initiale, damit ein
+ * fremder Absender visuell klar als "unbekannt" markiert ist und kein
+ * (potenziell missbräuchlicher) Initialen-/Farb-Hinweis durchscheint.
+ */
+.avatar-blurred {
+  filter: blur(5px) saturate(0.6);
+  color: transparent !important;
+  position: relative;
+}
+
+.avatar-blurred::after {
+  content: "?";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  filter: none;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 700;
+}
+
+/* Message-request action bar (replaces the composer for unknown senders). */
+.request-bar {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--bg-elevated);
+}
+
+.request-bar-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.request-bar-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.request-bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
 .contact-preview.typing {
   color: var(--accent);
 }

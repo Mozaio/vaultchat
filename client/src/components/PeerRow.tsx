@@ -15,6 +15,8 @@ export function PeerRow({
   isPinned,
   isOnline,
   isTyping,
+  isRequest,
+  blurAvatar,
   onTogglePin,
   selected,
   onSelect,
@@ -28,6 +30,10 @@ export function PeerRow({
   isPinned?: boolean;
   isOnline?: boolean;
   isTyping?: boolean;
+  /** Pending message request from a not-yet-accepted sender. */
+  isRequest?: boolean;
+  /** Pixelate/blur the avatar (unknown, not-yet-accepted sender). */
+  blurAvatar?: boolean;
   onTogglePin?: () => void;
   selected: boolean;
   onSelect: () => void;
@@ -48,16 +54,26 @@ export function PeerRow({
       >
         <div className="peer-avatar-wrap">
           <div
-            className="contact-avatar !h-9 !w-9 !text-sm"
+            className={`contact-avatar !h-9 !w-9 !text-sm${
+              blurAvatar ? " avatar-blurred" : ""
+            }`}
             style={{ background: userGradient(u.id) }}
+            aria-label={blurAvatar ? t("requests.unknownSender") : undefined}
           >
             {u.username.slice(0, 1).toUpperCase()}
           </div>
-          {isOnline && <span className="peer-online-dot" aria-label={t("chat.online")} />}
+          {isOnline && !blurAvatar && (
+            <span className="peer-online-dot" aria-label={t("chat.online")} />
+          )}
         </div>
         <div className="contact-info min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="contact-name">{u.username}</span>
+            {isRequest && (
+              <span className="row-badge row-badge-request" title={t("requests.rowBadge")}>
+                {t("requests.rowBadge")}
+              </span>
+            )}
             {isPinned && (
               <span className="row-badge row-badge-pin" title={t("chat.pinnedToTop")}>
                 <IconPin size={11} />

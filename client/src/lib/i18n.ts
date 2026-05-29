@@ -2692,6 +2692,84 @@ const DICT: Record<string, Dict> = {
     zh: "已标记", hi: "तारांकित",
   },
 
+  // ── Message requests (Signal-style gate for unknown senders) ─────────
+  "requests.title": {
+    en: "Message requests", de: "Nachrichtenanfragen", tr: "Mesaj istekleri",
+    es: "Solicitudes de mensaje", fr: "Demandes de message",
+    pt: "Pedidos de mensagem", ru: "Запросы на переписку",
+    ar: "طلبات المراسلة", zh: "消息请求", hi: "संदेश अनुरोध",
+  },
+  "requests.entry": {
+    en: "Message requests", de: "Nachrichtenanfragen", tr: "Mesaj istekleri",
+    es: "Solicitudes", fr: "Demandes de message", pt: "Pedidos de mensagem",
+    ru: "Запросы", ar: "طلبات المراسلة", zh: "消息请求", hi: "संदेश अनुरोध",
+  },
+  "requests.entrySub": {
+    en: "{n} pending", de: "{n} ausstehend", tr: "{n} bekliyor",
+    es: "{n} pendientes", fr: "{n} en attente", pt: "{n} pendentes",
+    ru: "{n} в ожидании", ar: "{n} قيد الانتظار", zh: "{n} 个待处理",
+    hi: "{n} लंबित",
+  },
+  "requests.empty": {
+    en: "No message requests", de: "Keine Nachrichtenanfragen",
+    tr: "Mesaj isteği yok", es: "Sin solicitudes de mensaje",
+    fr: "Aucune demande de message", pt: "Sem pedidos de mensagem",
+    ru: "Нет запросов на переписку", ar: "لا توجد طلبات مراسلة",
+    zh: "没有消息请求", hi: "कोई संदेश अनुरोध नहीं",
+  },
+  "requests.rowBadge": {
+    en: "Request", de: "Anfrage", tr: "İstek", es: "Solicitud",
+    fr: "Demande", pt: "Pedido", ru: "Запрос", ar: "طلب", zh: "请求",
+    hi: "अनुरोध",
+  },
+  "requests.bannerTitle": {
+    en: "{name} wants to message you", de: "{name} möchte dir schreiben",
+    tr: "{name} sana mesaj göndermek istiyor",
+    es: "{name} quiere enviarte un mensaje",
+    fr: "{name} veut vous écrire", pt: "{name} quer enviar-lhe uma mensagem",
+    ru: "{name} хочет вам написать", ar: "{name} يريد مراسلتك",
+    zh: "{name} 想给你发消息", hi: "{name} आपको संदेश भेजना चाहता है",
+  },
+  "requests.bannerText": {
+    en: "This person isn't in your contacts. Accept to reply, or block them.",
+    de: "Diese Person ist nicht in deinen Kontakten. Annehmen zum Antworten oder blockieren.",
+    tr: "Bu kişi kişilerinde değil. Yanıtlamak için kabul et veya engelle.",
+    es: "Esta persona no está en tus contactos. Acepta para responder o bloquéala.",
+    fr: "Cette personne n'est pas dans vos contacts. Acceptez pour répondre ou bloquez-la.",
+    pt: "Esta pessoa não está nos seus contactos. Aceite para responder ou bloqueie.",
+    ru: "Этого человека нет в ваших контактах. Примите, чтобы ответить, или заблокируйте.",
+    ar: "هذا الشخص ليس في جهات اتصالك. اقبل للرد أو احظره.",
+    zh: "此人不在你的联系人中。接受以回复，或将其屏蔽。",
+    hi: "यह व्यक्ति आपके संपर्कों में नहीं है। उत्तर देने के लिए स्वीकार करें, या ब्लॉक करें।",
+  },
+  "requests.accept": {
+    en: "Accept", de: "Annehmen", tr: "Kabul et", es: "Aceptar",
+    fr: "Accepter", pt: "Aceitar", ru: "Принять", ar: "قبول", zh: "接受",
+    hi: "स्वीकारें",
+  },
+  "requests.block": {
+    en: "Block", de: "Blockieren", tr: "Engelle", es: "Bloquear",
+    fr: "Bloquer", pt: "Bloquear", ru: "Заблокировать", ar: "حظر",
+    zh: "屏蔽", hi: "ब्लॉक करें",
+  },
+  "requests.delete": {
+    en: "Delete", de: "Löschen", tr: "Sil", es: "Eliminar", fr: "Supprimer",
+    pt: "Eliminar", ru: "Удалить", ar: "حذف", zh: "删除", hi: "हटाएं",
+  },
+  "requests.notif": {
+    en: "New message request", de: "Neue Nachrichtenanfrage",
+    tr: "Yeni mesaj isteği", es: "Nueva solicitud de mensaje",
+    fr: "Nouvelle demande de message", pt: "Novo pedido de mensagem",
+    ru: "Новый запрос на переписку", ar: "طلب مراسلة جديد",
+    zh: "新的消息请求", hi: "नया संदेश अनुरोध",
+  },
+  "requests.unknownSender": {
+    en: "Unknown sender", de: "Unbekannter Absender", tr: "Bilinmeyen gönderen",
+    es: "Remitente desconocido", fr: "Expéditeur inconnu",
+    pt: "Remetente desconhecido", ru: "Неизвестный отправитель",
+    ar: "مرسل غير معروف", zh: "未知发件人", hi: "अज्ञात प्रेषक",
+  },
+
   // ── Add contact ───────────────────────────────────────────────────
   "addc.title": {
     en: "Add contact", de: "Kontakt hinzufügen", tr: "Kişi ekle",

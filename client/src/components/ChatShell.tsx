@@ -20,6 +20,7 @@ import {
   idbDeleteDm,
   idbDeleteGroupMsg,
   idbListDm,
+  idbListDmPeerIds,
   idbListGroup,
   idbPutDm,
   idbPutGroupMsg,
@@ -150,6 +151,7 @@ type SidebarFilter =
   | "fav"
   | "unread"
   | "star"
+  | "requests"
   | `folder:${string}`;
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
 
@@ -298,6 +300,16 @@ export function ChatShell({
   );
   const [blockedPeers, setBlockedPeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.blocked.peers")
+  );
+  // Message requests (Signal-style gate): a peer is "accepted" once the user
+  // has engaged (added them, sent them a message, or explicitly accepted a
+  // request). The first DM from a not-yet-accepted, not-blocked sender lands
+  // in the requests area instead of the main chat list.
+  const [acceptedPeers, setAcceptedPeers] = useState<Set<string>>(
+    () => loadStringSet("vaultchat.accepted.peers")
+  );
+  const [requestPeers, setRequestPeers] = useState<Set<string>>(
+    () => loadStringSet("vaultchat.requests.peers")
   );
   // Online status tracking
   const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
@@ -457,6 +469,11 @@ export function ChatShell({
   const groupRef = useRef<api.ApiGroup | null>(null);
   const usersRef = useRef<api.ApiUser[]>([]);
   const groupsRef = useRef<api.ApiGroup[]>([]);
+  // Live mirrors so the WS handler closure always sees current acceptance
+  // state without re-subscribing the socket on every set change.
+  const acceptedPeersRef = useRef<Set<string>>(acceptedPeers);
+  const blockedPeersRef = useRef<Set<string>>(blockedPeers);
+  const requestPeersRef = useRef<Set<string>>(requestPeers);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const groupTypingClearTimers = useRef<
     Map<string, ReturnType<typeof setTimeout>>
@@ -508,6 +525,9 @@ export function ChatShell({
   groupRef.current = group;
   usersRef.current = users;
   groupsRef.current = groups;
+  acceptedPeersRef.current = acceptedPeers;
+  blockedPeersRef.current = blockedPeers;
+  requestPeersRef.current = requestPeers;
   tokenRef.current = session.token;
 
   useEffect(() => {
@@ -716,14 +736,48 @@ export function ChatShell({
     }
   }, [session.token, session.user.id]);
 
-  // Load only contacts from local messages (not from server)
+  // Load contacts from local DM history (persisted at rest), unioned with the
+  // in-memory set, plus any pending request senders / accepted peers so they
+  // survive a reload. `peerId` is an unencrypted index field, so enumerating
+  // it does not require the local key.
   const loadContacts = useCallback(async () => {
-    // Only show contacts we've exchanged messages with (from local storage)
-    const contactIds = Array.from(rawDmRef.current.keys());
+    const localIds = await idbListDmPeerIds().catch(() => [] as string[]);
+    const contactIds = Array.from(
+      new Set<string>([
+        ...rawDmRef.current.keys(),
+        ...localIds,
+        ...requestPeersRef.current,
+        ...acceptedPeersRef.current,
+      ])
+    ).filter((id) => id && id !== session.user.id);
+
+    // One-time migration: before this feature shipped there was no concept of
+    // "accepted". Treat every pre-existing conversation as accepted so we never
+    // dump established chats into the requests area on upgrade.
+    try {
+      if (!localStorage.getItem("vaultchat.requests.migrated")) {
+        if (localIds.length > 0) {
+          setAcceptedPeers((prev) => {
+            const next = new Set(prev);
+            for (const id of localIds) if (id !== session.user.id) next.add(id);
+            saveStringSet("vaultchat.accepted.peers", next);
+            return next;
+          });
+        }
+        localStorage.setItem("vaultchat.requests.migrated", "1");
+      }
+    } catch {
+      /* localStorage unavailable — skip migration flag */
+    }
+
+    if (contactIds.length === 0) {
+      setUsers([]);
+      return;
+    }
     const { users: list } = await api.listUsers(session.token, contactIds);
     const contacts = list.filter((u) => contactIds.includes(u.id));
     setUsers(contacts);
-    
+
     // Also observe peer keys for contacts
     for (const u of contacts) {
       try {
@@ -732,7 +786,92 @@ export function ChatShell({
         /* ignore */
       }
     }
-  }, [session.token]);
+  }, [session.token, session.user.id]);
+
+  /** Content kinds that constitute a real, user-visible incoming message
+   *  (as opposed to receipts, typing, key distribution, etc.) and therefore
+   *  trigger a message request from an unknown sender. */
+  const isRequestContentKind = useCallback((kind: string | undefined) => {
+    return (
+      kind === "text" ||
+      kind === "file" ||
+      kind === "voice" ||
+      kind === "poll" ||
+      kind === "system"
+    );
+  }, []);
+
+  /** Mark a peer as accepted (engaged): remove from requests, add to accepted. */
+  const markAccepted = useCallback((userId: string) => {
+    setAcceptedPeers((prev) => {
+      if (prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.add(userId);
+      saveStringSet("vaultchat.accepted.peers", next);
+      return next;
+    });
+    setRequestPeers((prev) => {
+      if (!prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.delete(userId);
+      saveStringSet("vaultchat.requests.peers", next);
+      return next;
+    });
+  }, []);
+
+  /** Record a pending message request from an unknown sender. */
+  const addRequestPeer = useCallback((userId: string) => {
+    setRequestPeers((prev) => {
+      if (prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.add(userId);
+      saveStringSet("vaultchat.requests.peers", next);
+      return next;
+    });
+  }, []);
+
+  /** Block a requesting sender and drop them from the requests area. */
+  const blockRequestPeer = useCallback((userId: string) => {
+    setBlockedPeers((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      saveStringSet("vaultchat.blocked.peers", next);
+      return next;
+    });
+    setRequestPeers((prev) => {
+      if (!prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.delete(userId);
+      saveStringSet("vaultchat.requests.peers", next);
+      return next;
+    });
+  }, []);
+
+  /** Delete a request conversation entirely without accepting. If the sender
+   *  writes again it will surface as a fresh request. */
+  const deleteRequestConversation = useCallback(async (userId: string) => {
+    const rows = rawDmRef.current.get(userId) ?? [];
+    for (const r of rows) await idbDeleteDm(r.id).catch(() => {});
+    rawDmRef.current.delete(userId);
+    setRequestPeers((prev) => {
+      if (!prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.delete(userId);
+      saveStringSet("vaultchat.requests.peers", next);
+      return next;
+    });
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    setUnreadByPeer((m) => {
+      if (!(userId in m)) return m;
+      const copy = { ...m };
+      delete copy[userId];
+      return copy;
+    });
+    if (peerRef.current?.id === userId) {
+      setPeer(null);
+      setInfoOpen(false);
+    }
+  }, []);
 
   const loadGroups = useCallback(async () => {
     const { groups: g } = await api.listGroups(session.token);
@@ -1176,6 +1315,11 @@ export function ChatShell({
         });
         rawDmRef.current.set(toUser.id, arr);
         if (peerRef.current?.id === toUser.id) rebuildDm(toUser.id);
+        // Sending a real message to someone implies accepting them — keep them
+        // out of the requests area. Receipts/typing (suppressLocal) don't count.
+        if (toUser.id !== session.user.id && isRequestContentKind(payload.kind)) {
+          markAccepted(toUser.id);
+        }
       }
 
       await outboxAdd(cid, toUser.id, envelope);
@@ -1190,7 +1334,15 @@ export function ChatShell({
       coverRef.current?.markRealActivity();
       return tmpId;
     },
-    [session.secretKey, session.user.id, rebuildDm, refreshPendingCount, blockedPeers]
+    [
+      session.secretKey,
+      session.user.id,
+      rebuildDm,
+      refreshPendingCount,
+      blockedPeers,
+      isRequestContentKind,
+      markAccepted,
+    ]
   );
 
   const commitForward = useCallback(async () => {
@@ -1753,10 +1905,27 @@ export function ChatShell({
             });
             rawDmRef.current.set(peerUser.id, arr);
             if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
+
+            // Message request gate: a real message from a sender we haven't
+            // accepted (and haven't blocked) surfaces in the requests area,
+            // not the main chat list. Group-key/receipt/typing frames don't
+            // count — only user-visible content does.
+            const isUnacceptedSender =
+              !acceptedPeersRef.current.has(peerUser.id) &&
+              !blockedPeersRef.current.has(peerUser.id);
+            if (isUnacceptedSender && isRequestContentKind(plain.kind)) {
+              addRequestPeer(peerUser.id);
+            }
+
             // Update unread (if chat not currently open).
             if (peerRef.current?.id !== peerUser.id) {
               if (!mutedPeers.has(peerUser.id)) {
-                maybeNotify(peerUser.username, previewForPayload(plain));
+                maybeNotify(
+                  peerUser.username,
+                  isUnacceptedSender
+                    ? t("requests.notif")
+                    : previewForPayload(plain)
+                );
               }
               void (async () => {
                 const seenRaw = await metaGet(`seen:dm:${peerUser.id}`).catch(
@@ -1772,7 +1941,14 @@ export function ChatShell({
               })();
             }
 
-            if (sendReadReceipts && plain.kind !== "receipt" && plain.cid) {
+            // Privacy: do NOT auto-acknowledge (read/delivered) to a sender we
+            // haven't accepted — that would confirm activity to a stranger.
+            if (
+              sendReadReceipts &&
+              plain.kind !== "receipt" &&
+              plain.cid &&
+              acceptedPeersRef.current.has(peerUser.id)
+            ) {
               const receipt: PlainPayload = {
                 v: 2,
                 cid: newCid(),
@@ -3211,10 +3387,31 @@ export function ChatShell({
     return folders.find((f) => f.id === id) ?? null;
   }, [sidebarFilter, folders]);
 
+  // Pending message requests: unknown senders we haven't accepted or blocked.
+  const requestPeerIds = useMemo(() => {
+    const out = new Set<string>();
+    for (const id of requestPeers) {
+      if (!acceptedPeers.has(id) && !blockedPeers.has(id)) out.add(id);
+    }
+    return out;
+  }, [requestPeers, acceptedPeers, blockedPeers]);
+
+  const requestUsers = useMemo(
+    () =>
+      [...filteredUsers.filter((u) => requestPeerIds.has(u.id))].sort((a, b) => {
+        const ta = lastDmPreviewByPeer.get(a.id)?.at ?? 0;
+        const tb = lastDmPreviewByPeer.get(b.id)?.at ?? 0;
+        return tb - ta;
+      }),
+    [filteredUsers, requestPeerIds, lastDmPreviewByPeer]
+  );
+
   const visibleUsers = useMemo(() => {
     let arr: api.ApiUser[];
     if (sidebarFilter === "group") return [];
-    if (sidebarFilter === "fav") {
+    if (sidebarFilter === "requests") {
+      arr = filteredUsers.filter((u) => requestPeerIds.has(u.id));
+    } else if (sidebarFilter === "fav") {
       arr = filteredUsers.filter((u) => favoritePeers.has(u.id));
     } else if (sidebarFilter === "unread") {
       arr = filteredUsers.filter((u) => (unreadByPeer[u.id] ?? 0) > 0);
@@ -3225,6 +3422,10 @@ export function ChatShell({
       arr = filteredUsers.filter((u) => keys.has(`dm:${u.id}`));
     } else {
       arr = filteredUsers;
+    }
+    // Outside the requests view, pending requests never pollute the list.
+    if (sidebarFilter !== "requests") {
+      arr = arr.filter((u) => !requestPeerIds.has(u.id));
     }
     // sort: pinned first, then by recency
     return [...arr].sort((a, b) => {
@@ -3244,10 +3445,16 @@ export function ChatShell({
     lastDmPreviewByPeer,
     peersWithStars,
     activeFolder,
+    requestPeerIds,
   ]);
 
   const visibleGroups = useMemo(() => {
-    if (sidebarFilter === "dm" || sidebarFilter === "unread" || sidebarFilter === "fav")
+    if (
+      sidebarFilter === "dm" ||
+      sidebarFilter === "unread" ||
+      sidebarFilter === "fav" ||
+      sidebarFilter === "requests"
+    )
       return [];
     if (sidebarFilter === "star")
       return filteredGroups.filter((g) => groupsWithStars.has(g.id));
@@ -3302,6 +3509,7 @@ export function ChatShell({
   const peerList = useMemo(() => {
     return visibleUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
+      const isReq = requestPeerIds.has(u.id);
       const subtitle =
         peer?.id === u.id && typing
           ? t("chat.typing")
@@ -3322,6 +3530,8 @@ export function ChatShell({
           isBlocked={blockedPeers.has(u.id)}
           isPinned={pinnedPeers.has(u.id)}
           isOnline={onlinePeers.has(u.id)}
+          isRequest={isReq}
+          blurAvatar={isReq}
           onTogglePin={() => togglePinPeer(u.id)}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
@@ -3344,6 +3554,7 @@ export function ChatShell({
     blockedPeers,
     pinnedPeers,
     onlinePeers,
+    requestPeerIds,
     togglePinPeer,
     fmtListTime,
   ]);
@@ -3866,6 +4077,7 @@ export function ChatShell({
           sidebarFilter === "dm" ||
           sidebarFilter === "unread" ||
           sidebarFilter === "star" ||
+          sidebarFilter === "requests" ||
           activeFolder !== null) && (
           <>
             <div
@@ -3875,6 +4087,26 @@ export function ChatShell({
                   : "flex-1"
               }`}
             >
+              {sidebarFilter === "requests" && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarFilter("all")}
+                  className="contact-item w-full !mx-0"
+                >
+                  <div
+                    className="contact-avatar !h-9 !w-9"
+                    style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}
+                  >
+                    ←
+                  </div>
+                  <div className="contact-info min-w-0">
+                    <span className="contact-name">{t("requests.title")}</span>
+                    <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
+                      {t("common.back")}
+                    </p>
+                  </div>
+                </button>
+              )}
               {(sidebarFilter === "all" || sidebarFilter === "dm") && (
                 <button
                   type="button"
@@ -3910,6 +4142,40 @@ export function ChatShell({
                     </p>
                   </div>
                 </button>
+              )}
+              {(sidebarFilter === "all" || sidebarFilter === "dm") &&
+                requestUsers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarFilter("requests")}
+                    className="contact-item w-full !mx-0"
+                  >
+                    <div
+                      className="contact-avatar !h-9 !w-9"
+                      style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                    >
+                      <IconBell size={16} />
+                    </div>
+                    <div className="contact-info min-w-0">
+                      <span className="contact-name">{t("requests.entry")}</span>
+                      <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
+                        {t("requests.entrySub", { n: requestUsers.length })}
+                      </p>
+                    </div>
+                    <div className="contact-meta">
+                      <span className="unread-badge">
+                        {requestUsers.length > 99 ? "99+" : requestUsers.length}
+                      </span>
+                    </div>
+                  </button>
+                )}
+              {sidebarFilter === "requests" && requestUsers.length === 0 && (
+                <p
+                  className="px-3 py-6 text-center text-sm"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t("requests.empty")}
+                </p>
               )}
               {peerList}
               {query.trim().length > 0 &&
@@ -4386,13 +4652,20 @@ export function ChatShell({
                   >
                     <div className="header-avatar-wrap">
                       <div
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md"
+                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md${
+                          requestPeerIds.has(peer.id) ? " avatar-blurred" : ""
+                        }`}
                         style={{
                           background:
                             peer.id === session.user.id
                               ? "var(--accent)"
                               : userGradient(peer.id),
                         }}
+                        aria-label={
+                          requestPeerIds.has(peer.id)
+                            ? t("requests.unknownSender")
+                            : undefined
+                        }
                       >
                         {peer.id === session.user.id ? (
                           <IconBookmark size={16} />
@@ -4400,13 +4673,14 @@ export function ChatShell({
                           peer.username.slice(0, 1).toUpperCase()
                         )}
                       </div>
-                      {peer.id !== session.user.id && (
-                        <span
-                          className={`header-online-dot${
-                            onlinePeers.has(peer.id) ? " online" : ""
-                          }`}
-                        />
-                      )}
+                      {peer.id !== session.user.id &&
+                        !requestPeerIds.has(peer.id) && (
+                          <span
+                            className={`header-online-dot${
+                              onlinePeers.has(peer.id) ? " online" : ""
+                            }`}
+                          />
+                        )}
                     </div>
                     <div className="header-identity-text min-w-0">
                       <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
@@ -4801,6 +5075,42 @@ export function ChatShell({
               {/* Typing-Indikator wird nun im Chat-Header angezeigt */}
             </div>
 
+            {requestPeerIds.has(peer.id) ? (
+              <footer className="chat-input-area !flex-col !items-stretch !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
+                <div className="request-bar">
+                  <p className="request-bar-title">
+                    {t("requests.bannerTitle", { name: peer.username })}
+                  </p>
+                  <p className="request-bar-text">{t("requests.bannerText")}</p>
+                  <div className="request-bar-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary !text-xs !text-[var(--danger)]"
+                      onClick={() => blockRequestPeer(peer.id)}
+                    >
+                      {t("requests.block")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary !text-xs"
+                      onClick={() => {
+                        const id = peer.id;
+                        void deleteRequestConversation(id);
+                      }}
+                    >
+                      {t("requests.delete")}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary !text-xs"
+                      onClick={() => markAccepted(peer.id)}
+                    >
+                      {t("requests.accept")}
+                    </button>
+                  </div>
+                </div>
+              </footer>
+            ) : (
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
               {error && (
                 <p className="mb-2 text-sm" style={{ color: "var(--danger)" }}>
@@ -5076,6 +5386,7 @@ export function ChatShell({
                 )}
               </div>
             </footer>
+            )}
           </>
         )}
 
@@ -6331,6 +6642,8 @@ export function ChatShell({
             if (prev.find((u) => u.id === user.id)) return prev;
             return [...prev, user];
           });
+          // Adding a contact deliberately = accepting them.
+          markAccepted(user.id);
           void observePeerKey(user.id, user.publicKey);
           setTab("dm");
           setPeer(user);

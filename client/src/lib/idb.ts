@@ -195,6 +195,33 @@ export async function idbListDm(peerId: string): Promise<StoredDmMessage[]> {
   return results.sort((a, b) => a.at - b.at);
 }
 
+/**
+ * Listet die eindeutigen Peer-IDs auf, mit denen DM-History existiert.
+ * `peerId` liegt unverschlüsselt im Record (Index-Metadatum), daher braucht
+ * dieser Aufruf KEINEN Local-Key — er funktioniert auch, um die Kontaktliste
+ * vor dem Entsperren zu rekonstruieren, und ist günstig (keine Krypto).
+ */
+export async function idbListDmPeerIds(): Promise<string[]> {
+  const db = await openDb();
+  const ids = await new Promise<Set<string>>((resolve, reject) => {
+    const out = new Set<string>();
+    const tx = db.transaction("dm", "readonly");
+    const req = tx.objectStore("dm").openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(out);
+        return;
+      }
+      const v = c.value as DmRecord;
+      if (v.peerId) out.add(v.peerId);
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  return Array.from(ids);
+}
+
 export async function idbListAllDm(): Promise<StoredDmMessage[]> {
   assertKey();
   const db = await openDb();
