@@ -3167,14 +3167,14 @@ export function ChatShell({
       )}
       {forwardTarget && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
           onClick={() => {
             setForwardTarget(null);
             setForwardPick(new Set());
           }}
         >
           <div
-            className="app-surface w-full max-w-md rounded-2xl p-6 shadow-xl"
+            className="app-surface u-modal-card w-full max-w-md rounded-2xl p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between gap-2">
@@ -5791,9 +5791,9 @@ export function ChatShell({
 
       {/* Mobile info drawer */}
       {isMobile && infoOpen && showConversation && (
-        <div className="fixed inset-0 z-50 bg-black/50 p-3" onClick={() => setInfoOpen(false)}>
+        <div className="u-modal-overlay fixed inset-0 z-50 bg-black/50 p-3" onClick={() => setInfoOpen(false)}>
           <div
-            className="app-surface ml-auto h-full w-full max-w-sm overflow-y-auto rounded-2xl p-4"
+            className="app-surface u-modal-sheet-right ml-auto h-full w-full max-w-sm overflow-y-auto rounded-2xl p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">

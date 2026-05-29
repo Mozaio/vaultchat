@@ -226,9 +226,9 @@ export function SecuritySettings({
     (import.meta.env.VITE_APP_VERSION as string | undefined)?.trim() || "1.0.0";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div
-        className="app-surface flex max-h-[min(90vh,720px)] w-full max-w-lg flex-col rounded-2xl p-0 shadow-xl"
+        className="app-surface u-modal-card flex max-h-[min(90vh,720px)] w-full max-w-lg flex-col rounded-2xl p-0 shadow-xl"
         role="dialog"
         aria-labelledby="settings-title"
       >

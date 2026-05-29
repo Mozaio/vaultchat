@@ -97,14 +97,14 @@ export function FoldersManageModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="folders-modal-title"
     >
       <div
-        className="app-surface w-full max-w-md rounded-2xl p-5"
+        className="app-surface u-modal-card w-full max-w-md rounded-2xl p-5"
         onClick={(e) => e.stopPropagation()}
         style={{ maxHeight: "85vh", display: "flex", flexDirection: "column" }}
       >

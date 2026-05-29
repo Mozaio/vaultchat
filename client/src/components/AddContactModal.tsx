@@ -95,11 +95,11 @@ export function AddContactModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={handleClose}
     >
       <div
-        className="app-surface w-full max-w-md rounded-2xl p-6"
+        className="app-surface u-modal-card w-full max-w-md rounded-2xl p-6"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

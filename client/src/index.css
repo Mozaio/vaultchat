@@ -7545,3 +7545,65 @@ button:focus-visible,
 
 /* End VAULTCHAT v6 */
 /* End VAULTCHAT v5 */
+
+/* ============================================================
+   v7 — Modal entrance polish
+   Subtle fade for the dim backdrop + a soft pop for the card,
+   so dialogs feel placed rather than snapped in. The global
+   prefers-reduced-motion guard above already collapses these
+   durations to ~0 for vestibular-sensitive users.
+   ============================================================ */
+@keyframes umbraOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes umbraCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Onboarding overlay (semantic classes) */
+.onboarding-overlay {
+  animation: umbraOverlayIn 0.18s ease both;
+}
+.onboarding-card {
+  animation: umbraCardIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Shared entrance utilities for the Tailwind-built modals
+   (add-contact, shortcuts help, folders, safety number). */
+.u-modal-overlay {
+  animation: umbraOverlayIn 0.18s ease both;
+}
+.u-modal-card {
+  animation: umbraCardIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Right-edge sheet (mobile details panel) slides in from the side
+   rather than popping from center. */
+@keyframes umbraSheetInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.u-modal-sheet-right {
+  animation: umbraSheetInRight 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* End VAULTCHAT v7 */

@@ -13,14 +13,14 @@ export function ShortcutsHelpModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="shortcuts-help-title"
     >
       <div
-        className="app-surface w-full max-w-md rounded-2xl p-5"
+        className="app-surface u-modal-card w-full max-w-md rounded-2xl p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between gap-2">

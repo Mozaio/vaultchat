@@ -69,13 +69,13 @@ export function SafetyNumberDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="safety-number-title"
     >
-      <div className="safety-number-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="safety-number-dialog u-modal-card" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="header">
           <div>
