@@ -47,7 +47,40 @@ function Spoiler({ children }: { children: ReactNode }) {
   );
 }
 
+/** Fenced multi-line code block: ```[lang]\n…\n``` */
+const FENCE = /```[ \t]*[A-Za-z0-9+#.-]*\n([\s\S]*?)```/g;
+
 export function renderInlineMarkdown(text: string): ReactNode[] {
+  if (!text) return [];
+  // Phase 1: carve out fenced code blocks; inline-render everything between
+  // them. The common case (no fences) returns inline output unchanged.
+  let last = 0;
+  let fkey = 0;
+  const blocks: ReactNode[] = [];
+  for (const m of text.matchAll(FENCE)) {
+    const idx = m.index ?? 0;
+    if (idx > last) {
+      blocks.push(
+        <span key={`s${fkey++}`}>{renderInline(text.slice(last, idx))}</span>
+      );
+    }
+    blocks.push(
+      <pre key={`p${fkey++}`} className="md-pre">
+        <code>{m[1].replace(/\n$/, "")}</code>
+      </pre>
+    );
+    last = idx + m[0].length;
+  }
+  if (last === 0) return renderInline(text);
+  if (last < text.length) {
+    blocks.push(
+      <span key={`s${fkey++}`}>{renderInline(text.slice(last))}</span>
+    );
+  }
+  return blocks;
+}
+
+function renderInline(text: string): ReactNode[] {
   if (!text) return [];
   const out: ReactNode[] = [];
   let lastIdx = 0;

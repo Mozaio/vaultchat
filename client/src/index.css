@@ -7672,6 +7672,26 @@ button:focus-visible,
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* Fenced code block (```…```). */
+.md-pre {
+  margin: 0.4rem 0;
+  padding: 0.55rem 0.7rem;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow-x: auto;
+  white-space: pre;
+  font-size: 0.82em;
+  line-height: 1.45;
+}
+.md-pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    monospace;
+  white-space: pre;
+  background: none;
+  padding: 0;
+}
+
 /* Spoiler (||text||) — blacked out until clicked/activated (Discord-style). */
 .md-spoiler {
   background-color: var(--text);
