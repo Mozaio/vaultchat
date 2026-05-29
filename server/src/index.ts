@@ -1,4 +1,4 @@
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
@@ -93,14 +93,33 @@ const connectSrc = [
   ...apiOrigins,
   ...(process.env.NODE_ENV === "production" ? ["wss:"] : ["ws:", "wss:"]),
 ];
-const corsOrigin =
-  corsOrigins.length === 0
-    ? process.env.NODE_ENV === "production"
-      ? false
-      : true
-    : corsOrigins.length === 1
-      ? corsOrigins[0]
-      : corsOrigins;
+// The Tauri desktop app serves its bundled UI from a local WebView origin —
+// WebView2 (Windows) uses http(s)://tauri.localhost, macOS/Linux use
+// tauri://localhost. It is a first-party client, so its fixed origins are
+// always permitted. This is NOT a wildcard: arbitrary web origins still must
+// be listed in VAULTCHAT_CORS_ORIGIN.
+const DESKTOP_ORIGINS = new Set<string>([
+  "tauri://localhost",
+  "http://tauri.localhost",
+  "https://tauri.localhost",
+]);
+function isDesktopOrigin(origin: string): boolean {
+  if (DESKTOP_ORIGINS.has(origin)) return true;
+  try {
+    return new URL(origin).hostname === "tauri.localhost";
+  } catch {
+    return false;
+  }
+}
+const corsAllow = new Set<string>(corsOrigins);
+const corsOrigin: CorsOptions["origin"] =
+  process.env.NODE_ENV === "production"
+    ? (origin, cb) => {
+        // No Origin header (same-origin, health checks, server-to-server).
+        if (!origin) return cb(null, true);
+        cb(null, corsAllow.has(origin) || isDesktopOrigin(origin));
+      }
+    : true;
 
 app.set("trust proxy", 1);
 app.use(
