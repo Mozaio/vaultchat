@@ -375,7 +375,7 @@ export function SecuritySettings({
                   <p
                     className="text-xs"
                     style={{
-                      color: serverStatusError ? "#fca5a5" : "var(--text-muted)",
+                      color: serverStatusError ? "var(--danger)" : "var(--text-muted)",
                     }}
                   >
                     {serverStatusError
@@ -724,7 +724,7 @@ export function SecuritySettings({
                   </p>
                 ) : (
                   <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    <strong style={{ color: "#ef4444" }}>Extrem:</strong>{" "}
+                    <strong style={{ color: "var(--danger)" }}>Extrem:</strong>{" "}
                     Aggressives Wiping, häufiger Speicher-Zyklen.
                   </p>
                 )}
@@ -811,11 +811,11 @@ export function SecuritySettings({
                 <div
                   className="rounded-lg p-3"
                   style={{
-                    background: "rgba(127, 29, 29, 0.3)",
-                    border: "1px solid rgba(127, 29, 29, 0.5)",
+                    background: "var(--danger-soft)",
+                    border: "1px solid var(--danger)",
                   }}
                 >
-                  <p className="text-xs" style={{ color: "#fca5a5" }}>
+                  <p className="text-xs" style={{ color: "var(--danger)" }}>
                     Extrem-Modus kann die Performance beeinträchtigen.
                   </p>
                 </div>
@@ -923,12 +923,12 @@ function AccountDangerZone() {
     <div
       className="rounded-xl border p-4"
       style={{
-        borderColor: "rgba(220, 38, 38, 0.4)",
-        background: "rgba(127, 29, 29, 0.08)",
+        borderColor: "var(--danger)",
+        background: "var(--danger-soft)",
         marginTop: "1.5rem",
       }}
     >
-      <p className="text-sm font-semibold" style={{ color: "#fca5a5" }}>
+      <p className="text-sm font-semibold" style={{ color: "var(--danger)" }}>
         Gefahrenzone
       </p>
       <p className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>
@@ -940,7 +940,7 @@ function AccountDangerZone() {
         <button
           type="button"
           className="mt-3 rounded-lg px-3 py-2 text-sm font-medium"
-          style={{ background: "rgba(220, 38, 38, 0.2)", color: "#fca5a5", border: "1px solid rgba(220, 38, 38, 0.5)" }}
+          style={{ background: "var(--danger-soft)", color: "var(--danger)", border: "1px solid var(--danger)" }}
           onClick={() => setConfirming(true)}
         >
           Account löschen …
@@ -948,7 +948,7 @@ function AccountDangerZone() {
       ) : (
         <div className="mt-3 space-y-2">
           <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            Tippe <code style={{ color: "#fca5a5" }}>{requiredPhrase}</code> um zu bestätigen:
+            Tippe <code style={{ color: "var(--danger)" }}>{requiredPhrase}</code> um zu bestätigen:
           </p>
           <input
             type="text"
@@ -965,7 +965,7 @@ function AccountDangerZone() {
             disabled={busy}
           />
           {error && (
-            <p className="text-xs" style={{ color: "#fca5a5" }}>
+            <p className="text-xs" style={{ color: "var(--danger)" }}>
               Fehler: {error}
             </p>
           )}
@@ -986,7 +986,7 @@ function AccountDangerZone() {
             <button
               type="button"
               className="flex-1 rounded-lg px-3 py-2 text-sm font-medium"
-              style={{ background: "rgb(220, 38, 38)", color: "white" }}
+              style={{ background: "var(--danger)", color: "white" }}
               onClick={() => void handleDelete()}
               disabled={busy || typed !== requiredPhrase}
             >
@@ -1275,7 +1275,7 @@ function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: st
         {ok ? (
           <IconCheck size={14} style={{ color: "var(--accent)", flexShrink: 0 }} />
         ) : (
-          <IconAlertTriangle size={14} style={{ color: "#f59e0b", flexShrink: 0 }} />
+          <IconAlertTriangle size={14} style={{ color: "var(--warning)", flexShrink: 0 }} />
         )}
         <span className="truncate">{label}</span>
       </span>
