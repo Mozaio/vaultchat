@@ -275,6 +275,10 @@ function ScreenPreview({ stream }: { stream: MediaStream }) {
       autoPlay
       muted
       playsInline
+      title="Klicken für Vollbild"
+      onClick={() => {
+        void ref.current?.requestFullscreen?.().catch(() => {});
+      }}
     />
   );
 }

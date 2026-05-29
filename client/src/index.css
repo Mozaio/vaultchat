@@ -6898,6 +6898,13 @@ button:focus-visible,
   max-height: 220px;
   object-fit: contain;
   background: #000;
+  cursor: zoom-in;
+}
+.group-call-screen-video:fullscreen {
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  cursor: auto;
 }
 .group-call-screen-badge {
   position: absolute;
