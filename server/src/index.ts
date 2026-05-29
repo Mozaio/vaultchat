@@ -173,6 +173,18 @@ const groupLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+// Prekey fetches consume a one-time key per call (Olm needs an OTK to start
+// a session). An unbounded loop could drain a victim's OTK pool and block
+// new sessions (DoS). 120/min/IP is generous for legitimate bulk session
+// setup (e.g. opening a large group) while capping a tight exhaustion loop.
+// NOTE: a determined slow attacker can still deplete over time — the proper
+// fix is per-(requester,target) OTK dedup or Olm fallback keys (tracked).
+const keysLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 app.use("/api", apiLimiter);
 
 app.get("/healthz", (_req, res) => {
@@ -916,7 +928,7 @@ app.get("/api/rtc/config", async (req, res) => {
   });
 });
 
-app.get("/api/keys/:userId", async (req, res) => {
+app.get("/api/keys/:userId", keysLimiter, async (req, res) => {
   const t = bearer(req);
   if (!t || !verifyToken(t)) {
     res.status(401).json({ error: "unauthorized" });
