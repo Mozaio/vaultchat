@@ -58,6 +58,7 @@ import {
 } from "./MessageBubble";
 import { PeerRow } from "./PeerRow";
 import { InfoPanel, type SharedMediaItem } from "./InfoPanel";
+import { safeMediaSrc } from "../lib/safeMedia";
 import { BackupReminder } from "./BackupReminder";
 import {
   authoredFromDm,
@@ -2914,7 +2915,7 @@ export function ChatShell({
                 id: row.id,
                 kind: "file" as const,
                 name: plain.fileName ?? "Datei",
-                href: plain.body ?? "#",
+                href: safeMediaSrc(plain.body, "file") || "#",
                 at: row.at,
               },
             ];
@@ -2925,7 +2926,7 @@ export function ChatShell({
                 id: row.id,
                 kind: "voice" as const,
                 name: "Sprachnachricht",
-                href: plain.body ?? "#",
+                href: safeMediaSrc(plain.body, "audio") || "#",
                 at: row.at,
               },
             ];
@@ -3008,9 +3009,9 @@ export function ChatShell({
                 : ""
             }`}
           >
-            {g.avatar ? (
+            {safeMediaSrc(g.avatar, "image") ? (
               <img
-                src={g.avatar}
+                src={safeMediaSrc(g.avatar, "image")}
                 alt={`${g.name} Avatar`}
                 className="contact-avatar !h-9 !w-9 object-cover"
               />
@@ -4697,9 +4698,9 @@ export function ChatShell({
                       ←
                     </button>
                   )}
-                  {group.avatar ? (
+                  {safeMediaSrc(group.avatar, "image") ? (
                     <img
-                      src={group.avatar}
+                      src={safeMediaSrc(group.avatar, "image")}
                       alt={`${group.name} Avatar`}
                       className="h-9 w-9 shrink-0 rounded-full object-cover shadow"
                     />
@@ -4805,7 +4806,8 @@ export function ChatShell({
                               {(() => {
                                 const showAvatar = groupEditAvatarRemoved
                                   ? null
-                                  : groupEditAvatar || group.avatar;
+                                  : groupEditAvatar ||
+                                    safeMediaSrc(group.avatar, "image");
                                 return showAvatar ? (
                                   <img src={showAvatar} alt="Vorschau" />
                                 ) : (

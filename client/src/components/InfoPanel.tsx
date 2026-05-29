@@ -1,5 +1,6 @@
 import * as api from "../lib/api";
 import { saveStringSet, userGradient } from "../lib/chatHelpers";
+import { safeMediaSrc } from "../lib/safeMedia";
 import {
   IconBell,
   IconFileText,
@@ -91,10 +92,10 @@ export function InfoPanel({
       {/* Profile Avatar */}
       <div className="flex flex-col items-center">
         <div className="relative">
-          {mode === "group" && group?.avatar ? (
+          {mode === "group" && safeMediaSrc(group?.avatar, "image") ? (
             <img
-              src={group.avatar}
-              alt={`${group.name} Avatar`}
+              src={safeMediaSrc(group?.avatar, "image")}
+              alt={`${group?.name ?? "Gruppe"} Avatar`}
               className="info-avatar-large"
               style={{ objectFit: "cover" }}
             />

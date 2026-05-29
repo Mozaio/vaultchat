@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlainPayload } from "../lib/crypto";
 import { userGradient } from "../lib/chatHelpers";
+import { safeMediaSrc } from "../lib/safeMedia";
 import {
   formatFileSize,
   fmtDuration,
@@ -91,6 +92,8 @@ function VoiceCard({
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const bars = useWaveform(cid, 28);
+  // Peer-controlled src must be a whitelisted audio data: URL.
+  const safeSrc = safeMediaSrc(src, "audio");
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -145,7 +148,7 @@ function VoiceCard({
         })}
       </div>
       <span className="voice-duration">{fmtDuration(durationMs)}</span>
-      <audio ref={audioRef} src={src} preload="metadata" hidden />
+      <audio ref={audioRef} src={safeSrc} preload="metadata" hidden />
     </div>
   );
 }
@@ -279,7 +282,12 @@ export function MessageBubble({
   const body = msg.plain.body ?? "";
   const reacts = msg.reactions ?? {};
   const reactEntries = Object.entries(reacts).filter(([, n]) => n > 0);
-  const isImage = isImagePayload(msg.plain);
+  // Peer-controlled body must be whitelisted before use as a src/href.
+  // A blocked image src falls back to the file-card download path below.
+  const imageSrc = isImagePayload(msg.plain) ? safeMediaSrc(body, "image") : "";
+  const isImage = isImagePayload(msg.plain) && imageSrc !== "";
+  const fileHref =
+    msg.plain.kind === "file" ? safeMediaSrc(body, "file") : "";
   const isSystem = msg.plain.kind === "system";
   const isViewOnce = !!msg.plain.viewOnce && !msg.deleted;
   const showCover = isViewOnce && !msg.fromMe && !revealed;
@@ -457,7 +465,7 @@ export function MessageBubble({
               aria-label="Bild öffnen"
             >
               <img
-                src={body}
+                src={imageSrc}
                 alt={msg.plain.fileName ?? "Bild"}
                 className="image-attachment-img"
                 loading="lazy"
@@ -483,15 +491,26 @@ export function MessageBubble({
                   {formatFileSize(msg.plain.fileSize) || msg.plain.mime || ""}
                 </div>
               </div>
-              <a
-                href={body}
-                download={msg.plain.fileName}
-                className="download-btn"
-                onClick={(e) => e.stopPropagation()}
-                aria-label="Herunterladen"
-              >
-                <IconDownload size={14} />
-              </a>
+              {fileHref ? (
+                <a
+                  href={fileHref}
+                  download={msg.plain.fileName}
+                  className="download-btn"
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label="Herunterladen"
+                >
+                  <IconDownload size={14} />
+                </a>
+              ) : (
+                <span
+                  className="download-btn"
+                  aria-label="Anhang blockiert"
+                  title="Anhang aus Sicherheitsgründen blockiert (unsicherer Typ)"
+                  style={{ opacity: 0.4, cursor: "not-allowed" }}
+                >
+                  <IconLock size={14} />
+                </span>
+              )}
             </div>
           ) : msg.plain.kind === "voice" ? (
             <VoiceCard
@@ -923,13 +942,13 @@ export function MessageBubble({
             <IconX size={20} />
           </button>
           <img
-            src={body}
+            src={imageSrc}
             alt={msg.plain.fileName ?? "Bild"}
             onClick={(e) => e.stopPropagation()}
           />
           {msg.plain.fileName && (
             <a
-              href={body}
+              href={imageSrc}
               download={msg.plain.fileName}
               className="image-lightbox-download"
               onClick={(e) => e.stopPropagation()}
