@@ -103,6 +103,7 @@ import { VaultChatLogo } from "./Logo";
 import { FoldersManageModal } from "./FoldersManageModal";
 import { ShortcutsHelpModal } from "./ShortcutsHelpModal";
 import { pushToast } from "../lib/toastBus";
+import { isTauri, sendDesktopNotification } from "../lib/desktopNotify";
 import {
   IconArrowDown,
   IconBan,
@@ -610,7 +611,15 @@ export function ChatShell({
       /* ignore */
     }
     const displayBody = showPreview ? body : t("chat.newMessageNotif");
-    if (!("Notification" in window) || document.visibilityState === "visible") return;
+    // Only notify when the window isn't focused (minimized / in tray / bg tab).
+    if (document.visibilityState === "visible") return;
+    // Desktop app: WebView2 doesn't reliably expose Web Notifications, so go
+    // through the native OS notification channel.
+    if (isTauri()) {
+      void sendDesktopNotification(title, displayBody);
+      return;
+    }
+    if (!("Notification" in window)) return;
     if (Notification.permission === "granted") {
       new Notification(title, { body: displayBody, tag: "vaultchat-message" });
       return;
