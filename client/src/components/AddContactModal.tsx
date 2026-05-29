@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { searchUsers, type ApiUser } from "../lib/api";
+import { userGradient } from "../lib/chatHelpers";
 import { IconX } from "./Icons";
 
 const MIN_SEARCH_CHARS = 3;
@@ -182,7 +183,7 @@ export function AddContactModal({
                 >
                   <div
                     className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium"
-                    style={{ background: "var(--accent)", color: "white" }}
+                    style={{ background: userGradient(user.id), color: "white" }}
                   >
                     {user.username.slice(0, 1).toUpperCase()}
                   </div>

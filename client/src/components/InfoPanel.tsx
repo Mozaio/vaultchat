@@ -1,5 +1,5 @@
 import * as api from "../lib/api";
-import { saveStringSet } from "../lib/chatHelpers";
+import { saveStringSet, userGradient } from "../lib/chatHelpers";
 import {
   IconBell,
   IconFileText,
@@ -99,7 +99,14 @@ export function InfoPanel({
               style={{ objectFit: "cover" }}
             />
           ) : (
-            <div className="info-avatar-large">
+            <div
+              className="info-avatar-large"
+              style={{
+                background: userGradient(
+                  (mode === "dm" ? peer?.id : group?.id) ?? title
+                ),
+              }}
+            >
               {initials}
             </div>
           )}

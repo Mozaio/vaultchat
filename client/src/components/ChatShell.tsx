@@ -3691,7 +3691,11 @@ export function ChatShell({
                       <label
                         key={u.id}
                         className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition hover:bg-[var(--bg-hover)]"
-                        style={{ color: "var(--text)" }}
+                        style={{
+                          color: checked ? "var(--accent)" : "var(--text)",
+                          background: checked ? "var(--accent-soft)" : "transparent",
+                          fontWeight: checked ? 600 : 400,
+                        }}
                       >
                         <input
                           type="checkbox"
