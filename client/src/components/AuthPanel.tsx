@@ -274,7 +274,7 @@ export function AuthPanel({
               Kein Server kennt<br /><em>deine Nachrichten.</em>
             </h1>
             <p>
-              Post-Quantum-verschlüsselt, Zero-Knowledge-Relay —
+              Ende-zu-Ende-verschlüsselt, Zero-Knowledge-Relay —
               kein Konto mit E-Mail nötig.
             </p>
           </div>
@@ -285,8 +285,8 @@ export function AuthPanel({
               <IconLock size={14} />
             </span>
             <div>
-              <strong>Double Ratchet + ML-KEM-1024</strong>
-              <span>Post-Quantum Forward Secrecy</span>
+              <strong>Olm + Megolm (Matrix)</strong>
+              <span>Auditierte Double-Ratchet-Verschlüsselung</span>
             </div>
           </li>
           <li>
@@ -774,7 +774,7 @@ export function AuthPanel({
                   aria-live="polite"
                 >
                   Schlüssel werden im Worker generiert (Argon2id + X25519 +
-                  ML-KEM-1024) — kann ein paar Sekunden dauern.
+                  Olm) — kann ein paar Sekunden dauern.
                 </p>
               )}
             </div>
