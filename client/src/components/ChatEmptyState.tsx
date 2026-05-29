@@ -6,6 +6,7 @@ import {
   IconUsers,
 } from "./Icons";
 import { VaultChatLogo } from "./Logo";
+import { t, useLocale } from "../lib/i18n";
 
 export function ChatEmptyState({
   hasChats,
@@ -20,6 +21,7 @@ export function ChatEmptyState({
   onCreateFolder?: () => void;
   onSaveBackup?: () => void;
 }) {
+  useLocale(); // re-render on language change
   const showQuickActions =
     !hasChats &&
     (onAddContact || onCreateGroup || onCreateFolder || onSaveBackup);
@@ -30,10 +32,9 @@ export function ChatEmptyState({
         <div className="chat-empty-state-logo">
           <VaultChatLogo size={60} style={{ color: "var(--accent)" }} />
         </div>
-        <h2 className="chat-empty-state-title">Willkommen bei Umbra</h2>
+        <h2 className="chat-empty-state-title">{t("empty.welcomeTitle")}</h2>
         <p className="chat-empty-state-subtitle">
-          Wähle links eine Unterhaltung — oder starte ein neues, privates
-          Gespräch. Ende-zu-Ende verschlüsselt, kein Server liest mit.
+          {t("empty.welcomeSubtitle")}
         </p>
       </div>
       {showQuickActions && (

@@ -30,6 +30,8 @@ import {
   IconX,
 } from "./Icons";
 import { ThemeToggle } from "./ThemeToggle";
+import { LanguageSwitcher } from "./LanguageSwitcher";
+import { t, useLocale } from "../lib/i18n";
 import {
   loadCustomEmojis,
   removeCustomEmoji,
@@ -141,6 +143,7 @@ export function SecuritySettings({
   notificationPermission = "default",
   onRequestNotificationPermission,
 }: SecuritySettingsProps) {
+  useLocale(); // re-render on language change
   const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
@@ -279,6 +282,29 @@ export function SecuritySettings({
         >
           {tab === "general" && (
             <div className="space-y-4">
+              <div
+                className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <div>
+                  <h3
+                    className="text-sm font-medium"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {t("lang.label")}
+                  </h3>
+                  <p
+                    className="mt-0.5 text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    English · Deutsch · Türkçe · Español · العربية · 中文 …
+                  </p>
+                </div>
+                <LanguageSwitcher />
+              </div>
               <div
                 className="rounded-lg border p-3"
                 style={{
