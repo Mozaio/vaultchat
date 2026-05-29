@@ -58,10 +58,11 @@ export const PLAN_LABELS: Record<PlanId, string> = {
   team: "Team",
 };
 
+/** `audience` holds an i18n key resolved via t() at render time. */
 export const PLAN_PRICES: Record<PlanId, { eurMonthly: number; audience: string }> = {
-  free: { eurMonthly: 0, audience: "Privat" },
-  pro: { eurMonthly: 5, audience: "Power-User" },
-  team: { eurMonthly: 9, audience: "Teams · pro Person" },
+  free: { eurMonthly: 0, audience: "plan.aud.free" },
+  pro: { eurMonthly: 5, audience: "plan.aud.pro" },
+  team: { eurMonthly: 9, audience: "plan.aud.team" },
 };
 
 const STORAGE_KEY = "vaultchat.plan.v1";
@@ -108,29 +109,33 @@ export function canAddFolder(currentCount: number, plan: PlanId = loadPlan()): b
   return currentCount < getLimits(plan).folderMax;
 }
 
-export const PLAN_FEATURES: Record<PlanId, string[]> = {
+/**
+ * Per-plan feature bullets as i18n keys. Resolve each with t() at render
+ * time so the pricing cards follow the chosen language.
+ */
+export const PLAN_FEATURE_KEYS: Record<PlanId, string[]> = {
   free: [
-    "Ende-zu-Ende-Verschlüsselung",
-    "Bis zu 16 eigene Emojis",
-    "Sprachnachrichten bis 60 Sekunden",
-    "Gruppen bis 8 Mitglieder",
-    "3 Chat-Ordner",
+    "plan.feat.e2ee",
+    "plan.feat.emoji16",
+    "plan.feat.voice60s",
+    "plan.feat.group8",
+    "plan.feat.folders3",
   ],
   pro: [
-    "Alles aus Personal",
-    "Bis zu 50 eigene Emojis",
-    "Sprachnachrichten bis 5 Minuten",
-    "Gruppen bis 50 Mitglieder",
-    "Unbegrenzt viele Ordner",
-    "„Pro“-Badge im Profil",
-    "Schnellere Server-Priorität",
+    "plan.feat.allPersonal",
+    "plan.feat.emoji50",
+    "plan.feat.voice5m",
+    "plan.feat.group50",
+    "plan.feat.foldersUnlimited",
+    "plan.feat.proBadge",
+    "plan.feat.priority",
   ],
   team: [
-    "Alles aus Pro",
-    "Gruppen bis 200 Mitglieder",
-    "Bis zu 200 eigene Emojis",
-    "Audit-Logs für Admins",
-    "Geteilte Custom-Branding-Optionen",
-    "Priorisierter E-Mail-Support",
+    "plan.feat.allPro",
+    "plan.feat.group200",
+    "plan.feat.emoji200",
+    "plan.feat.auditLogs",
+    "plan.feat.branding",
+    "plan.feat.emailSupport",
   ],
 };

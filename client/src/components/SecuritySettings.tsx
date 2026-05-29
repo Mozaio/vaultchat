@@ -49,7 +49,7 @@ import {
   setPlanLocal,
   PLAN_LABELS,
   PLAN_PRICES,
-  PLAN_FEATURES,
+  PLAN_FEATURE_KEYS,
   PLAN_LIMITS,
   type PlanId,
 } from "../lib/plan";
@@ -1298,6 +1298,7 @@ function EmojiSettingsTab() {
 }
 
 function PlanSettingsTab() {
+  useLocale();
   const [plan, setPlan] = useState<PlanId>(() => loadPlan());
 
   function activate(next: PlanId) {
@@ -1309,23 +1310,19 @@ function PlanSettingsTab() {
     <div className="space-y-4">
       <div>
         <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
-          Plan & Abonnement
+          {t("plan.title")}
         </p>
         <p
           className="mt-1 text-xs leading-relaxed"
           style={{ color: "var(--text-muted)" }}
         >
-          Umbra ist privat — der Server sieht keine Inhalte. Pro-Plan
-          schaltet höhere Limits frei (mehr Emojis, längere Sprachnachrichten,
-          größere Gruppen). Bezahlung läuft über einen externen Anbieter
-          (Stripe), Umbra selbst speichert keine Karten- oder
-          Rechnungsdaten.
+          {t("plan.intro")}
         </p>
         <p
           className="mt-2 text-xs"
           style={{ color: "var(--accent)" }}
         >
-          Aktuell: <strong>{PLAN_LABELS[plan]}</strong>
+          {t("plan.current")} <strong>{PLAN_LABELS[plan]}</strong>
         </p>
       </div>
 
@@ -1344,23 +1341,23 @@ function PlanSettingsTab() {
               className={`pricing-card${isCurrent ? " current" : ""}${id === "pro" ? " featured" : ""}`}
             >
               {id === "pro" && (
-                <span className="pricing-card-tag">Beliebt</span>
+                <span className="pricing-card-tag">{t("plan.popular")}</span>
               )}
               <p className="pricing-card-name">{PLAN_LABELS[id]}</p>
               <p className="pricing-card-price">
                 {price.eurMonthly === 0 ? (
-                  <span>Kostenlos</span>
+                  <span>{t("plan.free")}</span>
                 ) : (
                   <>
                     <strong>{price.eurMonthly} €</strong>
-                    <span className="pricing-card-period"> / Monat</span>
+                    <span className="pricing-card-period">{t("plan.perMonth")}</span>
                   </>
                 )}
               </p>
-              <p className="pricing-card-audience">{price.audience}</p>
+              <p className="pricing-card-audience">{t(price.audience)}</p>
               <ul className="pricing-card-features">
-                {PLAN_FEATURES[id].map((f) => (
-                  <li key={f}>{f}</li>
+                {PLAN_FEATURE_KEYS[id].map((f) => (
+                  <li key={f}>{t(f)}</li>
                 ))}
               </ul>
               <button
@@ -1370,15 +1367,14 @@ function PlanSettingsTab() {
                 className="pricing-card-cta"
               >
                 {isCurrent
-                  ? "Aktueller Plan"
+                  ? t("plan.currentPlan")
                   : id === "free"
-                    ? "Wechseln"
-                    : "Upgrade"}
+                    ? t("plan.switch")
+                    : t("plan.upgrade")}
               </button>
               {id !== "free" && (
                 <p className="pricing-card-note">
-                  Demo: lokale Aktivierung. Echte Bezahlung folgt mit
-                  Stripe-Integration.
+                  {t("plan.demoNote")}
                 </p>
               )}
             </div>
@@ -1387,8 +1383,7 @@ function PlanSettingsTab() {
       </div>
 
       <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-        Privacy-Hinweis: Server sieht nur den Subscription-Status (free / pro /
-        team), nicht Karten- oder Identitätsdaten.
+        {t("plan.privacyNote")}
       </p>
     </div>
   );
