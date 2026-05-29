@@ -958,7 +958,7 @@ app.get("/api/keys/:userId", keysLimiter, async (req, res) => {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  const bundle = getPreKeyBundle(req.params.userId);
+  const bundle = getPreKeyBundle(String(req.params.userId));
   if (!bundle) {
     res.status(404).json({ error: "no_keys" });
     return;
