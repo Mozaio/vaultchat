@@ -1666,6 +1666,27 @@ const DICT: Record<string, Dict> = {
     ru: "Отметить как проверенное", ar: "وضع علامة موثّق",
     zh: "标记为已验证", hi: "सत्यापित के रूप में चिह्नित करें",
   },
+  "trust.verified": {
+    en: "Verified", de: "Verifiziert", tr: "Doğrulandı", es: "Verificado",
+    fr: "Vérifié", pt: "Verificado", ru: "Проверено", ar: "موثّق",
+    zh: "已验证", hi: "सत्यापित",
+  },
+  "trust.pinned": {
+    en: "Pinned (TOFU)", de: "Gepinnt (TOFU)", tr: "Sabitlendi (TOFU)",
+    es: "Fijado (TOFU)", fr: "Épinglé (TOFU)", pt: "Fixado (TOFU)",
+    ru: "Закреплено (TOFU)", ar: "مثبّت (TOFU)", zh: "已固定 (TOFU)",
+    hi: "पिन किया गया (TOFU)",
+  },
+  "trust.mismatch": {
+    en: "⚠ Key changed", de: "⚠ Schlüssel geändert",
+    tr: "⚠ Anahtar değişti", es: "⚠ Clave cambiada", fr: "⚠ Clé modifiée",
+    pt: "⚠ Chave alterada", ru: "⚠ Ключ изменён", ar: "⚠ تغيّر المفتاح",
+    zh: "⚠ 密钥已更改", hi: "⚠ कुंजी बदली",
+  },
+  "trust.new": {
+    en: "New", de: "Neu", tr: "Yeni", es: "Nuevo", fr: "Nouveau",
+    pt: "Novo", ru: "Новый", ar: "جديد", zh: "新", hi: "नया",
+  },
   "safety.howTitle": {
     en: "How does this work?", de: "Wie funktioniert das?",
     tr: "Bu nasıl çalışır?", es: "¿Cómo funciona esto?",

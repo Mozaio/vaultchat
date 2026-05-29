@@ -12,6 +12,7 @@
  *  Alle Pins werden per LDK verschlüsselt in der IndexedDB (meta) abgelegt.
  */
 import { metaGet, metaSet } from "./idb";
+import { t } from "./i18n";
 
 export type TrustState = "new" | "pinned" | "verified" | "mismatch";
 
@@ -112,12 +113,12 @@ export async function acceptKeyChange(
 export function trustLabel(state: TrustState): string {
   switch (state) {
     case "verified":
-      return "Verifiziert";
+      return t("trust.verified");
     case "pinned":
-      return "Gepinnt (TOFU)";
+      return t("trust.pinned");
     case "mismatch":
-      return "⚠ Schlüssel geändert";
+      return t("trust.mismatch");
     case "new":
-      return "Neu";
+      return t("trust.new");
   }
 }
