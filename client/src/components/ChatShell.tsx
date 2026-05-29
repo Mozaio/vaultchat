@@ -3292,9 +3292,21 @@ export function ChatShell({
       )}
       <div className="u-row flex min-h-0 flex-1 overflow-visible">
       <nav className="u-rail">
-        <div className="u-rail-logo" aria-hidden="true">
+        <button
+          type="button"
+          className="u-rail-logo"
+          title="Umbra — zu allen Chats"
+          aria-label="Zu allen Chats"
+          onClick={() => {
+            setSidebarFilter("all");
+            setTab("dm");
+            setPeer(null);
+            setGroup(null);
+            setInfoOpen(false);
+          }}
+        >
           <VaultChatLogo size={32} style={{ color: "var(--accent)" }} />
-        </div>
+        </button>
         <div className="u-rail-spacer" />
         <div className="u-rail-theme">
           <ThemeToggle />
