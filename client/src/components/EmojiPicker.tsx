@@ -6,6 +6,7 @@ import {
   removeCustomEmoji,
   type CustomEmoji,
 } from "../lib/customEmojis";
+import { t, useLocale } from "../lib/i18n";
 
 type Category = {
   id: string;
@@ -224,6 +225,7 @@ export function EmojiPicker({
    */
   excludeCustom?: boolean;
 }) {
+  useLocale();
   const [active, setActive] = useState<string>(CATEGORIES[0].id);
   const [query, setQuery] = useState("");
   const [recent, setRecent] = useState<string[]>(() => loadRecent());
@@ -299,16 +301,14 @@ export function EmojiPicker({
       const code = err instanceof Error ? err.message : "emoji_failed";
       if (code.startsWith("emoji_plan_limit:")) {
         const limit = code.slice("emoji_plan_limit:".length);
-        setUploadError(
-          `Limit erreicht (${limit} eigene Emojis im aktuellen Plan). Upgrade auf Pro für mehr — siehe Einstellungen → Plan & Abo.`
-        );
+        setUploadError(t("emoji.errLimit", { limit }));
       } else {
         setUploadError(
           code === "emoji_invalid_type"
-            ? "Bitte ein Bild (PNG, JPEG, WebP) auswählen."
+            ? t("emoji.errType")
             : code === "emoji_too_large"
-              ? "Bild zu groß — versuche ein kleineres Motiv."
-              : "Konnte den Emoji nicht hinzufügen."
+              ? t("emoji.errTooLarge")
+              : t("emoji.errGeneric")
         );
       }
     } finally {
@@ -326,14 +326,14 @@ export function EmojiPicker({
       ref={wrapRef}
       className={`emoji-picker ${align === "right" ? "align-right" : "align-left"}`}
       role="dialog"
-      aria-label="Emoji-Auswahl"
+      aria-label={t("emoji.picker")}
     >
       <div className="emoji-picker-header">
         <div className="emoji-picker-search">
           <IconSearch size={14} aria-hidden />
           <input
             type="text"
-            placeholder="Suchen…"
+            placeholder={t("emoji.search")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoFocus
@@ -343,7 +343,7 @@ export function EmojiPicker({
           type="button"
           className="emoji-picker-close"
           onClick={onClose}
-          aria-label="Schließen"
+          aria-label={t("common.close")}
         >
           <IconX size={14} />
         </button>
@@ -358,7 +358,7 @@ export function EmojiPicker({
               aria-selected={active === "recent"}
               className={`emoji-picker-tab${active === "recent" ? " active" : ""}`}
               onClick={() => setActive("recent")}
-              title="Zuletzt verwendet"
+              title={t("emoji.recent")}
             >
               🕘
             </button>
@@ -370,7 +370,7 @@ export function EmojiPicker({
               aria-selected={active === CUSTOM_TAB_ID}
               className={`emoji-picker-tab${active === CUSTOM_TAB_ID ? " active" : ""}`}
               onClick={() => setActive(CUSTOM_TAB_ID)}
-              title="Eigene Emojis"
+              title={t("emoji.custom")}
             >
               🎨
             </button>
@@ -383,7 +383,7 @@ export function EmojiPicker({
               aria-selected={active === c.id}
               className={`emoji-picker-tab${active === c.id ? " active" : ""}`}
               onClick={() => setActive(c.id)}
-              title={c.label}
+              title={t(`emoji.cat.${c.id}`)}
             >
               {c.icon}
             </button>
@@ -416,10 +416,10 @@ export function EmojiPicker({
             <IconPlus size={14} />
             <span>
               {uploading
-                ? "Lade …"
+                ? t("emoji.uploading")
                 : dragOver
-                  ? "Bild hier ablegen"
-                  : "Eigenes Emoji hinzufügen oder hierher ziehen"}
+                  ? t("emoji.dropHere")
+                  : t("emoji.addOrDrag")}
             </span>
           </button>
           <input
@@ -443,8 +443,8 @@ export function EmojiPicker({
         {visible.length === 0 ? (
           <div className="emoji-picker-empty">
             {active === CUSTOM_TAB_ID
-              ? "Noch keine eigenen Emojis. Klicke oben auf „Hinzufügen“."
-              : "Keine Treffer."}
+              ? t("emoji.emptyCustom")
+              : t("emoji.noMatch")}
           </div>
         ) : (
           visible.map((e, i) => {
@@ -461,7 +461,11 @@ export function EmojiPicker({
                 onContextMenu={(ev) => {
                   if (customMeta) {
                     ev.preventDefault();
-                    if (window.confirm(`„${customMeta.name}“ entfernen?`)) {
+                    if (
+                      window.confirm(
+                        t("emoji.removeConfirm", { name: customMeta.name })
+                      )
+                    ) {
                       handleRemoveCustom(customMeta.id);
                     }
                   }
@@ -469,7 +473,7 @@ export function EmojiPicker({
                 aria-label={isCustom ? customMeta?.name ?? "Custom" : e}
                 title={
                   isCustom
-                    ? `${customMeta?.name ?? "Custom"} (Rechtsklick: entfernen)`
+                    ? `${customMeta?.name ?? "Custom"} (${t("emoji.removeHint")})`
                     : e
                 }
               >
@@ -481,7 +485,7 @@ export function EmojiPicker({
                         role="button"
                         tabIndex={0}
                         className="emoji-picker-cell-remove"
-                        aria-label={`„${customMeta.name}“ entfernen`}
+                        aria-label={t("emoji.remove", { name: customMeta.name })}
                         onClick={(ev) => {
                           ev.stopPropagation();
                           handleRemoveCustom(customMeta.id);
