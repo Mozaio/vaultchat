@@ -3987,7 +3987,10 @@ export function ChatShell({
           <>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
               <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
-                <div className={`h-full transition-all duration-500 ${connected ? 'w-0 opacity-0' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
+                <div
+                  className={`h-full transition-all duration-500 ${connected ? 'w-0 opacity-0' : 'w-1/2 animate-pulse'}`}
+                  style={connected ? undefined : { background: 'var(--warning)' }}
+                />
               </div>
               <div className="flex w-full items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
