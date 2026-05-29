@@ -977,12 +977,12 @@ export function SecuritySettings({
                 className="list-inside list-disc space-y-2 text-sm"
                 style={{ color: "var(--text-secondary)" }}
               >
-                <li>Ende-zu-Ende-Verschlüsselung (Double-Ratchet, libsodium)</li>
-                <li>Sealed Sender für Direktnachrichten</li>
-                <li>TOFU &amp; verifizierbare Sicherheitsnummern</li>
-                <li>Gruppennachrichten E2EE mit verteilten Schlüsseln</li>
-                <li>QR-Code-Sicherheitsnummer (out-of-band-Verifikation)</li>
-                <li>Threads in DMs &amp; Gruppen, Custom-Emoji-Reaktionen</li>
+                <li>{t("about.feat.e2ee")}</li>
+                <li>{t("about.feat.sealedSender")}</li>
+                <li>{t("about.feat.tofu")}</li>
+                <li>{t("about.feat.groupE2ee")}</li>
+                <li>{t("about.feat.qr")}</li>
+                <li>{t("about.feat.threads")}</li>
               </ul>
               <a
                 href="https://github.com/Mozaio/vaultchat"
@@ -995,12 +995,10 @@ export function SecuritySettings({
                   textDecoration: "none",
                 }}
               >
-                Quellcode auf GitHub →
+                {t("about.sourceCode")}
               </a>
               <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                Server sieht Nachrichteninhalte und DM-Absender nicht. Gruppen-
-                Frames enthalten nur ciphertext. Keine serverseitige
-                Nachrichtenhistorie (RAM-only Demo-Backend).
+                {t("about.serverNote")}
               </p>
             </div>
           )}
