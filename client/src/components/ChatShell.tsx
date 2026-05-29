@@ -2218,12 +2218,12 @@ export function ChatShell({
     rebuildGroup(group.id);
   }
 
-  function copyText(t: string) {
-    if (!t) return;
+  function copyText(text: string) {
+    if (!text) return;
     void navigator.clipboard
-      ?.writeText(t)
-      .then(() => pushToast("In Zwischenablage kopiert", "success"))
-      .catch(() => pushToast("Kopieren fehlgeschlagen", "danger"));
+      ?.writeText(text)
+      .then(() => pushToast(t("common.copied"), "success"))
+      .catch(() => pushToast(t("common.copyFailed"), "danger"));
   }
 
   // Phase 5: distributeGroupKey/rotateGroupKey sind entfernt — Megolm

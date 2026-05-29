@@ -307,6 +307,19 @@ const DICT: Record<string, Dict> = {
     en: "Done", de: "Fertig", tr: "Bitti", es: "Listo", fr: "Terminé",
     pt: "Concluído", ru: "Готово", ar: "تم", zh: "完成", hi: "हो गया",
   },
+  "common.copied": {
+    en: "Copied to clipboard", de: "In Zwischenablage kopiert",
+    tr: "Panoya kopyalandı", es: "Copiado al portapapeles",
+    fr: "Copié dans le presse-papiers", pt: "Copiado",
+    ru: "Скопировано в буфер", ar: "تم النسخ", zh: "已复制到剪贴板",
+    hi: "क्लिपबोर्ड में कॉपी किया",
+  },
+  "common.copyFailed": {
+    en: "Copy failed", de: "Kopieren fehlgeschlagen", tr: "Kopyalama başarısız",
+    es: "Error al copiar", fr: "Échec de la copie", pt: "Falha ao copiar",
+    ru: "Не удалось скопировать", ar: "فشل النسخ", zh: "复制失败",
+    hi: "कॉपी विफल",
+  },
 
   // ── Onboarding ────────────────────────────────────────────────────
   "ob.s1.title": {
