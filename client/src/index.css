@@ -7347,6 +7347,14 @@ button:focus-visible,
   font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
 }
 
+/* Cohesion: warm serif on display-level titles across surfaces, so the
+   "Warm Cozy" identity carries through auth, empty states, onboarding. */
+.chat-empty-state-title,
+.onboarding-title {
+  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
+  letter-spacing: -0.01em;
+}
+
 /* Group message sender avatar + name (group chats only — DMs stay clean). */
 .message-wrapper.received.with-av {
   align-items: flex-start;
@@ -7406,6 +7414,28 @@ button:focus-visible,
   font-size: 1.2rem;
   font-weight: 800;
   line-height: 0;
+}
+
+/* Search-to-add bridge: shown when a search has no local match. */
+.u-search-add {
+  width: calc(100% - 1.4rem);
+  margin: 6px 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+.u-search-add:hover {
+  background: var(--accent-soft);
 }
 
 /* End VAULTCHAT v6 */

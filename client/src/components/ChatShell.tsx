@@ -3570,6 +3570,21 @@ export function ChatShell({
                 </button>
               )}
               {peerList}
+              {query.trim().length > 0 &&
+                visibleUsers.length === 0 &&
+                visibleGroups.length === 0 &&
+                sidebarFilter === "all" && (
+                  <button
+                    type="button"
+                    className="u-search-add"
+                    onClick={() => setShowAddContact(true)}
+                  >
+                    <span className="u-newchat-plus" aria-hidden>
+                      +
+                    </span>
+                    Keine Treffer — „{query.trim()}" hinzufügen
+                  </button>
+                )}
               {sidebarFilter === "star" &&
                 visibleUsers.length === 0 &&
                 visibleGroups.length > 0 && (
