@@ -376,6 +376,74 @@ const DICT: Record<string, Dict> = {
     ru: "Акцентный цвет", ar: "لون التمييز", zh: "强调色",
     hi: "एक्सेंट रंग",
   },
+
+  // ── Message actions (per-message menu, very high frequency) ───────
+  "msg.reply": {
+    en: "Reply", de: "Antworten", tr: "Yanıtla", es: "Responder",
+    fr: "Répondre", pt: "Responder", ru: "Ответить", ar: "رد", zh: "回复",
+    hi: "उत्तर दें",
+  },
+  "msg.replyThread": {
+    en: "Reply in thread", de: "Im Thread antworten", tr: "Konuda yanıtla",
+    es: "Responder en el hilo", fr: "Répondre dans le fil",
+    pt: "Responder no tópico", ru: "Ответить в треде",
+    ar: "الرد في الموضوع", zh: "在话题中回复", hi: "थ्रेड में उत्तर दें",
+  },
+  "msg.forward": {
+    en: "Forward", de: "Weiterleiten", tr: "İlet", es: "Reenviar",
+    fr: "Transférer", pt: "Encaminhar", ru: "Переслать", ar: "إعادة توجيه",
+    zh: "转发", hi: "आगे भेजें",
+  },
+  "msg.star": {
+    en: "Star", de: "Markieren", tr: "Yıldızla", es: "Destacar",
+    fr: "Marquer", pt: "Marcar", ru: "В избранное", ar: "تمييز",
+    zh: "标记", hi: "तारांकित करें",
+  },
+  "msg.unstar": {
+    en: "Unstar", de: "Markierung entfernen", tr: "Yıldızı kaldır",
+    es: "Quitar destacado", fr: "Retirer le repère", pt: "Remover marca",
+    ru: "Убрать из избранного", ar: "إلغاء التمييز", zh: "取消标记",
+    hi: "तारा हटाएं",
+  },
+  "msg.pin": {
+    en: "Pin", de: "Anpinnen", tr: "Sabitle", es: "Fijar", fr: "Épingler",
+    pt: "Fixar", ru: "Закрепить", ar: "تثبيت", zh: "置顶", hi: "पिन करें",
+  },
+  "msg.unpin": {
+    en: "Unpin", de: "Pin entfernen", tr: "Sabitlemeyi kaldır",
+    es: "Quitar fijado", fr: "Détacher", pt: "Desafixar", ru: "Открепить",
+    ar: "إلغاء التثبيت", zh: "取消置顶", hi: "अनपिन करें",
+  },
+  "msg.copy": {
+    en: "Copy", de: "Kopieren", tr: "Kopyala", es: "Copiar", fr: "Copier",
+    pt: "Copiar", ru: "Копировать", ar: "نسخ", zh: "复制", hi: "कॉपी करें",
+  },
+  "msg.edit": {
+    en: "Edit", de: "Bearbeiten", tr: "Düzenle", es: "Editar", fr: "Modifier",
+    pt: "Editar", ru: "Изменить", ar: "تعديل", zh: "编辑", hi: "संपादित करें",
+  },
+  "msg.deleteForAll": {
+    en: "Delete for everyone", de: "Für alle löschen", tr: "Herkesten sil",
+    es: "Eliminar para todos", fr: "Supprimer pour tous",
+    pt: "Apagar para todos", ru: "Удалить у всех", ar: "حذف للجميع",
+    zh: "为所有人删除", hi: "सभी के लिए हटाएं",
+  },
+  "msg.deleted": {
+    en: "Message deleted", de: "Nachricht gelöscht", tr: "Mesaj silindi",
+    es: "Mensaje eliminado", fr: "Message supprimé", pt: "Mensagem apagada",
+    ru: "Сообщение удалено", ar: "تم حذف الرسالة", zh: "消息已删除",
+    hi: "संदेश हटाया गया",
+  },
+  "msg.edited": {
+    en: "edited", de: "bearbeitet", tr: "düzenlendi", es: "editado",
+    fr: "modifié", pt: "editado", ru: "изменено", ar: "معدّل",
+    zh: "已编辑", hi: "संपादित",
+  },
+  "msg.react": {
+    en: "React", de: "Reagieren", tr: "Tepki ver", es: "Reaccionar",
+    fr: "Réagir", pt: "Reagir", ru: "Реакция", ar: "تفاعل", zh: "回应",
+    hi: "प्रतिक्रिया दें",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";

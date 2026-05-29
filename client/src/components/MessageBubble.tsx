@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlainPayload } from "../lib/crypto";
 import { userGradient } from "../lib/chatHelpers";
 import { safeMediaSrc } from "../lib/safeMedia";
+import { t, useLocale } from "../lib/i18n";
 import {
   formatFileSize,
   fmtDuration,
@@ -220,6 +221,7 @@ export function MessageBubble({
   /** Click handler to open the thread side panel. */
   onOpenThread?: (m: ChatMsg) => void;
 }) {
+  useLocale(); // re-render on language change
   const [menuOpen, setMenuOpen] = useState(false);
   const [reactOpen, setReactOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -418,7 +420,7 @@ export function MessageBubble({
         >
           {msg.deleted ? (
             <span className="bubble-deleted">
-              <IconTrash size={12} aria-hidden /> Nachricht gelöscht
+              <IconTrash size={12} aria-hidden /> {t("msg.deleted")}
             </span>
           ) : editing ? (
             <div className="bubble-edit">
@@ -640,7 +642,7 @@ export function MessageBubble({
               </span>
             )}
             {msg.edited && !msg.deleted && (
-              <span className="meta-edited">bearbeitet</span>
+              <span className="meta-edited">{t("msg.edited")}</span>
             )}
             <span
               className="meta-time"
@@ -694,8 +696,8 @@ export function MessageBubble({
                   setReactOpen((v) => !v);
                   setMenuOpen(false);
                 }}
-                aria-label="Reagieren"
-                title="Reagieren"
+                aria-label={t("msg.react")}
+                title={t("msg.react")}
               >
                 <IconSmile size={14} />
               </button>
@@ -706,8 +708,8 @@ export function MessageBubble({
                   e.stopPropagation();
                   onReply(msg);
                 }}
-                aria-label="Antworten"
-                title="Antworten"
+                aria-label={t("msg.reply")}
+                title={t("msg.reply")}
               >
                 <IconReply size={14} />
               </button>
@@ -740,7 +742,7 @@ export function MessageBubble({
                   setMenuOpen(false);
                 }}
               >
-                <IconReply size={14} /> Antworten
+                <IconReply size={14} /> {t("msg.reply")}
               </button>
               {onOpenThread && !msg.plain.threadParentCid && (
                 <button
@@ -751,7 +753,7 @@ export function MessageBubble({
                     setMenuOpen(false);
                   }}
                 >
-                  <IconMessageSquare size={14} /> Im Thread antworten
+                  <IconMessageSquare size={14} /> {t("msg.replyThread")}
                 </button>
               )}
               {onForward && msg.plain.kind !== "voice" && (
@@ -763,7 +765,7 @@ export function MessageBubble({
                     setMenuOpen(false);
                   }}
                 >
-                  <IconForward size={14} /> Weiterleiten
+                  <IconForward size={14} /> {t("msg.forward")}
                 </button>
               )}
               {onToggleStar && msg.plain.kind === "text" && (
@@ -776,7 +778,7 @@ export function MessageBubble({
                   }}
                 >
                   {isStarred ? <IconBookmark size={14} /> : <IconStar size={14} />}
-                  {isStarred ? "Markierung entfernen" : "Markieren"}
+                  {isStarred ? t("msg.unstar") : t("msg.star")}
                 </button>
               )}
               {onTogglePin && (
@@ -789,7 +791,7 @@ export function MessageBubble({
                   }}
                 >
                   <IconPin size={14} />
-                  {isPinned ? "Pin entfernen" : "Anpinnen"}
+                  {isPinned ? t("msg.unpin") : t("msg.pin")}
                 </button>
               )}
               {msg.plain.kind === "text" && body && (
@@ -801,7 +803,7 @@ export function MessageBubble({
                     setMenuOpen(false);
                   }}
                 >
-                  <IconCopy size={14} /> Kopieren
+                  <IconCopy size={14} /> {t("msg.copy")}
                 </button>
               )}
               {msg.fromMe && msg.plain.kind === "text" && (
@@ -813,7 +815,7 @@ export function MessageBubble({
                     setMenuOpen(false);
                   }}
                 >
-                  <IconEdit size={14} /> Bearbeiten
+                  <IconEdit size={14} /> {t("msg.edit")}
                 </button>
               )}
               {msg.fromMe && (
@@ -825,7 +827,7 @@ export function MessageBubble({
                     setMenuOpen(false);
                   }}
                 >
-                  <IconTrash size={14} /> Für alle löschen
+                  <IconTrash size={14} /> {t("msg.deleteForAll")}
                 </button>
               )}
             </div>
