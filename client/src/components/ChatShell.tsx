@@ -1575,6 +1575,11 @@ export function ChatShell({
               ...(ttl ? { expiresAt: createdAt + ttl } : {}),
             });
             const arr = rawDmRef.current.get(peerUser.id) ?? [];
+            // Durable dedup: a re-delivered mailbox frame (older than the
+            // replay window, or after the in-session `seen` set was reset on
+            // a chat switch) must not be appended twice. The ack above
+            // already fired, so returning here is safe.
+            if (arr.some((x) => x.id === id)) return;
             arr.push({
               id,
               fromMe: false,
@@ -1660,6 +1665,8 @@ export function ChatShell({
               ...(ttl ? { expiresAt: at + ttl } : {}),
             });
             const arr = rawGroupRef.current.get(gid) ?? [];
+            // Durable dedup against re-delivered mailbox frames (see DM path).
+            if (arr.some((x) => x.id === id)) return;
             arr.push({
               id,
               fromMe: fromUserId === session.user.id,
