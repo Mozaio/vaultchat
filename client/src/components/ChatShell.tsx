@@ -5792,11 +5792,23 @@ export function ChatShell({
                         return;
                       }
                       if (e.key === "Tab" || e.key === "Enter") {
-                        const candidates = users.filter((u) =>
-                          group.memberIds.includes(u.id) &&
-                          u.username.toLowerCase().startsWith(mentionQuery.toLowerCase())
-                        );
-                        const pick = candidates[mentionIndex % Math.max(1, candidates.length)];
+                        // Must match the dropdown's filter exactly (incl. the
+                        // self-exclusion + cap) or the highlighted index and
+                        // the inserted pick disagree.
+                        const candidates = users
+                          .filter(
+                            (u) =>
+                              group.memberIds.includes(u.id) &&
+                              u.id !== session.user.id &&
+                              u.username
+                                .toLowerCase()
+                                .startsWith(mentionQuery.toLowerCase())
+                          )
+                          .slice(0, 6);
+                        if (candidates.length === 0) {
+                          setMentionOpen(false);
+                        } else {
+                        const pick = candidates[mentionIndex % candidates.length];
                         if (pick) {
                           e.preventDefault();
                           const before = groupText.slice(0, mentionStart);
@@ -5812,6 +5824,7 @@ export function ChatShell({
                             el.setSelectionRange(pos, pos);
                           });
                           return;
+                        }
                         }
                       }
                     }
