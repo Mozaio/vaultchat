@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { GroupCallState } from "../lib/groupCall";
-import { IconMic, IconPhone, IconUsers } from "./Icons";
+import { IconMic, IconPhone, IconScreenShare, IconUsers } from "./Icons";
 
 type Props = {
   /** Active call state (null = not in a call). */
@@ -27,6 +27,8 @@ type Props = {
   onLeave: () => void;
   /** Toggle local mute. */
   onToggleMute: () => void;
+  /** Toggle screen sharing (step 1: local preview only). */
+  onToggleScreenShare?: () => void;
   /** Indicator: is anyone else currently in the room (from announces). */
   occupants: number;
   /** Connection-quality summary string for the user (debug-friendly). */
@@ -40,9 +42,11 @@ export function GroupCallBar({
   onJoin,
   onLeave,
   onToggleMute,
+  onToggleScreenShare,
   occupants,
   qualityHint,
 }: Props) {
+  const screenStream = state?.localScreenStream ?? null;
   const inCall = !!state;
 
   // Push-to-talk: hold Space to speak. We don't know the previous mute
@@ -123,6 +127,14 @@ export function GroupCallBar({
         </span>
         <span className="group-call-header-hint">Leertaste: sprechen</span>
       </div>
+      {screenStream && (
+        <div className="group-call-screen">
+          <span className="group-call-screen-badge">
+            <IconScreenShare size={12} aria-hidden /> Du teilst deinen Bildschirm
+          </span>
+          <ScreenPreview stream={screenStream} />
+        </div>
+      )}
       <div className="group-call-grid" data-count={total}>
         <Tile
           label={selfUsername}
@@ -156,6 +168,19 @@ export function GroupCallBar({
         >
           <IconMic size={18} aria-hidden />
         </button>
+        {onToggleScreenShare && (
+          <button
+            type="button"
+            className={`group-call-control screen${screenStream ? " active" : ""}`}
+            onClick={onToggleScreenShare}
+            title={
+              screenStream ? "Bildschirmteilen beenden" : "Bildschirm teilen"
+            }
+            aria-pressed={!!screenStream}
+          >
+            <IconScreenShare size={18} aria-hidden />
+          </button>
+        )}
         <button
           type="button"
           className="group-call-control hangup"
@@ -224,6 +249,22 @@ function Tile({
         <audio ref={audioRef} autoPlay playsInline />
       )}
     </div>
+  );
+}
+
+function ScreenPreview({ stream }: { stream: MediaStream }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.srcObject = stream;
+  }, [stream]);
+  return (
+    <video
+      ref={ref}
+      className="group-call-screen-video"
+      autoPlay
+      muted
+      playsInline
+    />
   );
 }
 

@@ -2688,6 +2688,13 @@ export function ChatShell({
     if (ctrl) ctrl.setMuted(!ctrl.isMuted());
   }
 
+  function toggleGroupScreenShare() {
+    const ctrl = groupCallCtrlRef.current;
+    if (!ctrl) return;
+    if (ctrl.isScreenSharing()) ctrl.stopScreenShare();
+    else void ctrl.startScreenShare();
+  }
+
   async function beginCall() {
     if (!peer) return;
     setCallStatus("connecting");
@@ -5371,6 +5378,7 @@ export function ChatShell({
               onJoin={() => void joinGroupVoice()}
               onLeave={leaveGroupVoice}
               onToggleMute={toggleGroupVoiceMute}
+              onToggleScreenShare={toggleGroupScreenShare}
               occupants={voiceOccupants[group.id] ?? 0}
             />
             <div

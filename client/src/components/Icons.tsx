@@ -738,6 +738,16 @@ export function IconBarChart(props: P) {
   );
 }
 
+export function IconScreenShare(props: P) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path d="M8 20h8M12 16v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      <path d="M12 12V7m0 0-2 2m2-2 2 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function IconHelpCircle(props: P) {
   return (
     <Svg {...props}>

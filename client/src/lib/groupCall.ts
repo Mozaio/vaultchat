@@ -72,6 +72,9 @@ export type GroupCallState = {
   joinedAt: number;
   peers: Map<string, GroupCallPeer>;
   localMuted: boolean;
+  /** Your own screen-share stream (local preview). null = not sharing.
+   *  Step 1 previews locally only; mesh transmission lands in step 2. */
+  localScreenStream: MediaStream | null;
 };
 
 export type GroupCallEvents = {
@@ -115,6 +118,7 @@ export class GroupCallController {
   private relayOnly: boolean;
   private monitorTimer: ReturnType<typeof setInterval> | null = null;
   private closed = false;
+  private screenStream: MediaStream | null = null;
 
   constructor(
     groupId: string,
@@ -266,6 +270,48 @@ export class GroupCallController {
     return this.localMuted;
   }
 
+  isScreenSharing() {
+    return this.screenStream !== null;
+  }
+
+  /**
+   * Step 1: capture the screen and preview it locally. Does NOT transmit to
+   * peers yet (that's step 2 — adding the track to each peer connection +
+   * renegotiation). Resolves silently if the user cancels the picker.
+   */
+  async startScreenShare(): Promise<void> {
+    if (this.closed || this.screenStream) return;
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+    } catch {
+      return; // user cancelled or unsupported
+    }
+    if (this.closed) {
+      stream.getTracks().forEach((tk) => tk.stop());
+      return;
+    }
+    this.screenStream = stream;
+    // The browser's own "Stop sharing" control ends the track — clean up then.
+    const track = stream.getVideoTracks()[0];
+    if (track) track.addEventListener("ended", () => this.stopScreenShare());
+    this.publishState();
+  }
+
+  stopScreenShare() {
+    if (!this.screenStream) return;
+    try {
+      this.screenStream.getTracks().forEach((tk) => tk.stop());
+    } catch {
+      /* noop */
+    }
+    this.screenStream = null;
+    this.publishState();
+  }
+
   /** Hangup: announce, close all peers, free mic. */
   leave() {
     if (this.closed) return;
@@ -281,6 +327,14 @@ export class GroupCallController {
     });
     for (const [, slot] of this.peers) this.closeSlot(slot);
     this.peers.clear();
+    if (this.screenStream) {
+      try {
+        this.screenStream.getTracks().forEach((tk) => tk.stop());
+      } catch {
+        /* noop */
+      }
+      this.screenStream = null;
+    }
     try {
       this.localStream.getTracks().forEach((t) => t.stop());
     } catch {
@@ -496,6 +550,7 @@ export class GroupCallController {
       joinedAt: this.joinedAt,
       peers,
       localMuted: this.localMuted,
+      localScreenStream: this.screenStream,
     });
   }
 }
