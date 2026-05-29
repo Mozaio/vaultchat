@@ -7572,4 +7572,17 @@ button:focus-visible,
   color: var(--text-muted);
 }
 
+/* @mention chip in message text */
+.mention {
+  color: var(--accent);
+  font-weight: 600;
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 0 0.18em;
+}
+.message-bubble.sent .mention {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.22);
+}
+
 /* End VAULTCHAT v7 */

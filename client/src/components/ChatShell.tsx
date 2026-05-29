@@ -1743,9 +1743,26 @@ export function ChatShell({
             });
             rawGroupRef.current.set(gid, arr);
             if (groupRef.current?.id === gid) rebuildGroup(gid);
-            if (groupRef.current?.id !== gid && !mutedGroups.has(gid)) {
+            // @mention: notify the mentioned user even if the group is muted
+            // (Discord behaviour). Word-boundary, case-insensitive match on
+            // the decrypted body — the mention lives inside the E2EE payload.
+            const myName = session.user.username;
+            const mentioned =
+              plain.kind === "text" &&
+              typeof plain.body === "string" &&
+              new RegExp(
+                `@${myName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_])`,
+                "i"
+              ).test(plain.body);
+            if (
+              groupRef.current?.id !== gid &&
+              (!mutedGroups.has(gid) || mentioned)
+            ) {
               const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? "Gruppe";
-              maybeNotify(groupName, previewForPayload(plain));
+              maybeNotify(
+                mentioned ? `${groupName} · Erwähnung` : groupName,
+                previewForPayload(plain)
+              );
             }
             if (
               sendReadReceipts &&

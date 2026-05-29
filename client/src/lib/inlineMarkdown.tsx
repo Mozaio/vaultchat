@@ -17,7 +17,7 @@ import type { ReactNode } from "react";
  * Whitespace in the input is preserved by the caller (the bubble keeps
  * `white-space: pre-wrap`), so newlines render as line breaks.
  */
-const TOKEN = /(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\n]+\*|_[^_\n]+_|https?:\/\/[^\s<>"']+)/g;
+const TOKEN = /(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\n]+\*|_[^_\n]+_|https?:\/\/[^\s<>"']+|@[A-Za-z0-9_]{2,32})/g;
 
 export function renderInlineMarkdown(text: string): ReactNode[] {
   if (!text) return [];
@@ -36,6 +36,14 @@ export function renderInlineMarkdown(text: string): ReactNode[] {
       out.push(<s key={key++}>{tok.slice(2, -2)}</s>);
     } else if (tok.startsWith("*") || tok.startsWith("_")) {
       out.push(<em key={key++}>{tok.slice(1, -1)}</em>);
+    } else if (tok.startsWith("@")) {
+      // @mention — highlighted chip (group chats). Display-only; the actual
+      // notify-on-mention check happens on the receiving side in ChatShell.
+      out.push(
+        <span key={key++} className="mention">
+          {tok}
+        </span>
+      );
     } else {
       // URL — sanitize so only http(s) gets through; anything else falls
       // back to plain text (defense-in-depth, the regex already guards).
