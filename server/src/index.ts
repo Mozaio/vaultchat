@@ -1534,9 +1534,17 @@ wss.on("connection", (ws, req) => {
     }
 
     /**
-     * Sealed-Sender DM: Der Server kennt weder Inhalt noch Absender. Er relayt
-     * den Envelope an toUserId. Kein fromUserId wird an den Empfänger gesendet
-     * — der Absender kommt aus dem vom Empfänger entschlüsselten Envelope.
+     * Sealed-Sender DM. Ehrliches Bedrohungsmodell:
+     *  - Inhalt: der Server kann ihn NICHT lesen (E2EE im Envelope).
+     *  - Absender gegenüber dem EMPFÄNGER-Frame: versteckt — wir hängen kein
+     *    fromUserId an; der Empfänger erfährt den Absender nur aus dem
+     *    entschlüsselten Envelope.
+     *  - Absender gegenüber dem SERVER: dem Server transient bekannt, weil die
+     *    WS-Verbindung authentifiziert ist (jwtUser). Wir LOGGEN/SPEICHERN das
+     *    Sender↔Empfänger-Paar aber NICHT (kein Log auf dem Erfolgspfad).
+     *  - Empfänger (toUserId): muss für die Zustellung bekannt sein — das lässt
+     *    sich bei einem Push-Relay prinzipiell nicht verbergen (gilt auch für
+     *    Signal). Cover-Traffic verrauscht den beobachtbaren Graphen zusätzlich.
      */
     const { toUserId, envelope, cid } = parsed.data;
     const peer = findUserById(toUserId);
@@ -1549,11 +1557,9 @@ wss.on("connection", (ws, req) => {
     // innerhalb von 10 min werden gedropt. Schützt vor JWT-Diebstahl-Replay
     // und reduziert Bandbreite, bevor der Empfänger DR-Counter prüft.
     if (!markEnvelopeIfNew(jwtUser!.userId, envelope)) {
-      log.debug("ws_replay_drop", {
-        kind: "dm",
-        userId: jwtUser!.userId,
-        cid,
-      });
+      // Don't log the sender↔activity link, even at debug level — keep the
+      // who-talks metadata out of logs entirely.
+      log.debug("ws_replay_drop", { kind: "dm" });
       ws.send(
         JSON.stringify({ type: "dm_ack", cid, delivered: 0, reason: "replay" })
       );
