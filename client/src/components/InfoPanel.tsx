@@ -131,7 +131,7 @@ export function InfoPanel({
           disabled={mode !== "dm"}
         >
           <IconPin size={18} />
-          <span>{isFavorite ? "Favorit" : "Favorit"}</span>
+          <span>{isFavorite ? "Favorisiert" : "Favorit"}</span>
         </button>
         <button
           type="button"
