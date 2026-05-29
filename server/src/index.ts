@@ -25,6 +25,7 @@ import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js"
 import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
 import {
   enqueueMailboxDm,
+  clearMailboxForUser,
   enqueueMailboxGroup,
   getMailboxStats,
   listMailboxDms,
@@ -34,6 +35,7 @@ import {
   sweepExpiredMailbox,
 } from "./mailboxStore.js";
 import {
+  deletePreKeyBundle,
   getPreKeyBundle,
   getPreKeyStats,
   getRemainingOlmKeyCount,
@@ -56,7 +58,11 @@ import {
   revokeInvite,
 } from "./inviteStore.js";
 import { log, requestLogger } from "./logger.js";
-import { markIfNew as markEnvelopeIfNew, replayStats } from "./replayStore.js";
+import {
+  clearReplayState,
+  markIfNew as markEnvelopeIfNew,
+  replayStats,
+} from "./replayStore.js";
 import {
   blobStats,
   getBlob,
@@ -517,6 +523,12 @@ app.delete("/api/me", async (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
+  // Purge all remaining server-side state for this user so nothing lingers
+  // after deletion (matches the contract documented above): prekey bundle,
+  // queued inbox (DM + group), and replay state.
+  deletePreKeyBundle(jwtUser.userId);
+  clearMailboxForUser(jwtUser.userId);
+  clearReplayState(jwtUser.userId);
   log.info("auth_account_deleted", {
     reqId: req.id,
     userId: jwtUser.userId,

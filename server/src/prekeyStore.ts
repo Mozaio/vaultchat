@@ -235,6 +235,17 @@ export function uploadOlmKeys(
   persistBundles();
 }
 
+/**
+ * Remove a user's entire prekey bundle (identity key, signed prekey, all
+ * one-time prekeys, Olm keys, PQ-KEM key). Called on account deletion so
+ * no key material lingers server-side after a user leaves.
+ */
+export function deletePreKeyBundle(userId: string): void {
+  if (bundles.delete(userId)) {
+    persistBundles();
+  }
+}
+
 export function getRemainingPreKeyCount(userId: string): number {
   return bundles.get(userId)?.oneTimePreKeys.size ?? 0;
 }

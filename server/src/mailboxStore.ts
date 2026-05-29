@@ -77,6 +77,17 @@ export function removeMailboxDm(userId: string, id: string): void {
   else dmByRecipient.delete(userId);
 }
 
+/**
+ * Drop a user's entire inbox (DM + group), e.g. on account deletion, so no
+ * queued ciphertext addressed to the departed user lingers server-side.
+ * Messages they SENT live in other recipients' boxes and are intentionally
+ * left for delivery.
+ */
+export function clearMailboxForUser(userId: string): void {
+  dmByRecipient.delete(userId);
+  groupByRecipient.delete(userId);
+}
+
 export function enqueueMailboxGroup(input: {
   toUserId: string;
   groupId: string;
