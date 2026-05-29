@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import {
   IconDownload,
   IconFolderPlus,
-  IconMessageSquare,
   IconShieldCheck,
   IconUsers,
 } from "./Icons";
+import { VaultChatLogo } from "./Logo";
 
 export function ChatEmptyState({
   hasChats,
@@ -27,14 +27,13 @@ export function ChatEmptyState({
   return (
     <div className="chat-empty-state">
       <div className="chat-empty-state-card">
-        <div className="chat-empty-state-icon">
-          <IconMessageSquare size={38} />
+        <div className="chat-empty-state-logo">
+          <VaultChatLogo size={60} style={{ color: "var(--accent)" }} />
         </div>
-        <h2 className="chat-empty-state-title">
-          Keine Unterhaltung ausgewählt
-        </h2>
+        <h2 className="chat-empty-state-title">Willkommen bei Umbra</h2>
         <p className="chat-empty-state-subtitle">
-          Wähle links einen Chat aus oder erstelle eine private Gruppe.
+          Wähle links eine Unterhaltung — oder starte ein neues, privates
+          Gespräch. Ende-zu-Ende verschlüsselt, kein Server liest mit.
         </p>
       </div>
       {showQuickActions && (
