@@ -5196,6 +5196,15 @@ export function ChatShell({
                   peerLabel={
                     users.find((u) => u.id === m.fromUserId)?.username ?? group.name
                   }
+                  groupAvatar={
+                    m.fromMe
+                      ? undefined
+                      : i > 0 &&
+                          mainMsgs[i - 1].fromUserId === m.fromUserId &&
+                          mainMsgs[i - 1].fromMe === m.fromMe
+                        ? "space"
+                        : "show"
+                  }
                   replyToPreview={replyPreviewForMessage(
                     groupMessages,
                     m,

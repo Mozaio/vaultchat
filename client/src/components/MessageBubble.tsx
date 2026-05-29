@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PlainPayload } from "../lib/crypto";
+import { userGradient } from "../lib/chatHelpers";
 import {
   formatFileSize,
   fmtDuration,
@@ -175,9 +176,14 @@ export function MessageBubble({
   threadReplyCount,
   threadUnreadCount,
   onOpenThread,
+  groupAvatar,
 }: {
   msg: ChatMsg;
   peerLabel: string;
+  /** Group chats only: "show" renders the sender avatar + name at the start
+   *  of a received run; "space" indents continuation bubbles to align. DMs
+   *  pass nothing (kept clean). */
+  groupAvatar?: "show" | "space";
   replyToPreview?: { author: string; text: string; cid?: string } | null;
   isGrouped?: boolean;
   isLastInGroup?: boolean;
@@ -335,13 +341,28 @@ export function MessageBubble({
       aria-label={ariaLabel}
       className={`message-wrapper group ${msg.fromMe ? "sent" : "received"}${
         isHighlighted ? " highlighted" : ""
-      }`}
+      }${groupAvatar ? " with-av" : ""}`}
     >
+      {groupAvatar === "show" && (
+        <div
+          className="msg-avatar"
+          style={{ background: userGradient(msg.fromUserId ?? peerLabel) }}
+          aria-hidden="true"
+        >
+          {(peerLabel || "?").charAt(0).toUpperCase()}
+        </div>
+      )}
+      {groupAvatar === "space" && (
+        <div className="msg-avatar-spacer" aria-hidden="true" />
+      )}
       <div
         className={`flex max-w-[min(85%,32rem)] flex-col ${
           msg.fromMe ? "items-end" : "items-start"
         }`}
       >
+        {groupAvatar === "show" && (
+          <span className="msg-sender-name">{peerLabel}</span>
+        )}
         {replyToPreview && (
           <button
             type="button"
