@@ -1835,7 +1835,7 @@ export function ChatShell({
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
       ...(viewOnceDm ? { viewOnce: true } : {}),
     };
-    if (isSelf) {
+    if (peer.id === session.user.id) {
       await appendSelfMessage(payload);
     } else {
       await sendDmWire(peer, payload);
