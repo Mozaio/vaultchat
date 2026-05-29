@@ -264,7 +264,7 @@ export function AuthPanel({
       {/* ── Left: always-dark brand panel ── */}
       <div className="auth-brand-panel" aria-hidden="true">
         <div className="auth-brand-top">
-          <VaultChatLogo size={32} style={{ color: "#0d9488" }} />
+          <VaultChatLogo size={32} style={{ color: "var(--accent)" }} />
           <span className="auth-brand-top-name">Umbra</span>
         </div>
 

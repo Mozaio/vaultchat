@@ -408,7 +408,7 @@ select:focus-visible {
 
 .btn-send:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 12px -4px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 0 0 3px var(--accent-soft), 0 4px 12px -4px var(--accent-glow);
 }
 
 /* ============================================================
@@ -1025,7 +1025,7 @@ select:focus-visible {
   border-color: var(--accent);
   border-left-color: var(--accent);
   background: var(--accent-soft);
-  box-shadow: 0 4px 12px -4px rgba(13, 148, 136, 0.25);
+  box-shadow: 0 4px 12px -4px var(--accent-glow);
   transform: translateY(-1px);
 }
 .link-preview-card:focus-visible {
@@ -2228,7 +2228,7 @@ select:focus-visible {
 
 .pricing-card.featured {
   border-color: var(--accent);
-  box-shadow: 0 4px 16px -8px rgba(13, 148, 136, 0.4);
+  box-shadow: 0 4px 16px -8px var(--accent-glow);
 }
 
 .pricing-card.current {
@@ -5472,7 +5472,7 @@ select:focus-visible {
 .auth-button:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-  box-shadow: 0 4px 14px -4px rgba(13, 148, 136, 0.45);
+  box-shadow: 0 4px 14px -4px var(--accent-glow);
   transform: translateY(-1px);
 }
 
@@ -5484,7 +5484,7 @@ select:focus-visible {
 .auth-button:focus-visible {
   outline: none;
   box-shadow:
-    0 4px 14px -4px rgba(13, 148, 136, 0.45),
+    0 4px 14px -4px var(--accent-glow),
     0 0 0 3px var(--accent-soft);
 }
 

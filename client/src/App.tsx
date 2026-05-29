@@ -332,9 +332,9 @@ export function App() {
       role="status"
       aria-live="polite"
       style={{
-        background: "rgba(13, 148, 136, 0.12)",
-        borderBottomColor: "rgba(13, 148, 136, 0.4)",
-        color: "var(--accent, #0d9488)",
+        background: "var(--accent-soft)",
+        borderBottomColor: "var(--accent-glow)",
+        color: "var(--accent)",
       }}
     >
       <span>Neue Version verfügbar — Reload für Update.</span>
