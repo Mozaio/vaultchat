@@ -20,7 +20,7 @@
  *    double up.
  */
 
-const BUILD_TAG = "vaultchat-2026-05";
+const BUILD_TAG = "vaultchat-2026-06";
 const STATIC_CACHE = `${BUILD_TAG}-static-v1`;
 
 self.addEventListener("install", (event) => {

@@ -1,10 +1,50 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="referrer" content="no-referrer" />
-    <title>Umbra</title>
+    <title>Umbra — private, end-to-end encrypted messenger</title>
+    <meta
+      name="description"
+      content="Umbra is an end-to-end encrypted messenger that runs in your browser. The server never sees your messages — your conversations stay yours."
+    />
+
+    <!-- PWA: installable, themed address bar.
+         Single theme-color meta; themeStore.applyTheme() keeps its content in
+         sync with the user's *chosen* theme at runtime (light/dark/system). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" id="meta-theme-color" content="#f6efe6" />
+    <meta name="color-scheme" content="light dark" />
+
+    <!-- Icons (SVG favicon + install icon) -->
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Umbra" />
+    <meta name="application-name" content="Umbra" />
+
+    <!-- Social preview (Open Graph + Twitter) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Umbra" />
+    <meta property="og:title" content="Umbra — private, end-to-end encrypted messenger" />
+    <meta
+      property="og:description"
+      content="End-to-end encrypted messaging in your browser. The server sees nothing."
+    />
+    <meta property="og:image" content="/icon.svg" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Umbra — private messenger" />
+    <meta
+      name="twitter:description"
+      content="End-to-end encrypted messaging in your browser. The server sees nothing."
+    />
+    <meta name="twitter:image" content="/icon.svg" />
   </head>
   <body class="bg-zinc-950 text-zinc-100 antialiased">
     <div id="root"></div>

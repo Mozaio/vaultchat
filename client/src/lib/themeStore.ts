@@ -40,6 +40,27 @@ export function applyTheme(theme: Theme = getStoredTheme()): void {
   } else {
     root.classList.toggle("dark", theme === "dark");
   }
+  syncThemeColorMeta();
+}
+
+/**
+ * Keep the browser/OS address-bar + PWA status-bar tint in sync with the
+ * *resolved* theme by writing the live `--bg` token into <meta theme-color>.
+ * Reading the computed token means custom themes/accents are honored too.
+ */
+function syncThemeColorMeta(): void {
+  try {
+    const meta = document.getElementById(
+      "meta-theme-color"
+    ) as HTMLMetaElement | null;
+    if (!meta) return;
+    const bg = getComputedStyle(document.documentElement)
+      .getPropertyValue("--bg")
+      .trim();
+    if (bg) meta.content = bg;
+  } catch {
+    /* ignore — non-fatal cosmetic */
+  }
 }
 
 export function initTheme(): void {
