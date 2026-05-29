@@ -7303,6 +7303,50 @@ button:focus-visible,
   }
 }
 
+/* Centered, focused login card (warm identity). The split hero is replaced
+   by a single calm card on a warm wash — Signal/WhatsApp-style focus. Dark
+   theme keeps its atmospheric split hero. */
+:root:not(.dark) .auth-split {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(900px 700px at 50% -8%, rgba(243, 217, 196, 0.75), transparent 60%),
+    linear-gradient(160deg, #fbf4ea 0%, #f6efe6 55%, #f1e4d6 100%);
+  padding: 24px;
+}
+:root:not(.dark) .auth-brand-panel {
+  display: none;
+}
+:root:not(.dark) .auth-form-panel {
+  background: var(--bg-elevated);
+  max-width: 466px;
+  width: 100%;
+  border-radius: 26px;
+  box-shadow: 0 34px 80px -30px rgba(80, 50, 30, 0.45);
+  padding: 42px 40px 36px;
+  height: auto;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--border);
+}
+:root:not(.dark) .auth-form-panel-mobile-brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 18px;
+}
+:root:not(.dark) .auth-form-panel-mobile-brand span {
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+:root:not(.dark) .auth-form-head-title {
+  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
+}
+
 /* Prominent "New chat" action in the conversation list. */
 .u-newchat-btn {
   width: 100%;
