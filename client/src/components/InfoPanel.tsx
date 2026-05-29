@@ -178,7 +178,7 @@ export function InfoPanel({
           <p className="info-section-title">{t("info.userInfo")}</p>
           <div className="rounded-xl border p-3" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}>
             <div className="flex items-center justify-between">
-              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>Username</span>
+              <span className="text-sm" style={{ color: "var(--text-secondary)" }}>{t("auth.username")}</span>
               <span className="font-medium" style={{ color: "var(--text)" }}>@{peer.username}</span>
             </div>
             <div className="mt-2 flex items-center justify-between">
