@@ -32,6 +32,7 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { t, useLocale } from "../lib/i18n";
+import { useInstallAvailable, promptInstall } from "../lib/installPrompt";
 import {
   ACCENTS,
   loadAccent,
@@ -150,6 +151,7 @@ export function SecuritySettings({
   onRequestNotificationPermission,
 }: SecuritySettingsProps) {
   useLocale(); // re-render on language change
+  const installAvailable = useInstallAvailable();
   const [accent, setAccent] = useState<AccentId>(() => loadAccent());
   const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
@@ -475,6 +477,36 @@ export function SecuritySettings({
                   <ThemeToggle />
                 </div>
               </div>
+
+              {installAvailable && (
+                <div
+                  className="rounded-lg border p-3"
+                  style={{
+                    borderColor: "var(--accent)",
+                    background: "var(--accent-soft)",
+                  }}
+                >
+                  <h3
+                    className="mb-1 text-sm font-medium"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {t("settings.installTitle")}
+                  </h3>
+                  <p
+                    className="mb-2.5 text-xs leading-relaxed"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    {t("settings.installDesc")}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary !px-3 !py-1.5 !text-xs"
+                    onClick={() => void promptInstall()}
+                  >
+                    {t("settings.installButton")}
+                  </button>
+                </div>
+              )}
 
               <div
                 className="rounded-lg border p-3"

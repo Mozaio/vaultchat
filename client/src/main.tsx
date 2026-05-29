@@ -5,10 +5,12 @@ import { App } from "./App";
 import { initTheme } from "./lib/themeStore";
 import { initAccent } from "./lib/accentStore";
 import { registerServiceWorker } from "./lib/serviceWorker";
+import { initInstallPrompt } from "./lib/installPrompt";
 
 initTheme();
 initAccent();
 registerServiceWorker();
+initInstallPrompt();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
