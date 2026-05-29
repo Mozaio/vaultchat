@@ -59,6 +59,12 @@ import {
 import { PeerRow } from "./PeerRow";
 import { InfoPanel, type SharedMediaItem } from "./InfoPanel";
 import { safeMediaSrc } from "../lib/safeMedia";
+import { GroupCallBar } from "./GroupCallBar";
+import {
+  GroupCallController,
+  type GroupCallState,
+  type VoiceAnnounce,
+} from "../lib/groupCall";
 import { BackupReminder } from "./BackupReminder";
 import {
   authoredFromDm,
@@ -313,6 +319,28 @@ export function ChatShell({
       /* ignore */
     }
   }, [relayOnly]);
+  // Group voice room (Discord-style, P2P mesh, E2EE via DTLS-SRTP). The
+  // controller lives in a ref; its published snapshot drives the UI.
+  const groupCallCtrlRef = useRef<GroupCallController | null>(null);
+  const groupCallGroupIdRef = useRef<string | null>(null);
+  const [groupCallState, setGroupCallState] = useState<GroupCallState | null>(
+    null
+  );
+  // Best-effort passive occupancy (who's in each group's voice room), tracked
+  // from announces seen while online so we can show a "join" prompt with a
+  // count before joining: groupId -> Set<userId>.
+  const voiceRoomsRef = useRef<Map<string, Set<string>>>(new Map());
+  const [voiceOccupants, setVoiceOccupants] = useState<Record<string, number>>(
+    {}
+  );
+  // Release the mic + mesh connections if the shell unmounts (lock/logout)
+  // while still in a voice room.
+  useEffect(() => {
+    return () => {
+      groupCallCtrlRef.current?.leave();
+      groupCallCtrlRef.current = null;
+    };
+  }, []);
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [groupEditMode, setGroupEditMode] = useState(false);
@@ -1339,8 +1367,15 @@ export function ChatShell({
           if (data.type === "pong") return;
           if (data.type === "rtc" && data.payload && data.fromUserId) {
             const fromId = String(data.fromUserId);
-            const u = usersRef.current.find((x) => x.id === fromId);
             const payload = data.payload as RtcPayload;
+            // While a group voice room is active, every rtc frame belongs to
+            // its P2P mesh — route to the controller and skip the 1:1 path
+            // (no incoming-call ring during a group call).
+            if (groupCallCtrlRef.current) {
+              await groupCallCtrlRef.current.onRtc(fromId, payload);
+              return;
+            }
+            const u = usersRef.current.find((x) => x.id === fromId);
             if (payload.type === "offer" && u) {
               setIncomingOffer({ from: u, sdp: payload.sdp });
               setCallStatus("ringing");
@@ -1541,6 +1576,16 @@ export function ChatShell({
                     }
                     seen.current.add(buf.id);
                     const fromUid = retried.senderUserId ?? "";
+                    // Ephemeral voice coordination — route, never store.
+                    if (retried.kind === "voice_announce" && retried.voiceKind) {
+                      handleVoiceAnnounce(
+                        plain.groupId,
+                        fromUid,
+                        retried.voiceKind,
+                        buf.createdAt || Date.now()
+                      );
+                      continue;
+                    }
                     await idbPutGroupMsg({
                       id: buf.id,
                       groupId: plain.groupId,
@@ -1670,6 +1715,12 @@ export function ChatShell({
             seen.current.add(id);
             const fromUserId = plain.senderUserId ?? "";
             const at = Number(data.createdAt);
+            // Voice-room coordination is ephemeral: hand it to the group-call
+            // layer and never persist or render it as a message.
+            if (plain.kind === "voice_announce" && plain.voiceKind) {
+              handleVoiceAnnounce(gid, fromUserId, plain.voiceKind, at || Date.now());
+              return;
+            }
             const ttl = plain.ttlMs ?? 0;
             await idbPutGroupMsg({
               id,
@@ -2519,6 +2570,89 @@ export function ChatShell({
     } catch (e) {
       setError(e instanceof Error ? e.message : "leave_failed");
     }
+  }
+
+  // ── Group voice room (Discord-style, P2P mesh) ──────────────────────────
+
+  /** Apply an inbound voice announce: maintain the passive occupancy set and,
+   *  if we're in this group's call, hand it to the mesh controller. */
+  function handleVoiceAnnounce(
+    gid: string,
+    fromUserId: string,
+    kind: VoiceAnnounce["kind"],
+    at: number
+  ) {
+    if (!fromUserId || fromUserId === session.user.id) return;
+    let set = voiceRoomsRef.current.get(gid);
+    if (!set) {
+      set = new Set<string>();
+      voiceRoomsRef.current.set(gid, set);
+    }
+    if (kind === "voice_leave") set.delete(fromUserId);
+    else set.add(fromUserId); // join or present
+    setVoiceOccupants((prev) => ({ ...prev, [gid]: set!.size }));
+    if (groupCallCtrlRef.current && groupCallGroupIdRef.current === gid) {
+      // All union members share one shape; cast is safe.
+      groupCallCtrlRef.current.onAnnounce({ kind, from: fromUserId, at } as VoiceAnnounce);
+    }
+  }
+
+  async function joinGroupVoice() {
+    const g = group;
+    if (!g || groupCallCtrlRef.current) return;
+    try {
+      const ctrl = await GroupCallController.start(
+        g.id,
+        session.user.id,
+        session.user.username,
+        tokenRef.current,
+        relayOnly,
+        {
+          onState: (s) => setGroupCallState(s),
+          sendRtc: (toUserId, payload) => sendRtc(toUserId, payload),
+          sendAnnounce: (msg) => {
+            // Ephemeral coordination over the E2EE group channel — never
+            // stored locally (suppressLocal) and silent on failure (quiet).
+            void sendGroupWire(
+              g,
+              {
+                v: 2,
+                cid: newCid(),
+                kind: "voice_announce",
+                voiceKind: msg.kind,
+              },
+              true,
+              true
+            );
+          },
+          resolveUser: (uid) => {
+            const u = usersRef.current.find((x) => x.id === uid);
+            return u ? { id: u.id, username: u.username } : null;
+          },
+        }
+      );
+      groupCallCtrlRef.current = ctrl;
+      groupCallGroupIdRef.current = g.id;
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message
+          ? e.message
+          : "Mikrofon nicht verfügbar oder Berechtigung verweigert."
+      );
+    }
+  }
+
+  function leaveGroupVoice() {
+    const ctrl = groupCallCtrlRef.current;
+    if (ctrl) ctrl.leave();
+    groupCallCtrlRef.current = null;
+    groupCallGroupIdRef.current = null;
+    setGroupCallState(null);
+  }
+
+  function toggleGroupVoiceMute() {
+    const ctrl = groupCallCtrlRef.current;
+    if (ctrl) ctrl.setMuted(!ctrl.isMuted());
   }
 
   async function beginCall() {
@@ -5193,6 +5327,19 @@ export function ChatShell({
                 </div>
               )}
             </header>
+            <GroupCallBar
+              state={
+                groupCallState && groupCallGroupIdRef.current === group.id
+                  ? groupCallState
+                  : null
+              }
+              selfUserId={session.user.id}
+              selfUsername={session.user.username}
+              onJoin={() => void joinGroupVoice()}
+              onLeave={leaveGroupVoice}
+              onToggleMute={toggleGroupVoiceMute}
+              occupants={voiceOccupants[group.id] ?? 0}
+            />
             <div
               ref={groupScrollRef}
               role="log"

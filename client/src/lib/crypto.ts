@@ -117,7 +117,8 @@ export type PlainPayload = {
     | "receipt"
     | "system"
     | "poll"
-    | "poll-vote";
+    | "poll-vote"
+    | "voice_announce";
   /** Text-Body bzw. Data-URL für Datei/Voice. Leer für Meta-Frames. */
   body?: string;
   fileName?: string;
@@ -164,6 +165,10 @@ export type PlainPayload = {
    *  InboundGroupSession aufzubauen. */
   megolmSessionId?: string;
   megolmSessionKey?: string;
+  /** Nur bei kind === "voice_announce": ephemerale Voice-Room-Koordination
+   *  (Beitreten/Verlassen/Anwesend). Wird NICHT gespeichert oder gerendert,
+   *  sondern an den GroupCallController weitergereicht. */
+  voiceKind?: "voice_join" | "voice_leave" | "voice_present";
   /**
    * Für Gruppen-Sealed-Sender: der Absender ist in der E2EE-Payload enthalten,
    * nicht im server-sichtbaren Group-Frame. Für DMs wird der Absender per
