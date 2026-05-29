@@ -247,6 +247,48 @@ const DICT: Record<string, Dict> = {
     zh: "在左侧选择一个对话，或开始新的私密聊天。端到端加密，服务器无法读取。",
     hi: "बाईं ओर कोई बातचीत चुनें — या नई, निजी चैट शुरू करें। एंड-टू-एंड एन्क्रिप्टेड, कोई सर्वर नहीं पढ़ता।",
   },
+
+  // ── Search + composer ─────────────────────────────────────────────
+  "search.placeholder": {
+    en: "Search or add a contact", de: "Suchen oder Kontakt hinzufügen",
+    tr: "Ara veya kişi ekle", es: "Buscar o añadir contacto",
+    fr: "Rechercher ou ajouter un contact", pt: "Buscar ou adicionar contato",
+    ru: "Поиск или добавить контакт", ar: "ابحث أو أضف جهة اتصال",
+    zh: "搜索或添加联系人", hi: "खोजें या संपर्क जोड़ें",
+  },
+  "composer.toName": {
+    en: "Message {name} …", de: "Nachricht an {name} …",
+    tr: "{name} kişisine mesaj …", es: "Mensaje para {name} …",
+    fr: "Message à {name} …", pt: "Mensagem para {name} …",
+    ru: "Сообщение для {name} …", ar: "رسالة إلى {name} …",
+    zh: "给 {name} 发消息 …", hi: "{name} को संदेश …",
+  },
+  "composer.note": {
+    en: "Write a note to yourself", de: "Notiz für dich schreiben",
+    tr: "Kendine bir not yaz", es: "Escribe una nota para ti",
+    fr: "Écrivez une note pour vous", pt: "Escreva uma nota para você",
+    ru: "Заметка для себя", ar: "اكتب ملاحظة لنفسك",
+    zh: "给自己写个备注", hi: "खुद के लिए नोट लिखें",
+  },
+  "composer.group": {
+    en: "Group message…", de: "Gruppennachricht…", tr: "Grup mesajı…",
+    es: "Mensaje de grupo…", fr: "Message de groupe…", pt: "Mensagem do grupo…",
+    ru: "Сообщение группе…", ar: "رسالة جماعية…", zh: "群组消息…",
+    hi: "समूह संदेश…",
+  },
+  "composer.viewOnce": {
+    en: "View-once message…", de: "Einmal-Nachricht…",
+    tr: "Tek seferlik mesaj…", es: "Mensaje de una vez…",
+    fr: "Message éphémère…", pt: "Mensagem única…",
+    ru: "Одноразовое сообщение…", ar: "رسالة لمرة واحدة…",
+    zh: "阅后即焚消息…", hi: "एक-बार संदेश…",
+  },
+  "composer.recording": {
+    en: "Recording …", de: "Aufnahme läuft …", tr: "Kaydediliyor …",
+    es: "Grabando …", fr: "Enregistrement …", pt: "Gravando …",
+    ru: "Идёт запись …", ar: "جارٍ التسجيل …", zh: "正在录音 …",
+    hi: "रिकॉर्डिंग …",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";

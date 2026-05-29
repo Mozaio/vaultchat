@@ -59,6 +59,7 @@ import {
 import { PeerRow } from "./PeerRow";
 import { InfoPanel, type SharedMediaItem } from "./InfoPanel";
 import { safeMediaSrc } from "../lib/safeMedia";
+import { t, useLocale } from "../lib/i18n";
 import { GroupCallBar } from "./GroupCallBar";
 import {
   GroupCallController,
@@ -239,6 +240,7 @@ export function ChatShell({
   onLogout: () => void;
   onLock: () => void;
 }) {
+  useLocale(); // re-render chat UI on language change
   const [users, setUsers] = useState<api.ApiUser[]>([]);
   const [groups, setGroups] = useState<api.ApiGroup[]>([]);
   const [tab, setTab] = useState<Tab>("dm");
@@ -3598,7 +3600,7 @@ export function ChatShell({
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
           <div className="flex min-w-0 items-center gap-2.5">
-            <h2 className="u-list-title">Chats</h2>
+            <h2 className="u-list-title">{t("nav.chats")}</h2>
             {!connected && (
               <span
                 className={`sidebar-status-pill ${
@@ -3639,8 +3641,8 @@ export function ChatShell({
               type="button"
               onClick={() => setShowAddContact(true)}
               className="u-header-icon-btn u-header-compose"
-              title="Neuer Chat"
-              aria-label="Neuer Chat"
+              title={t("nav.newChat")}
+              aria-label={t("nav.newChat")}
             >
               <IconPlus size={20} />
             </button>
@@ -3655,7 +3657,7 @@ export function ChatShell({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Suchen oder Kontakt hinzufügen"
+              placeholder={t("search.placeholder")}
               className="w-full border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text)" }}
               aria-label="Chats durchsuchen oder Kontakt hinzufügen"
@@ -4830,17 +4832,17 @@ export function ChatShell({
                   className="chat-input-textarea"
                   aria-label={
                     peer && peer.id !== session.user.id
-                      ? `Nachricht an ${peer.username} schreiben`
-                      : "Notiz für dich schreiben"
+                      ? t("composer.toName", { name: peer.username })
+                      : t("composer.note")
                   }
                   placeholder={
                     voice.recording
-                      ? `Aufnahme läuft … ${formatElapsedMs(voice.elapsedMs)}`
+                      ? `${t("composer.recording")} ${formatElapsedMs(voice.elapsedMs)}`
                       : viewOnceDm
-                        ? "Einmal-Nachricht…"
+                        ? t("composer.viewOnce")
                         : peer && peer.id !== session.user.id
-                          ? `Nachricht an ${peer.username} …`
-                          : "Notiz für dich …"
+                          ? t("composer.toName", { name: peer.username })
+                          : t("composer.note")
                   }
                   value={text}
                   disabled={voice.recording || peerPin?.state === "mismatch"}
@@ -5699,16 +5701,18 @@ export function ChatShell({
                   ref={groupInputRef}
                   className="chat-input-textarea"
                   aria-label={
-                    group ? `Nachricht an Gruppe ${group.name} schreiben` : "Gruppennachricht schreiben"
+                    group
+                      ? t("composer.toName", { name: group.name })
+                      : t("composer.group")
                   }
                   placeholder={
                     groupVoice.recording
-                      ? `Aufnahme läuft … ${formatElapsedMs(groupVoice.elapsedMs)}`
+                      ? `${t("composer.recording")} ${formatElapsedMs(groupVoice.elapsedMs)}`
                       : viewOnceGroup
-                        ? "Einmal-Nachricht…"
+                        ? t("composer.viewOnce")
                         : group
-                          ? `Nachricht an ${group.name} …`
-                          : "Gruppennachricht…"
+                          ? t("composer.toName", { name: group.name })
+                          : t("composer.group")
                   }
                   value={groupText}
                   disabled={groupVoice.recording}
