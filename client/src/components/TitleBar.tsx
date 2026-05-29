@@ -62,7 +62,16 @@ export function TitleBar() {
   if (!tauri) return null;
 
   return (
-    <div className="titlebar" data-tauri-drag-region>
+    <div
+      className="titlebar"
+      data-tauri-drag-region
+      onDoubleClick={(e) => {
+        // Double-click the bar (but not the window controls) to maximize/
+        // restore — standard native behavior.
+        if ((e.target as HTMLElement).closest(".titlebar-controls")) return;
+        void windowAction("toggleMaximize");
+      }}
+    >
       <div className="titlebar-brand" data-tauri-drag-region>
         <VaultChatLogo size={15} style={{ color: "var(--accent)" }} />
         <span>Umbra</span>
