@@ -2591,6 +2591,20 @@ export function ChatShell({
     if (kind === "voice_leave") set.delete(fromUserId);
     else set.add(fromUserId); // join or present
     setVoiceOccupants((prev) => ({ ...prev, [gid]: set!.size }));
+    // Discord-style presence feedback for the group you're viewing or in.
+    // "present" acks are silent (they'd flood toasts on your own join).
+    if (
+      (kind === "voice_join" || kind === "voice_leave") &&
+      (groupRef.current?.id === gid || groupCallGroupIdRef.current === gid)
+    ) {
+      const name =
+        usersRef.current.find((u) => u.id === fromUserId)?.username ?? "Jemand";
+      pushToast(
+        kind === "voice_join"
+          ? `${name} ist dem Sprachraum beigetreten`
+          : `${name} hat den Sprachraum verlassen`
+      );
+    }
     if (groupCallCtrlRef.current && groupCallGroupIdRef.current === gid) {
       // All union members share one shape; cast is safe.
       groupCallCtrlRef.current.onAnnounce({ kind, from: fromUserId, at } as VoiceAnnounce);
