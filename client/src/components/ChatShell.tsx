@@ -5027,7 +5027,7 @@ export function ChatShell({
                     type="button"
                     onClick={() => setGroupPanelOpen((v) => !v)}
                     className="btn btn-secondary btn-icon !h-9 !w-9"
-                    title="Mitglieder"
+                    title={t("group.members")}
                   >
                     <IconUsers size={18} />
                   </button>
@@ -5059,7 +5059,7 @@ export function ChatShell({
                           <IconSearch size={16} /> Suche in Konversation
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setGroupPanelOpen(true); }}>
-                          <IconUsers size={16} /> Mitglieder anzeigen
+                          <IconUsers size={16} /> {t("group.showMembers")}
                         </button>
                       </div>
                     )}
@@ -5316,7 +5316,7 @@ export function ChatShell({
                                   color: "var(--accent)",
                                 }}
                               >
-                                Gründer
+                                {t("group.founder")}
                               </span>
                             )}
                           </span>
@@ -5326,7 +5326,7 @@ export function ChatShell({
                               onClick={() => void removeMember(mid)}
                               className="btn btn-danger shrink-0 !px-2 !py-0.5 !text-[10px]"
                             >
-                              Entfernen
+                              {t("common.remove")}
                             </button>
                           )}
                         </li>
@@ -5339,7 +5339,7 @@ export function ChatShell({
                       onChange={(e) => setAddMemberId(e.target.value)}
                       className="app-input flex-1 !py-1 !text-xs"
                     >
-                      <option value="">— Mitglied wählen —</option>
+                      <option value="">{t("group.pickMember")}</option>
                       {users
                         .filter((u) => !group.memberIds.includes(u.id))
                         .map((u) => (
@@ -5354,14 +5354,14 @@ export function ChatShell({
                       disabled={!addMemberId}
                       className="btn btn-primary !px-2 !py-1 !text-[10px] disabled:opacity-40"
                     >
-                      Hinzufügen
+                      {t("common.add")}
                     </button>
                     <button
                       type="button"
                       onClick={() => void leaveCurrentGroup()}
                       className="btn btn-danger !px-2 !py-1 !text-[10px]"
                     >
-                      Verlassen
+                      {t("group.leave")}
                     </button>
                   </div>
                 </div>

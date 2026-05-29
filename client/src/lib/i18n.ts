@@ -836,6 +836,43 @@ const DICT: Record<string, Dict> = {
     ru: "Удалить изображение", ar: "إزالة الصورة", zh: "移除图片",
     hi: "छवि हटाएं",
   },
+
+  // ── Group management ──────────────────────────────────────────────
+  "common.remove": {
+    en: "Remove", de: "Entfernen", tr: "Kaldır", es: "Eliminar",
+    fr: "Retirer", pt: "Remover", ru: "Удалить", ar: "إزالة", zh: "移除",
+    hi: "हटाएं",
+  },
+  "common.add": {
+    en: "Add", de: "Hinzufügen", tr: "Ekle", es: "Añadir", fr: "Ajouter",
+    pt: "Adicionar", ru: "Добавить", ar: "إضافة", zh: "添加", hi: "जोड़ें",
+  },
+  "group.founder": {
+    en: "Founder", de: "Gründer", tr: "Kurucu", es: "Fundador",
+    fr: "Fondateur", pt: "Fundador", ru: "Создатель", ar: "المؤسس",
+    zh: "创建者", hi: "संस्थापक",
+  },
+  "group.leave": {
+    en: "Leave", de: "Verlassen", tr: "Ayrıl", es: "Salir", fr: "Quitter",
+    pt: "Sair", ru: "Покинуть", ar: "مغادرة", zh: "退出", hi: "छोड़ें",
+  },
+  "group.pickMember": {
+    en: "— Choose member —", de: "— Mitglied wählen —", tr: "— Üye seç —",
+    es: "— Elegir miembro —", fr: "— Choisir un membre —",
+    pt: "— Escolher membro —", ru: "— Выбрать участника —",
+    ar: "— اختر عضوًا —", zh: "— 选择成员 —", hi: "— सदस्य चुनें —",
+  },
+  "group.members": {
+    en: "Members", de: "Mitglieder", tr: "Üyeler", es: "Miembros",
+    fr: "Membres", pt: "Membros", ru: "Участники", ar: "الأعضاء",
+    zh: "成员", hi: "सदस्य",
+  },
+  "group.showMembers": {
+    en: "Show members", de: "Mitglieder anzeigen", tr: "Üyeleri göster",
+    es: "Mostrar miembros", fr: "Afficher les membres",
+    pt: "Mostrar membros", ru: "Показать участников", ar: "عرض الأعضاء",
+    zh: "显示成员", hi: "सदस्य दिखाएं",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";
