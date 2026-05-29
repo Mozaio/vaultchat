@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { ApiUser, ApiGroup } from "../lib/api";
 import { type ChatFolder, newFolderId } from "../lib/chatFolders";
 import { canAddFolder, getLimits } from "../lib/plan";
+import { t, useLocale } from "../lib/i18n";
 import { IconX, IconBookmark, IconUsers } from "./Icons";
 
 type Props = {
@@ -32,6 +33,7 @@ export function FoldersManageModal({
   editing,
   setEditing,
 }: Props) {
+  useLocale();
   const [draft, setDraft] = useState<ChatFolder | null>(editing);
 
   useEffect(() => {
@@ -116,16 +118,16 @@ export function FoldersManageModal({
           >
             {draft
               ? folders.some((f) => f.id === draft.id)
-                ? "Ordner bearbeiten"
-                : "Neuer Ordner"
-              : "Ordner verwalten"}
+                ? t("folders.edit")
+                : t("folders.new")
+              : t("folders.manage")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             style={{ color: "var(--text-muted)" }}
-            aria-label="Schließen"
+            aria-label={t("common.close")}
           >
             <IconX size={18} />
           </button>
@@ -139,7 +141,7 @@ export function FoldersManageModal({
                 className="py-6 text-center text-sm"
                 style={{ color: "var(--text-muted)" }}
               >
-                Noch keine Ordner. Erstelle einen, um Chats zu gruppieren.
+                {t("folders.empty")}
               </p>
             ) : (
               <ul className="flex-1 space-y-1.5 overflow-y-auto">
@@ -169,14 +171,14 @@ export function FoldersManageModal({
                       className="btn btn-secondary !px-2 !py-1 !text-xs"
                       onClick={() => setDraft(f)}
                     >
-                      Bearbeiten
+                      {t("msg.edit")}
                     </button>
                     <button
                       type="button"
                       className="btn btn-danger !px-2 !py-1 !text-xs"
                       onClick={() => deleteFolder(f.id)}
                     >
-                      Löschen
+                      {t("common.delete")}
                     </button>
                   </li>
                 ))}
@@ -187,20 +189,20 @@ export function FoldersManageModal({
               className="btn btn-primary w-full"
               onClick={startNewFolder}
             >
-              + Neuer Ordner
+              + {t("folders.new")}
             </button>
           </div>
         ) : (
           /* Edit view */
           <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
             <div className="auth-input-group">
-              <label htmlFor="folder-name">Name</label>
+              <label htmlFor="folder-name">{t("common.name")}</label>
               <input
                 id="folder-name"
                 className="app-input"
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                placeholder="z.B. Familie, Arbeit, Privat"
+                placeholder={t("folders.namePlaceholder")}
                 maxLength={40}
                 autoFocus
               />
@@ -210,7 +212,7 @@ export function FoldersManageModal({
                 className="mb-1.5 block text-xs font-medium"
                 style={{ color: "var(--text-secondary)" }}
               >
-                Icon
+                {t("common.icon")}
               </label>
               <div
                 className="grid gap-1.5"
@@ -248,7 +250,7 @@ export function FoldersManageModal({
                 className="mb-1.5 block text-xs font-medium"
                 style={{ color: "var(--text-secondary)" }}
               >
-                Chats in diesem Ordner ({draft.chatKeys.length})
+                {t("folders.chatsIn", { n: draft.chatKeys.length })}
               </label>
               <div
                 className="flex-1 space-y-0.5 overflow-y-auto rounded-lg border p-1"
@@ -277,8 +279,7 @@ export function FoldersManageModal({
                     className="py-3 text-center text-xs"
                     style={{ color: "var(--text-muted)" }}
                   >
-                    Saved Messages ist immer verfügbar. Füge Kontakte oder
-                    Gruppen hinzu, um sie hier auszuwählen.
+                    {t("folders.savedAlways")}
                   </p>
                 ) : (
                   <>
@@ -330,7 +331,7 @@ export function FoldersManageModal({
                 className="btn btn-secondary !px-3 !py-1.5 !text-xs"
                 onClick={() => setDraft(null)}
               >
-                Abbrechen
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -338,7 +339,7 @@ export function FoldersManageModal({
                 onClick={saveDraft}
                 disabled={!draft.name.trim()}
               >
-                Speichern
+                {t("common.save")}
               </button>
             </div>
           </div>
