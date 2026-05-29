@@ -469,6 +469,13 @@ export function ChatShell({
   const groupUnreadDividerAtRef = useRef<number>(0);
   const groupUnreadDividerCapRef = useRef<number>(0);
   /**
+   * Set true the moment a chat opens so the next render scrolls to the
+   * "New messages" divider (if any) instead of jumping straight to the
+   * bottom — like Slack/Discord. Consumed (cleared) by the auto-scroll effect.
+   */
+  const dmScrollToUnreadRef = useRef<boolean>(false);
+  const groupScrollToUnreadRef = useRef<boolean>(false);
+  /**
    * Buffered group ciphertexts that arrived BEFORE the group key was
    * known. We retry them once the matching `group_key` DM lands so the
    * race between `group_key` distribution and the first chat message
@@ -930,6 +937,7 @@ export function ChatShell({
       const prevSeenRaw = await metaGet(`seen:dm:${peer.id}`).catch(() => null);
       dmUnreadDividerAtRef.current = prevSeenRaw ? Number(prevSeenRaw) || 0 : 0;
       dmUnreadDividerCapRef.current = Date.now();
+      dmScrollToUnreadRef.current = dmUnreadDividerAtRef.current > 0;
       await loadDmLocal(peer);
       await metaSet(
         `seen:dm:${peer.id}`,
@@ -954,6 +962,7 @@ export function ChatShell({
         ? Number(prevSeenRaw) || 0
         : 0;
       groupUnreadDividerCapRef.current = Date.now();
+      groupScrollToUnreadRef.current = groupUnreadDividerAtRef.current > 0;
       await loadGroupLocal(group);
       await metaSet(
         `seen:group:${group.id}`,
@@ -967,6 +976,19 @@ export function ChatShell({
   useEffect(() => {
     const el = dmScrollRef.current;
     if (!el) return;
+    // First render after opening a chat with unread messages: land on the
+    // "New messages" divider rather than the very bottom.
+    if (dmScrollToUnreadRef.current) {
+      dmScrollToUnreadRef.current = false;
+      const divider = el.querySelector(".unread-divider");
+      if (divider) {
+        requestAnimationFrame(() =>
+          divider.scrollIntoView({ block: "center", behavior: "auto" })
+        );
+        setDmScrolledUp(true);
+        return;
+      }
+    }
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     if (isNearBottom) {
       el.scrollTo({
@@ -986,6 +1008,17 @@ export function ChatShell({
   useEffect(() => {
     const el = groupScrollRef.current;
     if (!el) return;
+    if (groupScrollToUnreadRef.current) {
+      groupScrollToUnreadRef.current = false;
+      const divider = el.querySelector(".unread-divider");
+      if (divider) {
+        requestAnimationFrame(() =>
+          divider.scrollIntoView({ block: "center", behavior: "auto" })
+        );
+        setGroupScrolledUp(true);
+        return;
+      }
+    }
     const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     if (isNearBottom) {
       el.scrollTo({
