@@ -2997,7 +2997,7 @@ export function ChatShell({
     }
     return cids.map((cid) => ({
       cid,
-      preview: lookup.get(cid) ?? "Angeheftete Nachricht",
+      preview: lookup.get(cid) ?? t("pinned.message"),
     }));
   }
 
@@ -4630,8 +4630,11 @@ export function ChatShell({
                   <span className="pinned-banner-content">
                     <span className="pinned-banner-label">
                       {pinnedDmList.length > 1
-                        ? `Angeheftet ${dmBannerIdx + 1}/${pinnedDmList.length}`
-                        : "Angeheftet"}
+                        ? t("pinned.indexed", {
+                            i: dmBannerIdx + 1,
+                            n: pinnedDmList.length,
+                          })
+                        : t("pinned.label")}
                     </span>
                     <span className="pinned-banner-text">
                       {pinnedDmBanner.preview}
@@ -4767,11 +4770,11 @@ export function ChatShell({
               {pollDm && (
                 <div className="poll-composer">
                   <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
-                    Umfrage erstellen
+                    {t("poll.create")}
                   </p>
                   <input
                     className="app-input !py-1.5 text-sm"
-                    placeholder="Frage"
+                    placeholder={t("poll.question")}
                     maxLength={200}
                     value={pollDm.question}
                     onChange={(e) =>
@@ -4782,7 +4785,7 @@ export function ChatShell({
                     <div key={i} className="poll-composer-row">
                       <input
                         className="app-input !py-1.5 text-sm"
-                        placeholder={`Option ${i + 1}`}
+                        placeholder={t("poll.option", { n: i + 1 })}
                         maxLength={120}
                         value={opt}
                         onChange={(e) => {
@@ -4801,7 +4804,7 @@ export function ChatShell({
                               options: pollDm.options.filter((_, j) => j !== i),
                             })
                           }
-                          aria-label={`Option ${i + 1} entfernen`}
+                          aria-label={t("poll.optionRemove", { n: i + 1 })}
                         >
                           <IconX size={12} />
                         </button>
@@ -4817,7 +4820,7 @@ export function ChatShell({
                           setPollDm({ ...pollDm, options: [...pollDm.options, ""] })
                         }
                       >
-                        + Option
+                        {t("poll.addOption")}
                       </button>
                     )}
                     <button
@@ -4825,7 +4828,7 @@ export function ChatShell({
                       className="btn btn-secondary !px-2 !py-1 !text-xs"
                       onClick={() => setPollDm(null)}
                     >
-                      Abbrechen
+                      {t("common.cancel")}
                     </button>
                     <button
                       type="button"
@@ -4836,7 +4839,7 @@ export function ChatShell({
                         pollDm.options.filter((o) => o.trim()).length < 2
                       }
                     >
-                      Senden
+                      {t("common.send")}
                     </button>
                   </div>
                 </div>
@@ -5508,8 +5511,11 @@ export function ChatShell({
                   <span className="pinned-banner-content">
                     <span className="pinned-banner-label">
                       {pinnedGroupList.length > 1
-                        ? `Angeheftet ${groupBannerIdx + 1}/${pinnedGroupList.length}`
-                        : "Angeheftet"}
+                        ? t("pinned.indexed", {
+                            i: groupBannerIdx + 1,
+                            n: pinnedGroupList.length,
+                          })
+                        : t("pinned.label")}
                     </span>
                     <span className="pinned-banner-text">
                       {pinnedGroupBanner.preview}
@@ -5655,11 +5661,11 @@ export function ChatShell({
               {pollGroup && (
                 <div className="poll-composer">
                   <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
-                    Umfrage erstellen
+                    {t("poll.create")}
                   </p>
                   <input
                     className="app-input !py-1.5 text-sm"
-                    placeholder="Frage"
+                    placeholder={t("poll.question")}
                     maxLength={200}
                     value={pollGroup.question}
                     onChange={(e) =>
@@ -5670,7 +5676,7 @@ export function ChatShell({
                     <div key={i} className="poll-composer-row">
                       <input
                         className="app-input !py-1.5 text-sm"
-                        placeholder={`Option ${i + 1}`}
+                        placeholder={t("poll.option", { n: i + 1 })}
                         maxLength={120}
                         value={opt}
                         onChange={(e) => {
@@ -5689,7 +5695,7 @@ export function ChatShell({
                               options: pollGroup.options.filter((_, j) => j !== i),
                             })
                           }
-                          aria-label={`Option ${i + 1} entfernen`}
+                          aria-label={t("poll.optionRemove", { n: i + 1 })}
                         >
                           <IconX size={12} />
                         </button>
@@ -5708,7 +5714,7 @@ export function ChatShell({
                           })
                         }
                       >
-                        + Option
+                        {t("poll.addOption")}
                       </button>
                     )}
                     <button
@@ -5716,7 +5722,7 @@ export function ChatShell({
                       className="btn btn-secondary !px-2 !py-1 !text-xs"
                       onClick={() => setPollGroup(null)}
                     >
-                      Abbrechen
+                      {t("common.cancel")}
                     </button>
                     <button
                       type="button"
@@ -5727,7 +5733,7 @@ export function ChatShell({
                         pollGroup.options.filter((o) => o.trim()).length < 2
                       }
                     >
-                      Senden
+                      {t("common.send")}
                     </button>
                   </div>
                 </div>

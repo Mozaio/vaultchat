@@ -306,6 +306,57 @@ const DICT: Record<string, Dict> = {
     hi: "रिकॉर्डिंग …",
   },
 
+  // ── Poll composer ────────────────────────────────────────────────
+  "poll.create": {
+    en: "Create poll", de: "Umfrage erstellen", tr: "Anket oluştur",
+    es: "Crear encuesta", fr: "Créer un sondage", pt: "Criar enquete",
+    ru: "Создать опрос", ar: "إنشاء استطلاع", zh: "创建投票",
+    hi: "पोल बनाएं",
+  },
+  "poll.question": {
+    en: "Question", de: "Frage", tr: "Soru", es: "Pregunta",
+    fr: "Question", pt: "Pergunta", ru: "Вопрос", ar: "سؤال",
+    zh: "问题", hi: "प्रश्न",
+  },
+  "poll.option": {
+    en: "Option {n}", de: "Option {n}", tr: "Seçenek {n}",
+    es: "Opción {n}", fr: "Option {n}", pt: "Opção {n}",
+    ru: "Вариант {n}", ar: "خيار {n}", zh: "选项 {n}", hi: "विकल्प {n}",
+  },
+  "poll.optionRemove": {
+    en: "Remove option {n}", de: "Option {n} entfernen",
+    tr: "Seçenek {n} kaldır", es: "Eliminar opción {n}",
+    fr: "Supprimer l'option {n}", pt: "Remover opção {n}",
+    ru: "Удалить вариант {n}", ar: "إزالة الخيار {n}",
+    zh: "删除选项 {n}", hi: "विकल्प {n} हटाएं",
+  },
+  "poll.addOption": {
+    en: "+ Option", de: "+ Option", tr: "+ Seçenek", es: "+ Opción",
+    fr: "+ Option", pt: "+ Opção", ru: "+ Вариант", ar: "+ خيار",
+    zh: "+ 选项", hi: "+ विकल्प",
+  },
+
+  // ── Pinned-message banner ────────────────────────────────────────
+  "pinned.label": {
+    en: "Pinned", de: "Angeheftet", tr: "Sabitlenmiş", es: "Fijado",
+    fr: "Épinglé", pt: "Fixado", ru: "Закреплено", ar: "مثبّت",
+    zh: "已置顶", hi: "पिन किया गया",
+  },
+  "pinned.indexed": {
+    en: "Pinned {i}/{n}", de: "Angeheftet {i}/{n}",
+    tr: "Sabitlenmiş {i}/{n}", es: "Fijado {i}/{n}",
+    fr: "Épinglé {i}/{n}", pt: "Fixado {i}/{n}",
+    ru: "Закреплено {i}/{n}", ar: "مثبّت {i}/{n}",
+    zh: "已置顶 {i}/{n}", hi: "पिन किया गया {i}/{n}",
+  },
+  "pinned.message": {
+    en: "Pinned message", de: "Angeheftete Nachricht",
+    tr: "Sabitlenmiş mesaj", es: "Mensaje fijado",
+    fr: "Message épinglé", pt: "Mensagem fixada",
+    ru: "Закреплённое сообщение", ar: "رسالة مثبّتة",
+    zh: "置顶消息", hi: "पिन किया गया संदेश",
+  },
+
   // ── Common buttons (reused across menus/modals/onboarding) ────────
   "common.skip": {
     en: "Skip", de: "Überspringen", tr: "Atla", es: "Omitir", fr: "Passer",
