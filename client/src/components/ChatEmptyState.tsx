@@ -42,32 +42,32 @@ export function ChatEmptyState({
           {onAddContact && (
             <QuickAction
               icon={<IconShieldCheck size={20} />}
-              title="Neuer Kontakt"
-              description="Per Benutzername hinzufügen"
+              title={t("empty.qaContact")}
+              description={t("empty.qaContactDesc")}
               onClick={onAddContact}
             />
           )}
           {onCreateGroup && (
             <QuickAction
               icon={<IconUsers size={20} />}
-              title="Gruppe erstellen"
-              description="Mehrere Personen auf einmal"
+              title={t("empty.qaGroup")}
+              description={t("empty.qaGroupDesc")}
               onClick={onCreateGroup}
             />
           )}
           {onCreateFolder && (
             <QuickAction
               icon={<IconFolderPlus size={20} />}
-              title="Ordner erstellen"
-              description="Chats nach Themen gruppieren"
+              title={t("empty.qaFolder")}
+              description={t("empty.qaFolderDesc")}
               onClick={onCreateFolder}
             />
           )}
           {onSaveBackup && (
             <QuickAction
               icon={<IconDownload size={20} />}
-              title="Backup speichern"
-              description="Identität verschlüsselt sichern"
+              title={t("empty.qaBackup")}
+              description={t("empty.qaBackupDesc")}
               onClick={onSaveBackup}
             />
           )}

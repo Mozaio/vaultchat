@@ -55,7 +55,7 @@ export function InfoPanel({
   sharedMediaItems: SharedMediaItem[];
 }) {
   useLocale(); // re-render on language change
-  const title = mode === "dm" ? peer?.username ?? "Kontakt" : group?.name ?? "Gruppe";
+  const title = mode === "dm" ? peer?.username ?? t("chat.contactFallback") : group?.name ?? t("chat.groupFallback");
   const initials = (title.slice(0, 1) || "•").toUpperCase();
   const status =
     mode === "dm"
@@ -100,7 +100,7 @@ export function InfoPanel({
           {mode === "group" && safeMediaSrc(group?.avatar, "image") ? (
             <img
               src={safeMediaSrc(group?.avatar, "image")}
-              alt={`${group?.name ?? "Gruppe"} Avatar`}
+              alt={`${group?.name ?? t("chat.groupFallback")} Avatar`}
               className="info-avatar-large"
               style={{ objectFit: "cover" }}
             />
@@ -132,7 +132,7 @@ export function InfoPanel({
           type="button"
           className={`info-action-button ${isFavorite ? "active" : ""}`}
           onClick={onToggleFavorite}
-          title={isFavorite ? "Aus Favoriten entfernen" : "Als Favorit markieren"}
+          title={isFavorite ? t("chat.unfavorite") : t("chat.favorite")}
           disabled={mode !== "dm"}
         >
           <IconPin size={18} />
@@ -142,7 +142,7 @@ export function InfoPanel({
           type="button"
           className={`info-action-button ${isMuted ? "active-warning" : ""}`}
           onClick={toggleMute}
-          title={isMuted ? "Stummschaltung aufheben" : "Stummschalten"}
+          title={isMuted ? t("chat.unmuteContact") : t("chat.muteContact")}
         >
           <IconBell size={18} />
           <span>
@@ -154,7 +154,7 @@ export function InfoPanel({
           className="info-action-button"
           onClick={onToggleBlocked}
           disabled={mode !== "dm"}
-          title={isBlocked ? "Kontakt entsperren" : "Kontakt blockieren"}
+          title={isBlocked ? t("chat.unblock") : t("chat.block")}
         >
           <IconShieldCheck size={18} />
           <span>{isBlocked ? t("info.blocked") : t("info.block")}</span>
@@ -187,7 +187,7 @@ export function InfoPanel({
                 type="button"
                 className="group inline-flex items-center gap-1 font-mono text-xs"
                 style={{ color: "var(--accent)" }}
-                title="ID kopieren"
+                title={t("chat.copyId")}
                 onClick={() => void navigator.clipboard?.writeText(peer.id)}
               >
                 {peer.id.slice(0, 16)}...

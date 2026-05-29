@@ -3,6 +3,7 @@ import * as api from "../lib/api";
 import { userGradient } from "../lib/chatHelpers";
 import { getPin, type PeerPin } from "../lib/trust";
 import { IconPin } from "./Icons";
+import { t, useLocale } from "../lib/i18n";
 
 export function PeerRow({
   u,
@@ -31,6 +32,7 @@ export function PeerRow({
   selected: boolean;
   onSelect: () => void;
 }) {
+  useLocale();
   const [pin, setPin] = useState<PeerPin | null>(null);
   useEffect(() => {
     void getPin(u.id).then(setPin);
@@ -51,33 +53,33 @@ export function PeerRow({
           >
             {u.username.slice(0, 1).toUpperCase()}
           </div>
-          {isOnline && <span className="peer-online-dot" aria-label="Online" />}
+          {isOnline && <span className="peer-online-dot" aria-label={t("chat.online")} />}
         </div>
         <div className="contact-info min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="contact-name">{u.username}</span>
             {isPinned && (
-              <span className="row-badge row-badge-pin" title="An Anfang geheftet">
+              <span className="row-badge row-badge-pin" title={t("chat.pinnedToTop")}>
                 <IconPin size={11} />
               </span>
             )}
             {isFavorite && (
-              <span className="row-badge row-badge-fav" title="Favorit">
+              <span className="row-badge row-badge-fav" title={t("chat.favoriteShort")}>
                 ★
               </span>
             )}
             {isBlocked && (
-              <span className="row-badge row-badge-warning" title="Blockiert">
-                blockiert
+              <span className="row-badge row-badge-warning" title={t("chat.blockedShort")}>
+                {t("chat.blockedShort").toLowerCase()}
               </span>
             )}
             {pin?.state === "mismatch" && (
-              <span className="row-badge row-badge-danger" title="Schlüssel hat gewechselt">
+              <span className="row-badge row-badge-danger" title={t("chat.keyChangedShort")}>
                 ⚠
               </span>
             )}
             {pin?.state === "verified" && (
-              <span className="row-badge row-badge-verified" title="Verifiziert">
+              <span className="row-badge row-badge-verified" title={t("trust.verified")}>
                 ✓
               </span>
             )}
@@ -110,8 +112,8 @@ export function PeerRow({
         <button
           type="button"
           className={`peer-pin-toggle${isPinned ? " active" : ""}`}
-          aria-label={isPinned ? "Pin entfernen" : "An Anfang heften"}
-          title={isPinned ? "Pin entfernen" : "An Anfang heften"}
+          aria-label={isPinned ? t("chat.unpinChat") : t("chat.pinChat")}
+          title={isPinned ? t("chat.unpinChat") : t("chat.pinChat")}
           onClick={(e) => {
             e.stopPropagation();
             onTogglePin();

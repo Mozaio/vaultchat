@@ -783,6 +783,55 @@ const DICT: Record<string, Dict> = {
     zh: "在左侧选择一个对话，或开始新的私密聊天。端到端加密，服务器无法读取。",
     hi: "बाईं ओर कोई बातचीत चुनें — या नई, निजी चैट शुरू करें। एंड-टू-एंड एन्क्रिप्टेड, कोई सर्वर नहीं पढ़ता।",
   },
+  "empty.qaContact": {
+    en: "New contact", de: "Neuer Kontakt", tr: "Yeni kişi",
+    es: "Nuevo contacto", fr: "Nouveau contact", pt: "Novo contato",
+    ru: "Новый контакт", ar: "جهة اتصال جديدة", zh: "新联系人", hi: "नया संपर्क",
+  },
+  "empty.qaContactDesc": {
+    en: "Add by username", de: "Per Benutzername hinzufügen",
+    tr: "Kullanıcı adıyla ekle", es: "Añadir por nombre de usuario",
+    fr: "Ajouter par nom d'utilisateur", pt: "Adicionar por nome de usuário",
+    ru: "Добавить по имени пользователя", ar: "إضافة باسم المستخدم",
+    zh: "通过用户名添加", hi: "उपयोगकर्ता नाम से जोड़ें",
+  },
+  "empty.qaGroup": {
+    en: "Create group", de: "Gruppe erstellen", tr: "Grup oluştur",
+    es: "Crear grupo", fr: "Créer un groupe", pt: "Criar grupo",
+    ru: "Создать группу", ar: "إنشاء مجموعة", zh: "创建群组", hi: "समूह बनाएं",
+  },
+  "empty.qaGroupDesc": {
+    en: "Several people at once", de: "Mehrere Personen auf einmal",
+    tr: "Aynı anda birkaç kişi", es: "Varias personas a la vez",
+    fr: "Plusieurs personnes à la fois", pt: "Várias pessoas de uma vez",
+    ru: "Несколько человек сразу", ar: "عدة أشخاص دفعة واحدة",
+    zh: "一次添加多人", hi: "एक साथ कई लोग",
+  },
+  "empty.qaFolder": {
+    en: "Create folder", de: "Ordner erstellen", tr: "Klasör oluştur",
+    es: "Crear carpeta", fr: "Créer un dossier", pt: "Criar pasta",
+    ru: "Создать папку", ar: "إنشاء مجلد", zh: "创建文件夹", hi: "फ़ोल्डर बनाएं",
+  },
+  "empty.qaFolderDesc": {
+    en: "Group chats by topic", de: "Chats nach Themen gruppieren",
+    tr: "Sohbetleri konuya göre grupla", es: "Agrupar chats por tema",
+    fr: "Grouper les chats par thème", pt: "Agrupar chats por tema",
+    ru: "Группировать чаты по темам", ar: "تجميع المحادثات حسب الموضوع",
+    zh: "按主题分组聊天", hi: "विषय के अनुसार चैट समूहित करें",
+  },
+  "empty.qaBackup": {
+    en: "Save backup", de: "Backup speichern", tr: "Yedek kaydet",
+    es: "Guardar copia", fr: "Sauvegarder", pt: "Salvar backup",
+    ru: "Сохранить копию", ar: "حفظ نسخة احتياطية", zh: "保存备份",
+    hi: "बैकअप सहेजें",
+  },
+  "empty.qaBackupDesc": {
+    en: "Back up your identity encrypted", de: "Identität verschlüsselt sichern",
+    tr: "Kimliğini şifreli yedekle", es: "Respalda tu identidad cifrada",
+    fr: "Sauvegardez votre identité chiffrée", pt: "Faça backup da identidade criptografada",
+    ru: "Сохраните личность в зашифрованном виде", ar: "انسخ هويتك مشفّرة",
+    zh: "加密备份你的身份", hi: "अपनी पहचान एन्क्रिप्टेड बैकअप करें",
+  },
 
   // ── Search + composer ─────────────────────────────────────────────
   "search.placeholder": {
@@ -1939,6 +1988,48 @@ const DICT: Record<string, Dict> = {
   "chat.memberFallback": {
     en: "Member", de: "Mitglied", tr: "Üye", es: "Miembro", fr: "Membre",
     pt: "Membro", ru: "Участник", ar: "عضو", zh: "成员", hi: "सदस्य",
+  },
+  "chat.contactFallback": {
+    en: "Contact", de: "Kontakt", tr: "Kişi", es: "Contacto", fr: "Contact",
+    pt: "Contato", ru: "Контакт", ar: "جهة اتصال", zh: "联系人", hi: "संपर्क",
+  },
+  "chat.pinnedToTop": {
+    en: "Pinned to top", de: "An Anfang geheftet", tr: "Üste sabitlendi",
+    es: "Fijado arriba", fr: "Épinglé en haut", pt: "Fixado no topo",
+    ru: "Закреплено сверху", ar: "مثبّت في الأعلى", zh: "已置顶",
+    hi: "ऊपर पिन किया गया",
+  },
+  "chat.favoriteShort": {
+    en: "Favorite", de: "Favorit", tr: "Favori", es: "Favorito",
+    fr: "Favori", pt: "Favorito", ru: "Избранное", ar: "مفضّل",
+    zh: "收藏", hi: "पसंदीदा",
+  },
+  "chat.blockedShort": {
+    en: "Blocked", de: "Blockiert", tr: "Engellendi", es: "Bloqueado",
+    fr: "Bloqué", pt: "Bloqueado", ru: "Заблокировано", ar: "محظور",
+    zh: "已屏蔽", hi: "अवरुद्ध",
+  },
+  "chat.keyChangedShort": {
+    en: "Key changed", de: "Schlüssel hat gewechselt", tr: "Anahtar değişti",
+    es: "Clave cambiada", fr: "Clé modifiée", pt: "Chave alterada",
+    ru: "Ключ изменён", ar: "تغيّر المفتاح", zh: "密钥已更改",
+    hi: "कुंजी बदली",
+  },
+  "chat.pinChat": {
+    en: "Pin to top", de: "An Anfang heften", tr: "Üste sabitle",
+    es: "Fijar arriba", fr: "Épingler en haut", pt: "Fixar no topo",
+    ru: "Закрепить сверху", ar: "تثبيت في الأعلى", zh: "置顶",
+    hi: "ऊपर पिन करें",
+  },
+  "chat.unpinChat": {
+    en: "Unpin", de: "Pin entfernen", tr: "Sabitlemeyi kaldır",
+    es: "Quitar fijado", fr: "Désépingler", pt: "Desafixar",
+    ru: "Открепить", ar: "إلغاء التثبيت", zh: "取消置顶", hi: "अनपिन करें",
+  },
+  "chat.copyId": {
+    en: "Copy ID", de: "ID kopieren", tr: "Kimliği kopyala", es: "Copiar ID",
+    fr: "Copier l'ID", pt: "Copiar ID", ru: "Скопировать ID", ar: "نسخ المعرّف",
+    zh: "复制 ID", hi: "ID कॉपी करें",
   },
   "chat.groupFallback": {
     en: "Group", de: "Gruppe", tr: "Grup", es: "Grupo", fr: "Groupe",
@@ -3471,6 +3562,13 @@ const DICT: Record<string, Dict> = {
     en: "with {name}", de: "mit {name}", tr: "{name} ile", es: "con {name}",
     fr: "avec {name}", pt: "com {name}", ru: "с {name}", ar: "مع {name}",
     zh: "与 {name}", hi: "{name} के साथ",
+  },
+  "safety.qrAria": {
+    en: "QR code of the safety number", de: "QR-Code der Sicherheitsnummer",
+    tr: "Güvenlik numarasının QR kodu", es: "Código QR del número de seguridad",
+    fr: "Code QR du numéro de sécurité", pt: "Código QR do número de segurança",
+    ru: "QR-код кода безопасности", ar: "رمز QR لرقم الأمان",
+    zh: "安全码的二维码", hi: "सुरक्षा नंबर का QR कोड",
   },
   "safety.changedTitle": {
     en: "⚠️ The security key has changed.",

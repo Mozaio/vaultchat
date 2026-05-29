@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { generateQrMatrix } from "../lib/qrCode";
+import { t } from "../lib/i18n";
 
 export function QrCodeSvg({
   digits,
@@ -59,7 +60,7 @@ export function QrCodeSvg({
       viewBox={`0 0 ${path.n} ${path.n}`}
       shapeRendering="crispEdges"
       role="img"
-      aria-label="QR-Code der Sicherheitsnummer"
+      aria-label={t("safety.qrAria")}
       style={{ display: "block", borderRadius: 8 }}
     >
       <rect width={path.n} height={path.n} fill={bg} />
