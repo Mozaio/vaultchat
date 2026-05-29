@@ -6637,6 +6637,50 @@ button:focus-visible,
   flex-direction: column;
   align-items: stretch;
   padding: 0.85rem;
+  animation: umbraCardIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Active-call header: live status + push-to-talk hint */
+.group-call-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.group-call-header-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.gc-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 0 var(--success);
+  animation: gc-live-pulse 1.8s ease-in-out infinite;
+}
+@keyframes gc-live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--success) 55%, transparent); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.group-call-header-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+}
+.group-call-bar.active.ptt-active .group-call-header-hint {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .group-call-bar.active.ptt-active {

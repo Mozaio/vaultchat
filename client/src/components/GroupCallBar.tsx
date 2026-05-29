@@ -116,12 +116,19 @@ export function GroupCallBar({
 
   return (
     <div className={`group-call-bar active${pttActive ? " ptt-active" : ""}`}>
+      <div className="group-call-header">
+        <span className="group-call-header-status">
+          <span className="gc-live-dot" aria-hidden />
+          {total === 1 ? "Sprachraum · nur du" : `Sprachraum · ${total} verbunden`}
+        </span>
+        <span className="group-call-header-hint">Leertaste: sprechen</span>
+      </div>
       <div className="group-call-grid" data-count={total}>
         <Tile
           label={selfUsername}
           isSelf
           muted={state?.localMuted ?? false}
-          speaking={false /* self-speaking is shown via local-mic ring elsewhere */}
+          speaking={pttActive && !(state?.localMuted ?? false)}
         />
         {peerList.map((p) => (
           <Tile
