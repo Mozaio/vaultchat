@@ -3691,12 +3691,12 @@ export function ChatShell({
               0
             );
             return [
-              ["all", "Alle", totalUnread],
-              ["dm", "DMs", totalUnread],
-              ["group", "Gruppen", 0],
-              ["fav", "Favoriten", 0],
-              ["unread", "Ungelesen", totalUnread],
-              ["star", "Markiert", 0],
+              ["all", t("filter.all"), totalUnread],
+              ["dm", t("filter.dms"), totalUnread],
+              ["group", t("filter.groups"), 0],
+              ["fav", t("filter.favorites"), 0],
+              ["unread", t("filter.unread"), totalUnread],
+              ["star", t("filter.starred"), 0],
             ] as const;
           })().map(([value, label, badgeCount]) => (
             <button

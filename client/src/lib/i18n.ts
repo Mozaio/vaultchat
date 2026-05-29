@@ -444,6 +444,35 @@ const DICT: Record<string, Dict> = {
     fr: "Réagir", pt: "Reagir", ru: "Реакция", ar: "تفاعل", zh: "回应",
     hi: "प्रतिक्रिया दें",
   },
+
+  // ── Sidebar filter chips ──────────────────────────────────────────
+  "filter.all": {
+    en: "All", de: "Alle", tr: "Tümü", es: "Todos", fr: "Tous", pt: "Todos",
+    ru: "Все", ar: "الكل", zh: "全部", hi: "सभी",
+  },
+  "filter.dms": {
+    en: "DMs", de: "DMs", tr: "DM'ler", es: "MD", fr: "MP", pt: "DMs",
+    ru: "ЛС", ar: "خاص", zh: "私信", hi: "DM",
+  },
+  "filter.groups": {
+    en: "Groups", de: "Gruppen", tr: "Gruplar", es: "Grupos", fr: "Groupes",
+    pt: "Grupos", ru: "Группы", ar: "المجموعات", zh: "群组", hi: "समूह",
+  },
+  "filter.favorites": {
+    en: "Favorites", de: "Favoriten", tr: "Favoriler", es: "Favoritos",
+    fr: "Favoris", pt: "Favoritos", ru: "Избранное", ar: "المفضلة",
+    zh: "收藏", hi: "पसंदीदा",
+  },
+  "filter.unread": {
+    en: "Unread", de: "Ungelesen", tr: "Okunmamış", es: "No leídos",
+    fr: "Non lus", pt: "Não lidos", ru: "Непрочитанные",
+    ar: "غير المقروءة", zh: "未读", hi: "अपठित",
+  },
+  "filter.starred": {
+    en: "Starred", de: "Markiert", tr: "Yıldızlı", es: "Destacados",
+    fr: "Marqués", pt: "Marcados", ru: "Помеченные", ar: "المميزة",
+    zh: "已标记", hi: "तारांकित",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";
