@@ -132,7 +132,7 @@ function VoiceCard({
         type="button"
         className="voice-play"
         onClick={toggle}
-        aria-label={playing ? "Pausieren" : "Abspielen"}
+        aria-label={playing ? t("msg.pause") : t("msg.play")}
       >
         {playing ? <IconPause size={14} /> : <IconPlay size={14} />}
       </button>
@@ -327,10 +327,10 @@ export function MessageBubble({
             onReveal?.(msg);
             setRevealed(true);
           }}
-          aria-label="Einmal-Nachricht öffnen — verschwindet nach dem Anschauen"
+          aria-label={t("msg.viewOnceOpen")}
         >
           <IconLock size={14} />
-          <span>Einmal anzeigen — tippen zum Öffnen</span>
+          <span>{t("msg.viewOnceTapOpen")}</span>
         </button>
       </div>
     );
@@ -346,13 +346,14 @@ export function MessageBubble({
   // Inhaltsart, Vorschau). Den vollen Body lesen Screenreader ohnehin im
   // Inhalt, das Label ist für die Liste-Navigation gedacht.
   const ariaLabel = (() => {
-    const who = msg.fromMe ? "Du" : peerLabel;
-    if (msg.deleted) return `${who}: gelöschte Nachricht`;
-    if (msg.plain.kind === "voice") return `${who}: Sprachnachricht`;
-    if (msg.plain.kind === "file") return `${who}: Datei ${msg.plain.fileName ?? ""}`;
+    const who = msg.fromMe ? t("chat.you") : peerLabel;
+    if (msg.deleted) return `${who}: ${t("msg.ariaDeleted")}`;
+    if (msg.plain.kind === "voice") return `${who}: ${t("chat.voiceMessage")}`;
+    if (msg.plain.kind === "file")
+      return `${who}: ${t("msg.ariaFile", { name: msg.plain.fileName ?? "" })}`;
     const text = msg.plain.body ?? "";
     const trimmed = text.length > 80 ? text.slice(0, 80) + "…" : text;
-    return `${who}: ${trimmed || "leere Nachricht"}`;
+    return `${who}: ${trimmed || t("msg.ariaEmpty")}`;
   })();
 
   return (
@@ -394,7 +395,7 @@ export function MessageBubble({
               if (replyToPreview.cid) onJumpToCid?.(replyToPreview.cid);
             }}
             disabled={!replyToPreview.cid}
-            title={replyToPreview.cid ? "Zur Nachricht springen" : undefined}
+            title={replyToPreview.cid ? t("msg.jumpTo") : undefined}
           >
             <span className="reply-stripe-author">{replyToPreview.author}</span>
             <span className="reply-stripe-text">
@@ -475,11 +476,11 @@ export function MessageBubble({
                 e.stopPropagation();
                 setImageOpen(true);
               }}
-              aria-label="Bild öffnen"
+              aria-label={t("msg.openImage")}
             >
               <img
                 src={imageSrc}
-                alt={msg.plain.fileName ?? "Bild"}
+                alt={msg.plain.fileName ?? t("msg.imageFallback")}
                 className="image-attachment-img"
                 loading="lazy"
                 draggable={false}
@@ -498,7 +499,7 @@ export function MessageBubble({
               </div>
               <div className="file-info">
                 <div className="file-name">
-                  {msg.plain.fileName ?? "Datei"}
+                  {msg.plain.fileName ?? t("chat.fileFallback")}
                 </div>
                 <div className="file-size">
                   {formatFileSize(msg.plain.fileSize) || msg.plain.mime || ""}
@@ -510,15 +511,15 @@ export function MessageBubble({
                   download={msg.plain.fileName}
                   className="download-btn"
                   onClick={(e) => e.stopPropagation()}
-                  aria-label="Herunterladen"
+                  aria-label={t("msg.download")}
                 >
                   <IconDownload size={14} />
                 </a>
               ) : (
                 <span
                   className="download-btn"
-                  aria-label="Anhang blockiert"
-                  title="Anhang aus Sicherheitsgründen blockiert (unsicherer Typ)"
+                  aria-label={t("msg.attachBlocked")}
+                  title={t("msg.attachBlockedTitle")}
                   style={{ opacity: 0.4, cursor: "not-allowed" }}
                 >
                   <IconLock size={14} />
@@ -558,7 +559,7 @@ export function MessageBubble({
                             onPollVote?.(msg, mine ? -1 : i);
                           }}
                           aria-pressed={mine}
-                          title={mine ? "Stimme zurückziehen" : undefined}
+                          title={mine ? t("msg.withdrawVote") : undefined}
                         >
                           <span className="poll-option-fill" style={{ width: `${pct}%` }} />
                           <span className="poll-option-label">
@@ -572,9 +573,7 @@ export function MessageBubble({
                     })}
                   </div>
                   <p className="poll-total">
-                    {total === 1
-                      ? "1 Stimme"
-                      : `${total} Stimmen`}
+                    {total === 1 ? t("msg.vote1") : t("msg.voteN", { n: total })}
                   </p>
                 </div>
               );
@@ -614,7 +613,7 @@ export function MessageBubble({
 
           <div className="bubble-meta">
             {isStarred && !msg.deleted && (
-              <span className="meta-star" title="Markiert">
+              <span className="meta-star" title={t("msg.starred")}>
                 <IconBookmark size={11} />
               </span>
             )}
@@ -623,10 +622,10 @@ export function MessageBubble({
                 className="disappearing-timer"
                 title={
                   msg.fromMe
-                    ? "Einmal-Nachricht — Empfänger sieht sie nur einmal"
+                    ? t("msg.viewOnceRecipient")
                     : viewOnceLeftMs !== null
-                      ? "Verschwindet beim Schließen"
-                      : "Einmal anzeigen"
+                      ? t("msg.disappearsOnClose")
+                      : t("msg.viewOnceShort")
                 }
               >
                 <IconLock size={10} />
@@ -636,7 +635,7 @@ export function MessageBubble({
               </span>
             )}
             {ttlLeft && (
-              <span className="disappearing-timer" title="Verschwindet bald">
+              <span className="disappearing-timer" title={t("msg.disappearsSoon")}>
                 <IconTimer size={10} />
                 {ttlLeft}
               </span>
@@ -665,10 +664,10 @@ export function MessageBubble({
                 className="status-icon"
                 title={
                   msg.readByPeer
-                    ? "Gelesen"
+                    ? t("msg.read")
                     : msg.deliveredToPeer
-                      ? "Zugestellt"
-                      : "Gesendet"
+                      ? t("msg.delivered")
+                      : t("msg.sent")
                 }
               >
                 {msg.readByPeer ? (
@@ -721,8 +720,8 @@ export function MessageBubble({
                   setMenuOpen((v) => !v);
                   setReactOpen(false);
                 }}
-                aria-label="Mehr"
-                title="Mehr"
+                aria-label={t("chat.more")}
+                title={t("chat.more")}
               >
                 ⋯
               </button>
@@ -848,7 +847,7 @@ export function MessageBubble({
                       msg.myReaction === e ? " active" : ""
                     }${isCustom ? " has-custom" : ""}`}
                     onClick={() => toggleReaction(e)}
-                    aria-label="Reagieren"
+                    aria-label={t("msg.react")}
                     aria-pressed={msg.myReaction === e}
                   >
                     {isCustom ? <img src={e} alt="" /> : e}
@@ -862,8 +861,8 @@ export function MessageBubble({
                   setReactOpen(false);
                   setEmojiPickerOpen(true);
                 }}
-                aria-label="Mehr Emojis"
-                title="Mehr Emojis"
+                aria-label={t("msg.moreEmojis")}
+                title={t("msg.moreEmojis")}
               >
                 ＋
               </button>
@@ -916,20 +915,24 @@ export function MessageBubble({
               threadUnreadCount && threadUnreadCount > 0 ? " has-unread" : ""
             }`}
             onClick={() => onOpenThread(msg)}
-            aria-label={`Thread mit ${threadReplyCount} ${
-              threadReplyCount === 1 ? "Antwort" : "Antworten"
-            }${
-              threadUnreadCount && threadUnreadCount > 0
-                ? `, ${threadUnreadCount} neu`
-                : ""
-            } öffnen`}
+            aria-label={t("msg.threadAria", {
+              count: threadReplyCount ?? 0,
+              replies:
+                threadReplyCount === 1
+                  ? t("msg.replyCount1")
+                  : t("msg.replyCountN"),
+              unread:
+                threadUnreadCount && threadUnreadCount > 0
+                  ? t("msg.threadNew", { n: threadUnreadCount })
+                  : "",
+            })}
           >
             <span className="thread-indicator-icon">
               <IconMessageSquare size={13} />
             </span>
             <span>
               {threadReplyCount}{" "}
-              {threadReplyCount === 1 ? "Antwort" : "Antworten"}
+              {threadReplyCount === 1 ? t("msg.replyCount1") : t("msg.replyCountN")}
             </span>
             {threadUnreadCount && threadUnreadCount > 0 && (
               <span className="thread-indicator-badge">{threadUnreadCount}</span>
@@ -953,13 +956,13 @@ export function MessageBubble({
               e.stopPropagation();
               setImageOpen(false);
             }}
-            aria-label="Schließen"
+            aria-label={t("common.close")}
           >
             <IconX size={20} />
           </button>
           <img
             src={imageSrc}
-            alt={msg.plain.fileName ?? "Bild"}
+            alt={msg.plain.fileName ?? t("msg.imageFallback")}
             onClick={(e) => e.stopPropagation()}
           />
           {msg.plain.fileName && (
