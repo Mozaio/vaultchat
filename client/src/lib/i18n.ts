@@ -1689,6 +1689,16 @@ const DICT: Record<string, Dict> = {
     en: "File", de: "Datei", tr: "Dosya", es: "Archivo", fr: "Fichier",
     pt: "Arquivo", ru: "Файл", ar: "ملف", zh: "文件", hi: "फ़ाइल",
   },
+  "preview.viewOnce": {
+    en: "Once-only message", de: "Einmal-Nachricht", tr: "Tek seferlik mesaj",
+    es: "Mensaje de una vez", fr: "Message éphémère", pt: "Mensagem única",
+    ru: "Одноразовое сообщение", ar: "رسالة لمرة واحدة", zh: "阅后即焚消息",
+    hi: "एक-बार संदेश",
+  },
+  "preview.poll": {
+    en: "Poll", de: "Umfrage", tr: "Anket", es: "Encuesta", fr: "Sondage",
+    pt: "Enquete", ru: "Опрос", ar: "استطلاع", zh: "投票", hi: "पोल",
+  },
   "chat.enableNotifsTitle": {
     en: "Enable notifications?", de: "Benachrichtigungen aktivieren?",
     tr: "Bildirimler etkinleştirilsin mi?", es: "¿Activar notificaciones?",
