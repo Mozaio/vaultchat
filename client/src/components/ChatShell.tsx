@@ -3258,7 +3258,7 @@ export function ChatShell({
           </div>
         </div>
       )}
-      <div className="app-surface flex min-h-0 w-full flex-1 flex-col overflow-visible rounded-2xl md:rounded-3xl">
+      <div className="app-surface u-shell flex min-h-0 w-full flex-1 flex-col overflow-visible rounded-2xl md:rounded-3xl">
       {!connected && (
         <div
           className={`connection-banner shrink-0 rounded-t-2xl md:rounded-t-3xl${wsHadError ? " error" : ""}`}
@@ -3285,11 +3285,44 @@ export function ChatShell({
           }}
         />
       )}
-      <div className="flex min-h-0 flex-1 overflow-visible">
+      <div className="u-row flex min-h-0 flex-1 overflow-visible">
+      <nav className="u-rail">
+        <div className="u-rail-logo" aria-hidden="true">
+          <VaultChatLogo size={32} style={{ color: "var(--accent)" }} />
+        </div>
+        <div className="u-rail-spacer" />
+        <button
+          type="button"
+          className="u-rail-btn"
+          title="Hilfe & Tastatur-Shortcuts"
+          aria-label="Hilfe"
+          onClick={() => setShortcutsHelpOpen(true)}
+        >
+          <IconHelpCircle size={20} />
+        </button>
+        <button
+          type="button"
+          className="u-rail-btn"
+          title="Einstellungen"
+          aria-label="Einstellungen"
+          onClick={() => setSecurityOpen(true)}
+        >
+          <IconSettings size={20} />
+        </button>
+        <button
+          type="button"
+          className="u-rail-avatar"
+          title="Konto"
+          aria-label="Konto"
+          onClick={() => setUserMenuOpen((v) => !v)}
+        >
+          {session.user.username.slice(0, 1).toUpperCase()}
+        </button>
+      </nav>
       <aside
         className={`${
           showSidebar ? "flex" : "hidden"
-        } w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
+        } u-panel u-panel-list w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
           <div className="flex min-w-0 items-center gap-2">
@@ -3861,7 +3894,7 @@ export function ChatShell({
       <main
         className={`${
           showSidebar ? "hidden" : "flex"
-        } min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 h-full`}
+        } u-panel u-panel-chat min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 h-full`}
       >
         {incomingOffer && (
           <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">

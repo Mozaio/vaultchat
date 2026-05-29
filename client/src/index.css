@@ -7177,4 +7177,126 @@ button:focus-visible,
   color: var(--text-secondary);
 }
 
+/* ============================================================
+   VAULTCHAT v6 — Floating-panel layout + icon rail
+
+   Ground-up structural shift (desktop): a slim icon rail, then two
+   floating "cards" (conversation list + chat) separated by a gap on a
+   slightly darker backdrop. Mobile stays edge-to-edge (rail hidden,
+   panels full-bleed) — all floating rules are min-width:768px only.
+   ============================================================ */
+
+/* ── Icon rail (base hidden; shown on desktop) ── */
+.u-rail {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  width: 68px;
+  flex-shrink: 0;
+  padding: 16px 0 14px;
+  gap: 8px;
+  background: var(--bg-elevated);
+  border-radius: 22px;
+  box-shadow: 0 4px 20px -10px rgba(20, 30, 55, 0.16);
+}
+:root.dark .u-rail {
+  box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+}
+.u-rail-logo {
+  margin-bottom: 6px;
+}
+.u-rail-spacer {
+  flex: 1 1 auto;
+}
+.u-rail-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.u-rail-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+.u-rail-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 12px -3px var(--accent-glow);
+  margin-top: 4px;
+}
+
+@media (min-width: 768px) {
+  /* Neutralise the single app-surface card so panels float separately. */
+  .u-shell {
+    background: transparent;
+    box-shadow: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    overflow: visible;
+  }
+  .u-row {
+    gap: 14px;
+  }
+  .u-rail {
+    display: flex;
+  }
+  /* The two content panels become floating cards. */
+  .u-panel {
+    border-radius: 22px;
+    background: var(--bg-elevated);
+    box-shadow: 0 4px 22px -10px rgba(20, 30, 55, 0.16);
+  }
+  :root.dark .u-panel {
+    box-shadow: 0 12px 34px -14px rgba(0, 0, 0, 0.72);
+  }
+  .u-panel-list {
+    border-right: none !important;
+  }
+  .u-panel-chat .messages-container {
+    background: var(--bg-elevated);
+  }
+  .u-panel-chat .chat-header,
+  .u-panel-chat .chat-input-area {
+    background: var(--bg-elevated);
+  }
+  /* Round the inner top/bottom bars to match the card (no overflow:hidden,
+     so dropdowns/menus can still escape the panel). */
+  .u-panel-chat .chat-header {
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
+  }
+  .u-panel-chat .chat-input-area {
+    border-bottom-left-radius: 22px;
+    border-bottom-right-radius: 22px;
+  }
+  /* Composer pill recedes against the card. */
+  .u-panel-chat .chat-input-row {
+    background: var(--input-bg);
+  }
+  /* Rail replaces the in-sidebar logo + footer actions on desktop. */
+  .sidebar-header > div:first-child > svg {
+    display: none;
+  }
+  .sidebar-footer-action {
+    display: none;
+  }
+}
+
+/* End VAULTCHAT v6 */
 /* End VAULTCHAT v5 */
