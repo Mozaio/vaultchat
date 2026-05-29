@@ -7303,5 +7303,36 @@ button:focus-visible,
   }
 }
 
+/* Prominent "New chat" action in the conversation list. */
+.u-newchat-btn {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -8px var(--accent-glow);
+  transition: filter 0.13s ease, transform 0.08s ease;
+}
+.u-newchat-btn:hover {
+  filter: brightness(1.05);
+}
+.u-newchat-btn:active {
+  transform: translateY(1px);
+}
+.u-newchat-plus {
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 0;
+}
+
 /* End VAULTCHAT v6 */
 /* End VAULTCHAT v5 */

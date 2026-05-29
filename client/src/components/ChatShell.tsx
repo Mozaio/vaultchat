@@ -3403,10 +3403,10 @@ export function ChatShell({
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Suchen…"
+              placeholder="Suchen oder Kontakt hinzufügen"
               className="w-full border-0 bg-transparent text-sm outline-none"
               style={{ color: "var(--text)" }}
-              aria-label="Kontakte und Gruppen filtern"
+              aria-label="Chats durchsuchen oder Kontakt hinzufügen"
             />
             {query && (
               <button
@@ -3421,6 +3421,15 @@ export function ChatShell({
               </button>
             )}
           </div>
+          <button
+            type="button"
+            className="u-newchat-btn"
+            onClick={() => setShowAddContact(true)}
+            aria-label="Neuen Chat starten"
+          >
+            <span className="u-newchat-plus" aria-hidden>+</span>
+            Neuer Chat
+          </button>
         </div>
 
         <div className="filter-chips mx-3 mt-3">
