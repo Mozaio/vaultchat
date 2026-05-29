@@ -33,6 +33,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { t, useLocale } from "../lib/i18n";
 import { useInstallAvailable, promptInstall } from "../lib/installPrompt";
+import { isTauri } from "../lib/desktopNotify";
+import { loadScreenSecurity, setScreenSecurity } from "../lib/screenSecurity";
 import {
   ACCENTS,
   loadAccent,
@@ -152,6 +154,8 @@ export function SecuritySettings({
 }: SecuritySettingsProps) {
   useLocale(); // re-render on language change
   const installAvailable = useInstallAvailable();
+  const desktop = isTauri();
+  const [screenSec, setScreenSec] = useState(() => loadScreenSecurity());
   const [accent, setAccent] = useState<AccentId>(() => loadAccent());
   const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
@@ -847,6 +851,40 @@ export function SecuritySettings({
 
           {tab === "security" && (
             <div className="space-y-4">
+              {desktop && (
+                <div
+                  className="rounded-lg border p-3"
+                  style={{
+                    borderColor: "var(--border)",
+                    background: "var(--bg-elevated)",
+                  }}
+                >
+                  <label
+                    className="flex cursor-pointer items-start gap-3 text-sm"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={screenSec}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setScreenSec(next);
+                        void setScreenSecurity(next);
+                      }}
+                      className="mt-1"
+                    />
+                    <span>
+                      {t("settings.screenSecurity")}
+                      <span
+                        className="mt-0.5 block text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {t("settings.screenSecurityDesc")}
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              )}
               <div>
                 <label
                   className="mb-2 block text-sm font-medium"

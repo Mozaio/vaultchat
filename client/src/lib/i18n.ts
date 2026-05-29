@@ -3275,6 +3275,23 @@ const DICT: Record<string, Dict> = {
     zh: "关闭：仅显示“新消息”（锁屏上内容更少）。",
     hi: "बंद: केवल “नया संदेश” (लॉक स्क्रीन पर कम सामग्री)।",
   },
+  "settings.screenSecurity": {
+    en: "Screen security", de: "Bildschirm-Sicherheit", tr: "Ekran güvenliği",
+    es: "Seguridad de pantalla", fr: "Sécurité de l'écran", pt: "Segurança de tela",
+    ru: "Защита экрана", ar: "أمان الشاشة", zh: "屏幕安全", hi: "स्क्रीन सुरक्षा",
+  },
+  "settings.screenSecurityDesc": {
+    en: "Hide app content from screenshots and screen recording. The window appears black in captures.",
+    de: "App-Inhalte vor Screenshots und Bildschirmaufnahmen verbergen. Das Fenster erscheint in Aufnahmen schwarz.",
+    tr: "Uygulama içeriğini ekran görüntülerinden ve ekran kaydından gizle. Pencere kayıtlarda siyah görünür.",
+    es: "Oculta el contenido de la app de capturas y grabaciones de pantalla. La ventana aparece en negro.",
+    fr: "Masque le contenu de l'app aux captures et enregistrements d'écran. La fenêtre apparaît en noir.",
+    pt: "Oculta o conteúdo do app de capturas e gravações de tela. A janela aparece preta nas capturas.",
+    ru: "Скрывает содержимое приложения от снимков и записи экрана. В записи окно отображается чёрным.",
+    ar: "يُخفي محتوى التطبيق من لقطات الشاشة وتسجيل الشاشة. تظهر النافذة سوداء في التسجيلات.",
+    zh: "在截图和录屏中隐藏应用内容。窗口在捕获中显示为黑色。",
+    hi: "स्क्रीनशॉट और स्क्रीन रिकॉर्डिंग से ऐप सामग्री छिपाएं। कैप्चर में विंडो काली दिखती है।",
+  },
   "settings.securityLevel": {
     en: "Security level (memory protection)", de: "Sicherheitsstufe (Speicher-Schutz)",
     tr: "Güvenlik düzeyi (bellek koruması)", es: "Nivel de seguridad (protección de memoria)",
