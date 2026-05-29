@@ -705,12 +705,12 @@ export function SecuritySettings({
                     className="mt-1"
                   />
                   <span>
-                    Lese- & Zustellbestätigungen senden
+                    {t("settings.readReceipts")}
                     <span
                       className="mt-0.5 block text-xs"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      E2EE, verrät Kontakten aber deine Aktivität.
+                      {t("settings.readReceiptsDesc")}
                     </span>
                   </span>
                 </label>
@@ -727,11 +727,11 @@ export function SecuritySettings({
                   className="mb-2 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Desktop-Benachrichtigungen
+                  {t("settings.desktopNotify")}
                 </h3>
                 {notifyPermission === "unsupported" ? (
                   <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                    Werden von diesem Browser nicht unterstützt.
+                    {t("settings.notifyUnsupported")}
                   </p>
                 ) : (
                   <>
@@ -739,13 +739,13 @@ export function SecuritySettings({
                       className="mb-3 text-xs"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Nur wenn der Tab im Hintergrund ist. Berechtigung:{" "}
+                      {t("settings.notifyPermLabel")}{" "}
                       <span className="font-medium" style={{ color: "var(--text-secondary)" }}>
                         {notifyPermission === "granted"
-                          ? "erteilt"
+                          ? t("settings.permGranted")
                           : notifyPermission === "denied"
-                            ? "verweigert"
-                            : "noch nicht festgelegt"}
+                            ? t("settings.permDenied")
+                            : t("settings.permUnset")}
                       </span>
                     </p>
                     {notifyPermission !== "granted" && (
@@ -759,7 +759,7 @@ export function SecuritySettings({
                         }}
                         onClick={requestNotifyPermission}
                       >
-                        Browser-Berechtigung anfragen
+                        {t("settings.requestPerm")}
                       </button>
                     )}
                     <label
@@ -775,12 +775,12 @@ export function SecuritySettings({
                         className="mt-1"
                       />
                       <span>
-                        Benachrichtigungen bei neuer Nachricht
+                        {t("settings.notifyOnNew")}
                         <span
                           className="mt-0.5 block text-xs"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          Master-Schalter (unabhängig von der Browser-Freigabe).
+                          {t("settings.notifyOnNewDesc")}
                         </span>
                       </span>
                     </label>
@@ -798,13 +798,12 @@ export function SecuritySettings({
                         className="mt-1 disabled:opacity-40"
                       />
                       <span>
-                        Textvorschau in der Benachrichtigung
+                        {t("settings.notifyPreview")}
                         <span
                           className="mt-0.5 block text-xs"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          Aus: nur „Neue Nachricht“ (weniger Inhalt auf dem
-                          Sperrbildschirm).
+                          {t("settings.notifyPreviewDesc")}
                         </span>
                       </span>
                     </label>
@@ -821,7 +820,7 @@ export function SecuritySettings({
                   className="mb-2 block text-sm font-medium"
                   style={{ color: "var(--text-secondary)" }}
                 >
-                  Sicherheitsstufe (Speicher-Schutz)
+                  {t("settings.securityLevel")}
                 </label>
                 <div className="flex gap-2">
                   <button
@@ -833,7 +832,7 @@ export function SecuritySettings({
                         : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                     }`}
                   >
-                    Normal
+                    {t("settings.levelNormal")}
                   </button>
                   <button
                     type="button"
@@ -844,7 +843,7 @@ export function SecuritySettings({
                         : "bg-[var(--bg-elevated)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                     }`}
                   >
-                    Extrem
+                    {t("settings.levelExtreme")}
                   </button>
                 </div>
               </div>
@@ -852,13 +851,13 @@ export function SecuritySettings({
               <div className="rounded-lg p-3" style={{ background: "var(--bg-elevated)" }}>
                 {level === "normal" ? (
                   <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    <strong style={{ color: "var(--accent)" }}>Normal:</strong>{" "}
-                    Standard Auto-Lock, moderate Memory-Wipe-Intervalle.
+                    <strong style={{ color: "var(--accent)" }}>{t("settings.levelNormal")}:</strong>{" "}
+                    {t("settings.levelNormalBody")}
                   </p>
                 ) : (
                   <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-                    <strong style={{ color: "var(--danger)" }}>Extrem:</strong>{" "}
-                    Aggressives Wiping, häufiger Speicher-Zyklen.
+                    <strong style={{ color: "var(--danger)" }}>{t("settings.levelExtreme")}:</strong>{" "}
+                    {t("settings.levelExtremeBody")}
                   </p>
                 )}
               </div>
