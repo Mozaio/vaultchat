@@ -258,7 +258,7 @@ export function SecuritySettings({
             onClick={onClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             style={{ color: "var(--text-muted)" }}
-            aria-label="Einstellungen schließen"
+            aria-label={t("settings.closeAria")}
           >
             <IconX size={18} />
           </button>
@@ -267,7 +267,7 @@ export function SecuritySettings({
         <div
           className="settings-tabs mx-4 mt-3 shrink-0"
           role="tablist"
-          aria-label="Einstellungsbereiche"
+          aria-label={t("settings.tabsAria")}
         >
           {SETTINGS_TABS.map((tabDef) => (
             <button
@@ -614,14 +614,13 @@ export function SecuritySettings({
                   className="mb-1 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Verschwindende Nachrichten
+                  {t("settings.disappearing")}
                 </h3>
                 <p
                   className="mb-2 text-xs"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Standardwert für neue Chats. Bestehende Chats behalten ihre
-                  individuelle Einstellung.
+                  {t("settings.disappearingDesc")}
                 </p>
                 <select
                   value={defaultTtl}
@@ -631,7 +630,7 @@ export function SecuritySettings({
                     saveDefaultTtl(next);
                   }}
                   className="app-input w-full !py-2 text-sm"
-                  aria-label="Standardablaufzeit für neue Chats"
+                  aria-label={t("settings.defaultExpiryAria")}
                 >
                   {DEFAULT_TTL_OPTIONS.map((opt) => (
                     <option key={opt.ms} value={opt.ms}>
@@ -874,7 +873,7 @@ export function SecuritySettings({
                   style={{ color: "var(--text-secondary)" }}
                   htmlFor="auto-lock-select"
                 >
-                  Automatische Sperre nach
+                  {t("settings.autoLock")}
                 </label>
                 <select
                   id="auto-lock-select"
@@ -886,20 +885,18 @@ export function SecuritySettings({
                   }}
                   className="app-input w-full !py-2 text-sm"
                 >
-                  <option value={0}>Aus (nicht empfohlen)</option>
-                  <option value={1}>1 Minute</option>
-                  <option value={5}>5 Minuten</option>
-                  <option value={10}>10 Minuten (Standard)</option>
-                  <option value={30}>30 Minuten</option>
-                  <option value={60}>1 Stunde</option>
+                  <option value={0}>{t("time.off")}</option>
+                  <option value={1}>{t("time.min1")}</option>
+                  <option value={5}>{t("time.min5")}</option>
+                  <option value={10}>{t("time.min10default")}</option>
+                  <option value={30}>{t("time.min30")}</option>
+                  <option value={60}>{t("time.hour1")}</option>
                 </select>
                 <p
                   className="mt-1 text-xs"
                   style={{ color: "var(--text-muted)" }}
                 >
-                  Nach Inaktivität wird der lokale Schlüssel aus dem
-                  Arbeitsspeicher gelöscht. Beim nächsten Mal brauchst du dein
-                  Passwort.
+                  {t("settings.autoLockDesc")}
                 </p>
               </div>
 
@@ -1014,6 +1011,7 @@ export function SecuritySettings({
 }
 
 function AccountDangerZone() {
+  useLocale();
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1067,12 +1065,10 @@ function AccountDangerZone() {
       }}
     >
       <p className="text-sm font-semibold" style={{ color: "var(--danger)" }}>
-        Gefahrenzone
+        {t("settings.dangerZone")}
       </p>
       <p className="mt-1 text-xs" style={{ color: "var(--text-secondary)" }}>
-        Account-Löschung entfernt den Benutzer + alle Gruppen-Mitgliedschaften
-        auf dem Server, dazu lokale Identity, Backup-Schlüssel und Chat-Verlauf.
-        Diese Aktion ist nicht rückgängig zu machen.
+        {t("settings.dangerZoneDesc")}
       </p>
       {!confirming ? (
         <button
