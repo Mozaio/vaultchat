@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { t } from "./i18n";
 
 /**
  * Single-pass inline markdown renderer for chat messages.
@@ -50,6 +51,34 @@ function Spoiler({ children }: { children: ReactNode }) {
 /** Fenced multi-line code block: ```[lang]\n…\n``` */
 const FENCE = /```[ \t]*[A-Za-z0-9+#.-]*\n([\s\S]*?)```/g;
 
+/** A fenced code block with a hover "copy" button (GitHub/Discord-style). */
+function CodeBlock({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <pre className="md-pre">
+      <button
+        type="button"
+        className="md-pre-copy"
+        title={t("safety.copy")}
+        aria-label={t("safety.copy")}
+        onClick={(e) => {
+          e.stopPropagation();
+          void navigator.clipboard
+            ?.writeText(code)
+            .then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            })
+            .catch(() => {});
+        }}
+      >
+        {copied ? t("safety.copied") : t("safety.copy")}
+      </button>
+      <code>{code}</code>
+    </pre>
+  );
+}
+
 export function renderInlineMarkdown(text: string): ReactNode[] {
   if (!text) return [];
   // Phase 1: carve out fenced code blocks; inline-render everything between
@@ -64,11 +93,7 @@ export function renderInlineMarkdown(text: string): ReactNode[] {
         <span key={`s${fkey++}`}>{renderInline(text.slice(last, idx))}</span>
       );
     }
-    blocks.push(
-      <pre key={`p${fkey++}`} className="md-pre">
-        <code>{m[1].replace(/\n$/, "")}</code>
-      </pre>
-    );
+    blocks.push(<CodeBlock key={`p${fkey++}`} code={m[1].replace(/\n$/, "")} />);
     last = idx + m[0].length;
   }
   if (last === 0) return renderInline(text);

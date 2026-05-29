@@ -7674,6 +7674,7 @@ button:focus-visible,
 
 /* Fenced code block (```…```). */
 .md-pre {
+  position: relative;
   margin: 0.4rem 0;
   padding: 0.55rem 0.7rem;
   background: color-mix(in srgb, var(--text) 8%, transparent);
@@ -7683,6 +7684,30 @@ button:focus-visible,
   white-space: pre;
   font-size: 0.82em;
   line-height: 1.45;
+}
+.md-pre-copy {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.72em;
+  font-weight: 600;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.md-pre:hover .md-pre-copy,
+.md-pre-copy:focus-visible {
+  opacity: 0.9;
+}
+.md-pre-copy:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  opacity: 1;
 }
 .md-pre code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
