@@ -75,18 +75,25 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
       if (!prev) continue;
       const idx = p.pollVoteIndex;
       const optCount = prev.plain.pollOptions?.length ?? 0;
-      if (idx < 0 || idx >= optCount) continue;
       const oldIdx = prev._pollVoteByUser.get(authorKey);
-      const counts = (prev.pollVotes
+      const counts = prev.pollVotes
         ? [...prev.pollVotes]
-        : new Array<number>(optCount).fill(0));
-      if (typeof oldIdx === "number") {
+        : new Array<number>(optCount).fill(0);
+      // Always retract the user's previous vote first.
+      if (typeof oldIdx === "number" && oldIdx >= 0 && oldIdx < optCount) {
         counts[oldIdx] = Math.max(0, (counts[oldIdx] ?? 1) - 1);
       }
-      counts[idx] = (counts[idx] ?? 0) + 1;
-      prev._pollVoteByUser.set(authorKey, idx);
+      if (idx < 0 || idx >= optCount) {
+        // Withdrawal: an out-of-range index (the UI sends -1 when you click
+        // your current choice again) means "retract my vote".
+        prev._pollVoteByUser.delete(authorKey);
+        if (r.fromMe) prev.myPollVote = undefined;
+      } else {
+        counts[idx] = (counts[idx] ?? 0) + 1;
+        prev._pollVoteByUser.set(authorKey, idx);
+        if (r.fromMe) prev.myPollVote = idx;
+      }
       prev.pollVotes = counts;
-      if (r.fromMe) prev.myPollVote = idx;
       continue;
     }
 

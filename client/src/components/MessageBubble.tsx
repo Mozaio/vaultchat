@@ -551,9 +551,12 @@ export function MessageBubble({
                           className={`poll-option${mine ? " mine" : ""}`}
                           onClick={(e) => {
                             e.stopPropagation();
-                            onPollVote?.(msg, i);
+                            // Clicking your current choice again withdraws the
+                            // vote (-1 sentinel); otherwise (re)cast for `i`.
+                            onPollVote?.(msg, mine ? -1 : i);
                           }}
                           aria-pressed={mine}
+                          title={mine ? "Stimme zurückziehen" : undefined}
                         >
                           <span className="poll-option-fill" style={{ width: `${pct}%` }} />
                           <span className="poll-option-label">
