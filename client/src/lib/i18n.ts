@@ -607,6 +607,36 @@ const DICT: Record<string, Dict> = {
     ar: "فشل البحث. حاول مرة أخرى.",
     zh: "搜索失败。请重试。", hi: "खोज विफल। कृपया पुनः प्रयास करें।",
   },
+
+  // ── Settings tabs ─────────────────────────────────────────────────
+  "settings.tab.general": {
+    en: "General", de: "Allgemein", tr: "Genel", es: "General", fr: "Général",
+    pt: "Geral", ru: "Общие", ar: "عام", zh: "常规", hi: "सामान्य",
+  },
+  "settings.tab.privacy": {
+    en: "Privacy", de: "Datenschutz", tr: "Gizlilik", es: "Privacidad",
+    fr: "Confidentialité", pt: "Privacidade", ru: "Приватность",
+    ar: "الخصوصية", zh: "隐私", hi: "गोपनीयता",
+  },
+  "settings.tab.security": {
+    en: "Security", de: "Sicherheit", tr: "Güvenlik", es: "Seguridad",
+    fr: "Sécurité", pt: "Segurança", ru: "Безопасность", ar: "الأمان",
+    zh: "安全", hi: "सुरक्षा",
+  },
+  "settings.tab.emojis": {
+    en: "Emojis", de: "Emojis", tr: "Emojiler", es: "Emojis", fr: "Emojis",
+    pt: "Emojis", ru: "Эмодзи", ar: "الرموز", zh: "表情", hi: "इमोजी",
+  },
+  "settings.tab.plan": {
+    en: "Plan & billing", de: "Plan & Abo", tr: "Plan & Abonelik",
+    es: "Plan y suscripción", fr: "Forfait & abonnement",
+    pt: "Plano e assinatura", ru: "Тариф и подписка", ar: "الخطة والاشتراك",
+    zh: "套餐与订阅", hi: "प्लान और बिलिंग",
+  },
+  "settings.tab.about": {
+    en: "About", de: "Über", tr: "Hakkında", es: "Acerca de", fr: "À propos",
+    pt: "Sobre", ru: "О приложении", ar: "حول", zh: "关于", hi: "परिचय",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";

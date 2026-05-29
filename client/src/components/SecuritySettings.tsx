@@ -85,13 +85,13 @@ export function saveSecurityLevel(level: SecurityLevel): void {
 
 type SettingsTabId = "general" | "privacy" | "security" | "emojis" | "plan" | "about";
 
-const SETTINGS_TABS: { id: SettingsTabId; label: string }[] = [
-  { id: "general", label: "Allgemein" },
-  { id: "privacy", label: "Datenschutz" },
-  { id: "security", label: "Sicherheit" },
-  { id: "emojis", label: "Emojis" },
-  { id: "plan", label: "Plan & Abo" },
-  { id: "about", label: "Über" },
+const SETTINGS_TABS: { id: SettingsTabId; labelKey: string }[] = [
+  { id: "general", labelKey: "settings.tab.general" },
+  { id: "privacy", labelKey: "settings.tab.privacy" },
+  { id: "security", labelKey: "settings.tab.security" },
+  { id: "emojis", labelKey: "settings.tab.emojis" },
+  { id: "plan", labelKey: "settings.tab.plan" },
+  { id: "about", labelKey: "settings.tab.about" },
 ];
 
 function readNotifyEnabled(): boolean {
@@ -251,7 +251,7 @@ export function SecuritySettings({
             className="text-lg font-semibold"
             style={{ color: "var(--text)" }}
           >
-            Einstellungen
+            {t("nav.settings")}
           </h2>
           <button
             type="button"
@@ -269,16 +269,16 @@ export function SecuritySettings({
           role="tablist"
           aria-label="Einstellungsbereiche"
         >
-          {SETTINGS_TABS.map((t) => (
+          {SETTINGS_TABS.map((tabDef) => (
             <button
-              key={t.id}
+              key={tabDef.id}
               type="button"
               role="tab"
-              aria-selected={tab === t.id}
-              className={`settings-tab${tab === t.id ? " active" : ""}`}
-              onClick={() => setTab(t.id)}
+              aria-selected={tab === tabDef.id}
+              className={`settings-tab${tab === tabDef.id ? " active" : ""}`}
+              onClick={() => setTab(tabDef.id)}
             >
-              {t.label}
+              {t(tabDef.labelKey)}
             </button>
           ))}
         </div>
