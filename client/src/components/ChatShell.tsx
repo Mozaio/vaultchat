@@ -297,7 +297,22 @@ export function ChatShell({
   const [pollGroup, setPollGroup] = useState<PollDraft | null>(null);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [peerPin, setPeerPin] = useState<PeerPin | null>(null);
-  const [relayOnly, setRelayOnly] = useState(false);
+  // Relay-only ("hide my IP from the call peer") persists across reloads —
+  // a privacy choice shouldn't silently reset to off every session.
+  const [relayOnly, setRelayOnly] = useState(() => {
+    try {
+      return localStorage.getItem("vaultchat.call.relayOnly") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("vaultchat.call.relayOnly", relayOnly ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [relayOnly]);
   const [addMemberId, setAddMemberId] = useState<string>("");
   const [groupPanelOpen, setGroupPanelOpen] = useState(false);
   const [groupEditMode, setGroupEditMode] = useState(false);
@@ -4006,7 +4021,16 @@ export function ChatShell({
           <div className="flex items-center justify-between border-b p-2 text-xs" style={{ borderColor: "var(--border)", background: "var(--bg-elevated)", color: "var(--text-secondary)" }}>
             <p>
               Anruf: {callStatus === "ringing" ? "eingehend" : callStatus === "connecting" ? "verbinde..." : callStatus === "connected" ? "verbunden" : "fehlgeschlagen"}
-              {relayOnly ? " · Relay geschützt" : ""}
+              {relayOnly ? (
+                <span style={{ color: "var(--success)" }}> · IP geschützt (Relay)</span>
+              ) : (
+                <span
+                  style={{ color: "var(--warning)" }}
+                  title="Ohne Relay-Only ist deine IP-Adresse für den Gesprächspartner sichtbar. Relay-Only kannst du in den Sicherheitseinstellungen aktivieren."
+                >
+                  {" "}· IP für Gegenseite sichtbar
+                </span>
+              )}
             </p>
             {callRef.current && (
               <button
