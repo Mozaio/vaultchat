@@ -1542,10 +1542,10 @@ export function ChatShell({
               if (newMemberId) {
                 const memberLabel =
                   usersRef.current.find((u) => u.id === newMemberId)?.username ??
-                  "Mitglied";
+                  t("chat.memberFallback");
                 await sendGroupSystemMessage(
                   updatedGroup,
-                  `${memberLabel} ist via Einladungslink beigetreten`
+                  t("chat.sysJoinedViaInvite", { member: memberLabel })
                 );
               }
             }
@@ -2552,23 +2552,32 @@ export function ChatShell({
       pushToast(t("chat.toastGroupUpdated"), "success");
       const changes: string[] = [];
       if (previousName !== trimmedName) {
-        changes.push(`Name auf „${trimmedName}"`);
+        changes.push(t("chat.sysChangeName", { name: trimmedName }));
       }
       if (previousDesc !== trimmedDesc) {
-        changes.push(trimmedDesc ? "Beschreibung" : "Beschreibung entfernt");
+        changes.push(
+          trimmedDesc ? t("chat.sysChangeDesc") : t("chat.sysChangeDescRemoved")
+        );
       }
       if (avatarUpdate !== undefined) {
         const newAvatarPresent = avatarUpdate !== "";
         if (previousAvatar !== newAvatarPresent) {
-          changes.push(newAvatarPresent ? "Bild" : "Bild entfernt");
+          changes.push(
+            newAvatarPresent
+              ? t("chat.sysChangeImage")
+              : t("chat.sysChangeImageRemoved")
+          );
         } else if (newAvatarPresent) {
-          changes.push("Bild");
+          changes.push(t("chat.sysChangeImage"));
         }
       }
       if (changes.length > 0) {
         await sendGroupSystemMessage(
           updated,
-          `${session.user.username} hat ${changes.join(" und ")} geändert`
+          t("chat.sysChanged", {
+            user: session.user.username,
+            what: changes.join(` ${t("chat.and")} `),
+          })
         );
       }
     } catch (err) {
@@ -2603,7 +2612,10 @@ export function ChatShell({
       setAddMemberId("");
       await sendGroupSystemMessage(
         g2,
-        `${session.user.username} hat ${memberLabel} hinzugefügt`
+        t("chat.sysMemberAdded", {
+          user: session.user.username,
+          member: memberLabel,
+        })
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "add_failed");
@@ -2628,7 +2640,10 @@ export function ChatShell({
       megolmDistributedRef.current.delete(g2.id);
       await sendGroupSystemMessage(
         g2,
-        `${session.user.username} hat ${memberLabel} entfernt`
+        t("chat.sysMemberRemoved", {
+          user: session.user.username,
+          member: memberLabel,
+        })
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "remove_failed");
@@ -2642,7 +2657,7 @@ export function ChatShell({
       // sees it; once we leave we can't send into that group any more.
       await sendGroupSystemMessage(
         group,
-        `${session.user.username} hat die Gruppe verlassen`
+        t("chat.sysLeft", { user: session.user.username })
       );
       await api.leaveGroup(session.token, group.id);
       setGroup(null);
@@ -4413,7 +4428,7 @@ export function ChatShell({
                       type="button"
                       onClick={() => void beginCall()}
                       className="btn btn-secondary btn-icon !h-9 !w-9"
-                      title="Anrufen"
+                      title={t("chat.call")}
                     >
                       <IconPhone size={18} />
                     </button>
@@ -4422,7 +4437,7 @@ export function ChatShell({
                     type="button"
                     onClick={() => setInfoOpen((v) => !v)}
                     className={`btn btn-secondary btn-icon !h-9 !w-9 ${infoOpen ? "!border-[var(--accent)] !bg-[var(--accent-soft)] !text-[var(--accent)]" : ""}`}
-                    title="Info"
+                    title={t("chat.info")}
                   >
                     <IconInfo size={18} />
                   </button>
@@ -4431,14 +4446,14 @@ export function ChatShell({
                       type="button"
                       onClick={() => setDmMenuOpen((v) => !v)}
                       className="btn btn-secondary btn-icon !h-9 !w-9"
-                      title="Mehr"
+                      title={t("chat.more")}
                     >
                       <IconMoreVertical size={18} />
                     </button>
                     {dmMenuOpen && (
                       <div className="chat-menu">
                         <label className="chat-menu-item cursor-default">
-                          <span>Verschwindende Nachrichten</span>
+                          <span>{t("settings.disappearing")}</span>
                           <select
                             value={ttlDm}
                             onChange={(e) => void onChangeTtlDm(Number(e.target.value))}
@@ -4451,10 +4466,10 @@ export function ChatShell({
                           </select>
                         </label>
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSafetyOpen(true); }}>
-                          <IconShieldCheck size={16} /> Sicherheitsnummer anzeigen
+                          <IconShieldCheck size={16} /> {t("chat.showSafetyNumber")}
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setInfoOpen(true); }}>
-                          <IconFileText size={16} /> Medien & Dateien
+                          <IconFileText size={16} /> {t("chat.mediaFiles")}
                         </button>
                         {peer.id !== session.user.id && (
                           <button
@@ -4473,8 +4488,8 @@ export function ChatShell({
                           >
                             <IconVolumeMute size={16} />
                             {mutedPeers.has(peer.id)
-                              ? "Stummschaltung aufheben"
-                              : "Stummschalten"}
+                              ? t("chat.unmuteContact")
+                              : t("chat.muteContact")}
                           </button>
                         )}
                         <button
@@ -4491,10 +4506,10 @@ export function ChatShell({
                             setDmMenuOpen(false);
                           }}
                         >
-                          <IconPin size={16} /> {favoritePeers.has(peer.id) ? "Aus Favoriten entfernen" : "Zu Favoriten hinzufügen"}
+                          <IconPin size={16} /> {favoritePeers.has(peer.id) ? t("chat.unfavorite") : t("chat.favorite")}
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSearchOpen(true); }}>
-                          <IconSearch size={16} /> Suche in Konversation
+                          <IconSearch size={16} /> {t("chat.searchInConvo")}
                         </button>
                         <button
                           type="button"
@@ -4510,10 +4525,10 @@ export function ChatShell({
                             setDmMenuOpen(false);
                           }}
                         >
-                          {blockedPeers.has(peer.id) ? "Kontakt entsperren" : "Kontakt blockieren"}
+                          {blockedPeers.has(peer.id) ? t("chat.unblock") : t("chat.block")}
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setInfoOpen(true); }}>
-                          <IconInfo size={16} /> Info / Profil anzeigen
+                          <IconInfo size={16} /> {t("chat.infoProfile")}
                         </button>
                       </div>
                     )}
@@ -5116,7 +5131,7 @@ export function ChatShell({
                       type="button"
                       onClick={() => setGroupMenuOpen((v) => !v)}
                       className="btn btn-secondary btn-icon !h-9 !w-9"
-                      title="Mehr"
+                      title={t("chat.more")}
                     >
                       <IconMoreVertical size={18} />
                     </button>
@@ -5136,7 +5151,7 @@ export function ChatShell({
                           </select>
                         </label>
                         <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setSearchOpen(true); }}>
-                          <IconSearch size={16} /> Suche in Konversation
+                          <IconSearch size={16} /> {t("chat.searchInConvo")}
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setGroupPanelOpen(true); }}>
                           <IconUsers size={16} /> {t("group.showMembers")}
@@ -5321,7 +5336,7 @@ export function ChatShell({
                                   value={url}
                                   className="app-input flex-1 !py-0.5 !text-[10px] font-mono"
                                   onFocus={(e) => e.currentTarget.select()}
-                                  aria-label="Einladungslink"
+                                  aria-label={t("chat.inviteLinkAria")}
                                 />
                                 <button
                                   type="button"
