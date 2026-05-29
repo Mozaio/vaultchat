@@ -1,9 +1,42 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   getOrBuildIndex,
   search as searchIndex,
 } from "../lib/searchIndex";
 import { IconSearch, IconX } from "./Icons";
+
+/**
+ * Wrap each occurrence of a query term in <mark> so matches stand out in
+ * the result list. Terms shorter than 2 chars are ignored to avoid
+ * highlighting nearly every character. Purely presentational — operates on
+ * the already-decrypted local preview text.
+ */
+function highlightMatches(text: string, query: string): ReactNode {
+  const terms = query
+    .trim()
+    .split(/\s+/)
+    .filter((t) => t.length >= 2);
+  if (terms.length === 0) return text;
+  const lowerTerms = terms.map((t) => t.toLowerCase());
+  const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const re = new RegExp(`(${escaped.join("|")})`, "gi");
+  return text.split(re).map((part, i) =>
+    lowerTerms.includes(part.toLowerCase()) ? (
+      <mark key={i} className="search-highlight">
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
 
 type SearchHit = {
   key: string;
@@ -132,7 +165,17 @@ export function SearchPanel({
         </div>
 
         <div className="search-results">
-          {results.length === 0 && query && !searching && (
+          {!query.trim() && (
+            <div className="search-empty">
+              <IconSearch size={26} aria-hidden />
+              <p className="search-empty-title">Nachrichten durchsuchen</p>
+              <p className="search-empty-hint">
+                Tippe ein Stichwort — die Suche läuft komplett lokal auf
+                deinem Gerät.
+              </p>
+            </div>
+          )}
+          {results.length === 0 && query.trim() && !searching && (
             <div className="search-empty">Keine Ergebnisse</div>
           )}
           {results.map((hit) => (
@@ -145,8 +188,12 @@ export function SearchPanel({
                 onSelect(hit.type, id, hit.cid);
               }}
             >
-              <div className="search-hit-title">{hit.title}</div>
-              <div className="search-hit-preview">{hit.preview}</div>
+              <div className="search-hit-title">
+                {highlightMatches(hit.title, query)}
+              </div>
+              <div className="search-hit-preview">
+                {highlightMatches(hit.preview, query)}
+              </div>
               <div className="search-hit-time">
                 {new Date(hit.timestamp).toLocaleString("de-DE")}
               </div>
