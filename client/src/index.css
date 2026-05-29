@@ -7354,6 +7354,71 @@ button:focus-visible,
   letter-spacing: -0.01em;
 }
 
+/* ── Cleaner conversation-list header (arrangement rework) ── */
+.u-list-title {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.u-header-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.u-header-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.u-header-compose {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.u-header-compose:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Filter chips: one tidy scrollable row instead of wrapping to two. */
+.filter-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.filter-chips::-webkit-scrollbar {
+  display: none;
+}
+.filter-chip {
+  flex-shrink: 0;
+}
+
+/* Theme toggle relocated into the icon rail — match the rail buttons. */
+.u-rail-theme .theme-toggle {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.u-rail-theme .theme-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
+
 /* Group message sender avatar + name (group chats only — DMs stay clean). */
 .message-wrapper.received.with-av {
   align-items: flex-start;

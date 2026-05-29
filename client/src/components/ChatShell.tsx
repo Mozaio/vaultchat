@@ -122,7 +122,6 @@ import {
   IconShieldCheck,
   IconSmile,
   IconStar,
-  IconUserPlus,
   IconUsers,
   IconVolumeMute,
   IconWifiOff,
@@ -3291,6 +3290,18 @@ export function ChatShell({
           <VaultChatLogo size={32} style={{ color: "var(--accent)" }} />
         </div>
         <div className="u-rail-spacer" />
+        <div className="u-rail-theme">
+          <ThemeToggle />
+        </div>
+        <button
+          type="button"
+          className="u-rail-btn"
+          title="Konto sperren (Ctrl/⌘+L)"
+          aria-label="Konto sperren"
+          onClick={onLock}
+        >
+          <IconLock size={20} />
+        </button>
         <button
           type="button"
           className="u-rail-btn"
@@ -3325,72 +3336,52 @@ export function ChatShell({
         } u-panel u-panel-list w-full min-w-0 flex-col border-[var(--border)] bg-[var(--bg-sidebar)] md:flex md:w-84 md:min-w-[20rem] md:border-r`}
       >
         <div className="sidebar-header flex items-center justify-between !py-3.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <VaultChatLogo size={32} style={{ color: "var(--accent)", flexShrink: 0 }} />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
-                Umbra
-              </p>
-              <div className="sidebar-status-row">
-                {(() => {
-                  // 3-Zustands-Anzeige: online | reconnecting | offline.
-                  // "reconnecting" ist der Fall, wenn wir nach einem Drop
-                  // einen neuen Connect-Versuch starten — vorher hieß das
-                  // einfach "Offline", was zwischen "Server schläft" und
-                  // "Mein Wifi ist weg" nicht unterschieden hat.
-                  const state =
-                    connected
-                      ? "online"
-                      : reconnectAttempt > 0
-                        ? "reconnecting"
-                        : "offline";
-                  const label =
-                    state === "online"
-                      ? "Online"
-                      : state === "reconnecting"
-                        ? `Verbinde (#${reconnectAttempt})`
-                        : "Offline";
-                  const title =
-                    state === "online"
-                      ? "Verbunden"
-                      : state === "reconnecting"
-                        ? `Reconnect-Versuch ${reconnectAttempt} — Server wacht evtl. gerade auf`
-                        : "Verbindung getrennt";
-                  return (
-                    <span
-                      className={`sidebar-status-pill ${state}`}
-                      title={title}
-                      aria-label={label}
-                      role="status"
-                      aria-live="polite"
-                    >
-                      <span className="sidebar-status-dot" aria-hidden />
-                      {label}
-                    </span>
-                  );
-                })()}
-                {pendingCount > 0 && (
-                  <span
-                    className="sidebar-status-pending"
-                    title={`${pendingCount} Nachricht${pendingCount === 1 ? "" : "en"} warten auf Zustellung`}
-                  >
-                    {pendingCount} ausstehend
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <h2 className="u-list-title">Chats</h2>
+            {!connected && (
+              <span
+                className={`sidebar-status-pill ${
+                  reconnectAttempt > 0 ? "reconnecting" : "offline"
+                }`}
+                title={
+                  reconnectAttempt > 0
+                    ? `Reconnect-Versuch ${reconnectAttempt} — Server wacht evtl. gerade auf`
+                    : "Verbindung getrennt"
+                }
+                role="status"
+                aria-live="polite"
+              >
+                <span className="sidebar-status-dot" aria-hidden />
+                {reconnectAttempt > 0 ? "Verbinde…" : "Offline"}
+              </span>
+            )}
+            {pendingCount > 0 && (
+              <span
+                className="sidebar-status-pending"
+                title={`${pendingCount} Nachricht${pendingCount === 1 ? "" : "en"} warten auf Zustellung`}
+              >
+                {pendingCount}
+              </span>
+            )}
           </div>
-          <div className="flex gap-1.5">
-            <ThemeToggle />
+          <div className="flex gap-1">
             <button
               type="button"
-              onClick={onLock}
-              className="btn btn-secondary !px-2.5 !py-1.5 !text-xs"
-              title="Konto sperren — Schlüssel aus dem Speicher entfernen (Ctrl/⌘+L)"
-              aria-label="Konto sperren"
+              onClick={() => void refreshLists()}
+              className={`u-header-icon-btn ${refreshing ? "animate-spin" : ""}`}
+              title="Aktualisieren"
+              aria-label="Kontakte und Gruppen aktualisieren"
             >
-              <IconLock size={14} />
-              Sperren
+              <IconRefreshCw size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAddContact(true)}
+              className="u-header-icon-btn u-header-compose"
+              title="Neuer Chat"
+              aria-label="Neuer Chat"
+            >
+              <IconPlus size={20} />
             </button>
           </div>
         </div>
@@ -3421,15 +3412,6 @@ export function ChatShell({
               </button>
             )}
           </div>
-          <button
-            type="button"
-            className="u-newchat-btn"
-            onClick={() => setShowAddContact(true)}
-            aria-label="Neuen Chat starten"
-          >
-            <span className="u-newchat-plus" aria-hidden>+</span>
-            Neuer Chat
-          </button>
         </div>
 
         <div className="filter-chips mx-3 mt-3">
@@ -3507,25 +3489,6 @@ export function ChatShell({
           sidebarFilter === "star" ||
           activeFolder !== null) && (
           <>
-            <div className="flex items-center justify-end gap-2 border-b px-3 py-2" style={{ borderColor: "var(--border)" }}>
-              <button
-                type="button"
-                onClick={() => void refreshLists()}
-                className={`btn btn-secondary btn-icon !h-8 !w-8 ${refreshing ? "animate-spin" : ""}`}
-                title="Kontakte und Gruppen aktualisieren"
-              >
-                <IconRefreshCw size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAddContact(true)}
-                className="btn btn-primary btn-icon !h-8 !w-8"
-                title="Kontakt hinzufügen"
-                aria-label="Kontakt hinzufügen"
-              >
-                <IconUserPlus size={16} />
-              </button>
-            </div>
             <div
               className={`overflow-y-auto p-2 ${
                 sidebarFilter === "all" || sidebarFilter === "star"
