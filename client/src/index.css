@@ -7388,11 +7388,15 @@ button:focus-visible,
   color: #fff;
 }
 
-/* Filter chips: one tidy scrollable row instead of wrapping to two. */
+/* Filter chips: one tidy scrollable row instead of wrapping to two; a soft
+   right-edge fade hints there's more to scroll (no hard mid-word cut-off). */
 .filter-chips {
   flex-wrap: nowrap;
   overflow-x: auto;
   scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 86%, transparent 100%);
+  padding-right: 0.5rem;
 }
 .filter-chips::-webkit-scrollbar {
   display: none;

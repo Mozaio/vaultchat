@@ -3956,7 +3956,7 @@ export function ChatShell({
           <>
             <header className="chat-header !h-auto min-h-14 !px-3 !py-3 md:!px-4">
               <div className="absolute top-0 left-0 right-0 h-0.5 overflow-hidden rounded-t-2xl">
-                <div className={`h-full transition-all duration-500 ${connected ? 'bg-emerald-500 w-full' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
+                <div className={`h-full transition-all duration-500 ${connected ? 'w-0 opacity-0' : 'bg-amber-500 w-1/2 animate-pulse'}`} />
               </div>
               <div className="flex w-full items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
@@ -4199,7 +4199,7 @@ export function ChatShell({
               }}
             >
               {dragOver && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-emerald-500/20 backdrop-blur-sm border-2 border-dashed border-emerald-400 m-2">
+                <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-[var(--accent-soft)] backdrop-blur-sm border-2 border-dashed border-[var(--accent)] m-2">
                   <div className="text-center">
                     <p className="text-2xl mb-2">📎</p>
                     <p className="text-sm font-medium text-emerald-100">Dateien hier ablegen</p>
@@ -5074,7 +5074,7 @@ export function ChatShell({
               }}
             >
               {groupDragOver && (
-                <div className="absolute inset-0 z-50 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-emerald-400 bg-emerald-500/20 backdrop-blur-sm">
+                <div className="absolute inset-0 z-50 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--accent)] bg-[var(--accent-soft)] backdrop-blur-sm">
                   <div className="text-center">
                     <p className="mb-2 text-2xl">📎</p>
                     <p className="text-sm font-medium text-emerald-100">Dateien in die Gruppe legen</p>
