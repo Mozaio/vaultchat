@@ -4414,6 +4414,24 @@ export function ChatShell({
                 const mainDmMsgs = messages.filter(
                   (m) => !m.plain.threadParentCid
                 );
+                if (mainDmMsgs.length === 0) {
+                  const isSelf = peer.id === session.user.id;
+                  return (
+                    <div className="conversation-blank" key="dm-blank">
+                      <span className="conversation-blank-icon" aria-hidden>
+                        <IconShieldCheck size={26} />
+                      </span>
+                      <p className="conversation-blank-title">
+                        {isSelf ? "Deine Notizen" : peer.username}
+                      </p>
+                      <p className="conversation-blank-text">
+                        {isSelf
+                          ? "Nur für dich — lokal verschlüsselt auf diesem Gerät."
+                          : "Noch keine Nachrichten. Eure Unterhaltung ist Ende-zu-Ende verschlüsselt — schreib die erste Nachricht."}
+                      </p>
+                    </div>
+                  );
+                }
                 return mainDmMsgs.flatMap((m, i) => {
                 const items: JSX.Element[] = [];
                 if (
