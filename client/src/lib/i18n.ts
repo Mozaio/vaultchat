@@ -2769,6 +2769,25 @@ const DICT: Record<string, Dict> = {
     pt: "Remetente desconhecido", ru: "Неизвестный отправитель",
     ar: "مرسل غير معروف", zh: "未知发件人", hi: "अज्ञात प्रेषक",
   },
+  "requests.previewHidden": {
+    en: "Tap to review request", de: "Tippen, um Anfrage zu prüfen",
+    tr: "İncelemek için dokun", es: "Toca para revisar la solicitud",
+    fr: "Touchez pour examiner la demande", pt: "Toque para rever o pedido",
+    ru: "Нажмите, чтобы просмотреть запрос", ar: "اضغط لمراجعة الطلب",
+    zh: "点按以查看请求", hi: "अनुरोध देखने के लिए टैप करें",
+  },
+  "requests.convNotice": {
+    en: "Message request — this sender isn't in your contacts. Review the messages below, then accept or block.",
+    de: "Nachrichtenanfrage — dieser Absender ist nicht in deinen Kontakten. Prüfe die Nachrichten unten und nimm dann an oder blockiere.",
+    tr: "Mesaj isteği — bu gönderen kişilerinde değil. Aşağıdaki mesajları incele, sonra kabul et veya engelle.",
+    es: "Solicitud de mensaje: este remitente no está en tus contactos. Revisa los mensajes y luego acepta o bloquea.",
+    fr: "Demande de message — cet expéditeur n'est pas dans vos contacts. Examinez les messages ci-dessous, puis acceptez ou bloquez.",
+    pt: "Pedido de mensagem — este remetente não está nos seus contactos. Reveja as mensagens abaixo e depois aceite ou bloqueie.",
+    ru: "Запрос на переписку — этого отправителя нет в ваших контактах. Просмотрите сообщения ниже, затем примите или заблокируйте.",
+    ar: "طلب مراسلة — هذا المرسل ليس في جهات اتصالك. راجع الرسائل أدناه ثم اقبل أو احظر.",
+    zh: "消息请求——此发件人不在你的联系人中。查看下方消息，然后接受或屏蔽。",
+    hi: "संदेश अनुरोध — यह प्रेषक आपके संपर्कों में नहीं है। नीचे संदेश देखें, फिर स्वीकारें या ब्लॉक करें।",
+  },
 
   // ── Add contact ───────────────────────────────────────────────────
   "addc.title": {

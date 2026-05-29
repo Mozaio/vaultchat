@@ -3575,8 +3575,11 @@ export function ChatShell({
     return visibleUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
       const isReq = requestPeerIds.has(u.id);
-      const subtitle =
-        peer?.id === u.id && typing
+      // Privacy: never surface a not-yet-accepted sender's message text in the
+      // list — it could be abusive/unsolicited. Show a neutral prompt instead.
+      const subtitle = isReq
+        ? t("requests.previewHidden")
+        : peer?.id === u.id && typing
           ? t("chat.typing")
           : prev
             ? prev.fromMe
@@ -4997,6 +5000,12 @@ export function ChatShell({
                     {t("chat.e2eeWith", { name: peer.username })}
                     {peerPin?.state !== "verified" && t("chat.verifyHint")}
                   </span>
+                </div>
+              )}
+              {requestPeerIds.has(peer.id) && (
+                <div className="request-notice" key="request-notice">
+                  <IconBell size={14} />
+                  <span>{t("requests.convNotice")}</span>
                 </div>
               )}
               {pinnedDmBanner && dmBannerKey && (

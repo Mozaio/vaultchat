@@ -3349,6 +3349,28 @@ select:focus-visible {
   flex-shrink: 0;
 }
 
+/* In-conversation message-request notice (unknown sender). */
+.request-notice {
+  align-self: center;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0 auto 1rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  max-width: 92%;
+}
+
+.request-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
 /* ============================================================
    PINNED MESSAGE BANNER (Phase 1.7)
    ============================================================ */
