@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 /**
  * Single-pass inline markdown renderer for chat messages.
@@ -7,9 +7,11 @@ import type { ReactNode } from "react";
  *   `code`         -> <code>
  *   **bold**       -> <strong>
  *   ~~strike~~     -> <s>
+ *   ||spoiler||    -> click-to-reveal hidden text
  *   *italic*       -> <em>
  *   _italic_       -> <em>
  *   https://…      -> <a target="_blank" rel="noopener noreferrer nofollow">
+ *   @mention       -> highlighted chip
  *
  * Block-level formatting (headings, lists, quotes) is intentionally
  * not supported — it's a chat composer, not a document editor.
@@ -17,7 +19,33 @@ import type { ReactNode } from "react";
  * Whitespace in the input is preserved by the caller (the bubble keeps
  * `white-space: pre-wrap`), so newlines render as line breaks.
  */
-const TOKEN = /(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\*[^*\n]+\*|_[^_\n]+_|https?:\/\/[^\s<>"']+|@[A-Za-z0-9_]{2,32})/g;
+const TOKEN = /(`[^`\n]+`|\*\*[^*\n]+\*\*|~~[^~\n]+~~|\|\|[^|\n]+\|\||\*[^*\n]+\*|_[^_\n]+_|https?:\/\/[^\s<>"']+|@[A-Za-z0-9_]{2,32})/g;
+
+/** Discord-style spoiler: blacked-out until clicked/activated. */
+function Spoiler({ children }: { children: ReactNode }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span
+      className={`md-spoiler${revealed ? " revealed" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={revealed ? undefined : "Spoiler"}
+      onClick={(e) => {
+        if (revealed) return;
+        e.stopPropagation();
+        setRevealed(true);
+      }}
+      onKeyDown={(e) => {
+        if (!revealed && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          setRevealed(true);
+        }
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 export function renderInlineMarkdown(text: string): ReactNode[] {
   if (!text) return [];
@@ -34,6 +62,8 @@ export function renderInlineMarkdown(text: string): ReactNode[] {
       out.push(<strong key={key++}>{tok.slice(2, -2)}</strong>);
     } else if (tok.startsWith("~~")) {
       out.push(<s key={key++}>{tok.slice(2, -2)}</s>);
+    } else if (tok.startsWith("||")) {
+      out.push(<Spoiler key={key++}>{tok.slice(2, -2)}</Spoiler>);
     } else if (tok.startsWith("*") || tok.startsWith("_")) {
       out.push(<em key={key++}>{tok.slice(1, -1)}</em>);
     } else if (tok.startsWith("@")) {

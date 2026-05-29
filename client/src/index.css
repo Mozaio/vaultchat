@@ -7672,6 +7672,29 @@ button:focus-visible,
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* Spoiler (||text||) — blacked out until clicked/activated (Discord-style). */
+.md-spoiler {
+  background-color: var(--text);
+  color: transparent;
+  border-radius: 4px;
+  padding: 0 0.22em;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.md-spoiler::selection,
+.md-spoiler *::selection {
+  background: transparent;
+}
+.md-spoiler.revealed {
+  background-color: color-mix(in srgb, var(--text) 12%, transparent);
+  color: inherit;
+  cursor: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 /* ===========================================================================
    Desktop (Tauri) custom title bar — frameless window chrome.
    Only active under html.is-tauri (set by initDesktopChrome), so the
