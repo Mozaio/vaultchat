@@ -1036,6 +1036,13 @@ const DICT: Record<string, Dict> = {
     ru: "Удалить изображение", ar: "إزالة الصورة", zh: "移除图片",
     hi: "छवि हटाएं",
   },
+  "group.noDescription": {
+    en: "No description set.", de: "Keine Beschreibung gesetzt.",
+    tr: "Açıklama ayarlanmadı.", es: "Sin descripción.",
+    fr: "Aucune description.", pt: "Nenhuma descrição definida.",
+    ru: "Описание не задано.", ar: "لم يتم تعيين وصف.",
+    zh: "未设置描述。", hi: "कोई विवरण सेट नहीं है।",
+  },
 
   // ── Group management ──────────────────────────────────────────────
   "common.remove": {

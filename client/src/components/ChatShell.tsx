@@ -5207,7 +5207,7 @@ export function ChatShell({
                                   setGroupEditAvatarRemoved(true);
                                 }}
                               >
-                                Bild entfernen
+                                {t("group.removeImage")}
                               </button>
                             )}
                           </div>
@@ -5215,9 +5215,9 @@ export function ChatShell({
                             className="app-input w-full !py-1 !text-xs"
                             value={groupEditName}
                             onChange={(e) => setGroupEditName(e.target.value)}
-                            placeholder="Gruppenname"
+                            placeholder={t("group.name")}
                             maxLength={64}
-                            aria-label="Gruppenname bearbeiten"
+                            aria-label={t("group.name")}
                           />
                           <textarea
                             className="app-input w-full !py-1 !text-xs"
@@ -5225,10 +5225,10 @@ export function ChatShell({
                             onChange={(e) =>
                               setGroupEditDescription(e.target.value.slice(0, 280))
                             }
-                            placeholder="Beschreibung (optional, max. 280 Zeichen)"
+                            placeholder={t("group.description")}
                             rows={2}
                             style={{ resize: "none" }}
-                            aria-label="Gruppenbeschreibung bearbeiten"
+                            aria-label={t("group.description")}
                           />
                           <div className="flex justify-end gap-2">
                             <button
@@ -5237,7 +5237,7 @@ export function ChatShell({
                               className="btn btn-secondary !px-2 !py-1 !text-[10px]"
                               disabled={groupEditBusy}
                             >
-                              Abbrechen
+                              {t("common.cancel")}
                             </button>
                             <button
                               type="button"
@@ -5245,7 +5245,7 @@ export function ChatShell({
                               className="btn btn-primary !px-2 !py-1 !text-[10px]"
                               disabled={groupEditBusy || !groupEditName.trim()}
                             >
-                              {groupEditBusy ? "…" : "Speichern"}
+                              {groupEditBusy ? "…" : t("common.save")}
                             </button>
                           </div>
                         </div>
@@ -5263,7 +5263,7 @@ export function ChatShell({
                               className="italic"
                               style={{ color: "var(--text-muted)" }}
                             >
-                              Keine Beschreibung gesetzt.
+                              {t("group.noDescription")}
                             </p>
                           )}
                           {group.createdByUserId === session.user.id && (
