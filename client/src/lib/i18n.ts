@@ -289,6 +289,87 @@ const DICT: Record<string, Dict> = {
     ru: "Идёт запись …", ar: "جارٍ التسجيل …", zh: "正在录音 …",
     hi: "रिकॉर्डिंग …",
   },
+
+  // ── Common buttons (reused across menus/modals/onboarding) ────────
+  "common.skip": {
+    en: "Skip", de: "Überspringen", tr: "Atla", es: "Omitir", fr: "Passer",
+    pt: "Pular", ru: "Пропустить", ar: "تخطّي", zh: "跳过", hi: "छोड़ें",
+  },
+  "common.back": {
+    en: "Back", de: "Zurück", tr: "Geri", es: "Atrás", fr: "Retour",
+    pt: "Voltar", ru: "Назад", ar: "رجوع", zh: "返回", hi: "वापस",
+  },
+  "common.next": {
+    en: "Next", de: "Weiter", tr: "İleri", es: "Siguiente", fr: "Suivant",
+    pt: "Próximo", ru: "Далее", ar: "التالي", zh: "下一步", hi: "आगे",
+  },
+  "common.done": {
+    en: "Done", de: "Fertig", tr: "Bitti", es: "Listo", fr: "Terminé",
+    pt: "Concluído", ru: "Готово", ar: "تم", zh: "完成", hi: "हो गया",
+  },
+
+  // ── Onboarding ────────────────────────────────────────────────────
+  "ob.s1.title": {
+    en: "Welcome to Umbra", de: "Willkommen bei Umbra",
+    tr: "Umbra'ya hoş geldin", es: "Bienvenido a Umbra",
+    fr: "Bienvenue sur Umbra", pt: "Bem-vindo ao Umbra",
+    ru: "Добро пожаловать в Umbra", ar: "مرحبًا بك في Umbra",
+    zh: "欢迎使用 Umbra", hi: "Umbra में आपका स्वागत है",
+  },
+  "ob.s1.text": {
+    en: "Your chats are end-to-end encrypted. For direct messages the server sees neither the content nor the sender (sealed sender).",
+    de: "Deine Chats sind Ende-zu-Ende verschlüsselt. Der Server sieht weder Inhalte noch den Absender bei Direktnachrichten (Sealed Sender).",
+    tr: "Sohbetlerin uçtan uca şifrelidir. Doğrudan mesajlarda sunucu ne içeriği ne de göndereni görür (sealed sender).",
+    es: "Tus chats están cifrados de extremo a extremo. En los mensajes directos el servidor no ve ni el contenido ni el remitente (sealed sender).",
+    fr: "Vos discussions sont chiffrées de bout en bout. Pour les messages directs, le serveur ne voit ni le contenu ni l'expéditeur (sealed sender).",
+    pt: "Seus chats são criptografados de ponta a ponta. Em mensagens diretas, o servidor não vê o conteúdo nem o remetente (sealed sender).",
+    ru: "Ваши чаты зашифрованы сквозным шифрованием. В личных сообщениях сервер не видит ни содержимое, ни отправителя (sealed sender).",
+    ar: "محادثاتك مشفّرة من طرف إلى طرف. في الرسائل المباشرة لا يرى الخادم المحتوى ولا المُرسِل (sealed sender).",
+    zh: "你的聊天是端到端加密的。私信中服务器既看不到内容也看不到发送者（sealed sender）。",
+    hi: "आपकी चैट एंड-टू-एंड एन्क्रिप्टेड हैं। डायरेक्ट मैसेज में सर्वर न सामग्री देखता है न भेजने वाले को (sealed sender)।",
+  },
+  "ob.s2.title": {
+    en: "Don't forget your backup", de: "Backup nicht vergessen",
+    tr: "Yedeği unutma", es: "No olvides tu copia de seguridad",
+    fr: "N'oubliez pas votre sauvegarde", pt: "Não esqueça seu backup",
+    ru: "Не забудьте о резервной копии", ar: "لا تنسَ نسختك الاحتياطية",
+    zh: "别忘了备份", hi: "अपना बैकअप न भूलें",
+  },
+  "ob.s2.text": {
+    en: "Your key lives only on this device. Without an encrypted backup you cannot access your conversations on a new phone or after data loss.",
+    de: "Der Schlüssel liegt nur auf diesem Gerät. Ohne verschlüsseltes Backup gibt es auf einem neuen Handy oder nach Datenverlust keinen Zugriff auf deine Konversationen.",
+    tr: "Anahtarın yalnızca bu cihazda. Şifreli bir yedek olmadan yeni bir telefonda veya veri kaybından sonra sohbetlerine erişemezsin.",
+    es: "Tu clave solo está en este dispositivo. Sin una copia cifrada no podrás acceder a tus conversaciones en un teléfono nuevo o tras una pérdida de datos.",
+    fr: "Votre clé n'existe que sur cet appareil. Sans sauvegarde chiffrée, vous ne pourrez pas accéder à vos conversations sur un nouveau téléphone ou après une perte de données.",
+    pt: "Sua chave fica apenas neste dispositivo. Sem um backup criptografado, você não acessa suas conversas em um novo celular ou após perda de dados.",
+    ru: "Ваш ключ хранится только на этом устройстве. Без зашифрованной резервной копии вы не получите доступ к перепискам на новом телефоне или после потери данных.",
+    ar: "مفتاحك موجود على هذا الجهاز فقط. بدون نسخة احتياطية مشفّرة لن تتمكن من الوصول إلى محادثاتك على هاتف جديد أو بعد فقدان البيانات.",
+    zh: "你的密钥只存在于此设备。没有加密备份，换新手机或数据丢失后将无法访问你的对话。",
+    hi: "आपकी कुंजी केवल इसी डिवाइस पर है। एन्क्रिप्टेड बैकअप के बिना नए फ़ोन पर या डेटा खोने के बाद आप अपनी बातचीत तक नहीं पहुँच पाएँगे।",
+  },
+  "ob.s3.title": {
+    en: "Get started", de: "Loslegen", tr: "Başla", es: "Empezar",
+    fr: "Commencer", pt: "Começar", ru: "Начать", ar: "ابدأ",
+    zh: "开始", hi: "शुरू करें",
+  },
+  "ob.s3.text": {
+    en: "Add contacts via search or create a group. Tip: verify safety numbers for important contacts.",
+    de: "Füge Kontakte über die Suche hinzu oder lege eine Gruppe an. Tipp: Sicherheitsnummern bei wichtigen Kontakten verifizieren.",
+    tr: "Aramayla kişi ekle veya bir grup oluştur. İpucu: önemli kişiler için güvenlik numaralarını doğrula.",
+    es: "Añade contactos mediante la búsqueda o crea un grupo. Consejo: verifica los números de seguridad de los contactos importantes.",
+    fr: "Ajoutez des contacts via la recherche ou créez un groupe. Astuce : vérifiez les numéros de sécurité des contacts importants.",
+    pt: "Adicione contatos pela busca ou crie um grupo. Dica: verifique os números de segurança dos contatos importantes.",
+    ru: "Добавляйте контакты через поиск или создайте группу. Совет: проверяйте номера безопасности у важных контактов.",
+    ar: "أضِف جهات اتصال عبر البحث أو أنشئ مجموعة. نصيحة: تحقّق من أرقام الأمان لجهات الاتصال المهمة.",
+    zh: "通过搜索添加联系人或创建群组。提示：为重要联系人验证安全码。",
+    hi: "खोज के ज़रिए संपर्क जोड़ें या समूह बनाएं। सुझाव: महत्वपूर्ण संपर्कों के सुरक्षा नंबर सत्यापित करें।",
+  },
+  "ob.backupNow": {
+    en: "Back up now", de: "Backup jetzt", tr: "Şimdi yedekle",
+    es: "Hacer copia ahora", fr: "Sauvegarder maintenant",
+    pt: "Fazer backup agora", ru: "Создать копию сейчас",
+    ar: "النسخ الاحتياطي الآن", zh: "立即备份", hi: "अभी बैकअप लें",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";

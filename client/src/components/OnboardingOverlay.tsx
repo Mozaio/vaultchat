@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { IconLock, IconShieldCheck, IconUsers } from "./Icons";
+import { t, useLocale } from "../lib/i18n";
 
 const ONBOARDING_KEY = "vaultchat.onboarding.pending";
 
@@ -20,21 +21,9 @@ export function clearOnboardingPending(): void {
 }
 
 const STEPS = [
-  {
-    title: "Willkommen bei Umbra",
-    text: "Deine Chats sind Ende-zu-Ende verschlüsselt. Der Server sieht weder Inhalte noch den Absender bei Direktnachrichten (Sealed Sender).",
-    icon: <IconShieldCheck size={36} />,
-  },
-  {
-    title: "Backup nicht vergessen",
-    text: "Der Schlüssel liegt nur auf diesem Gerät. Ohne verschlüsseltes Backup gibt es auf einem neuen Handy oder nach Datenverlust keinen Zugriff auf deine Konversationen.",
-    icon: <IconLock size={34} />,
-  },
-  {
-    title: "Loslegen",
-    text: "Füge Kontakte über die Suche hinzu oder lege eine Gruppe an. Tipp: Sicherheitsnummern bei wichtigen Kontakten verifizieren.",
-    icon: <IconUsers size={34} />,
-  },
+  { titleKey: "ob.s1.title", textKey: "ob.s1.text", icon: <IconShieldCheck size={36} /> },
+  { titleKey: "ob.s2.title", textKey: "ob.s2.text", icon: <IconLock size={34} /> },
+  { titleKey: "ob.s3.title", textKey: "ob.s3.text", icon: <IconUsers size={34} /> },
 ] as const;
 
 type Props = {
@@ -43,6 +32,7 @@ type Props = {
 };
 
 export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
+  useLocale(); // re-render on language change
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
 
@@ -70,9 +60,9 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
           {STEPS[step].icon}
         </div>
         <h2 id="onboarding-title" className="onboarding-title">
-          {STEPS[step].title}
+          {t(STEPS[step].titleKey)}
         </h2>
-        <p className="onboarding-text">{STEPS[step].text}</p>
+        <p className="onboarding-text">{t(STEPS[step].textKey)}</p>
 
         <div className="onboarding-progress" aria-hidden>
           {STEPS.map((_, i) => (
@@ -86,7 +76,7 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
             className="btn btn-secondary !text-xs"
             onClick={finish}
           >
-            Überspringen
+            {t("common.skip")}
           </button>
           {step > 0 && (
             <button
@@ -94,7 +84,7 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
               className="btn btn-secondary !text-xs"
               onClick={() => setStep((s) => s - 1)}
             >
-              Zurück
+              {t("common.back")}
             </button>
           )}
           {step === 1 && (
@@ -106,7 +96,7 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
                 finish();
               }}
             >
-              Backup jetzt
+              {t("ob.backupNow")}
             </button>
           )}
           {!last ? (
@@ -115,7 +105,7 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
               className="btn btn-primary !text-xs"
               onClick={() => setStep((s) => s + 1)}
             >
-              Weiter
+              {t("common.next")}
             </button>
           ) : (
             <button
@@ -123,7 +113,7 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
               className="btn btn-primary !text-xs"
               onClick={finish}
             >
-              Fertig
+              {t("common.done")}
             </button>
           )}
         </div>
