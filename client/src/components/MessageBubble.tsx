@@ -176,6 +176,7 @@ export function MessageBubble({
   onToggleStar,
   onTogglePin,
   onLocalDelete,
+  onReveal,
   onPollVote,
   threadReplyCount,
   threadUnreadCount,
@@ -205,6 +206,11 @@ export function MessageBubble({
   onTogglePin?: (m: ChatMsg) => void;
   /** Local-only delete (no network frame). Used for view-once reveal expiry. */
   onLocalDelete?: (m: ChatMsg) => void;
+  /** Fired the moment a view-once message is revealed, so the caller can
+   *  durably purge the stored copy (IndexedDB) immediately — the in-memory
+   *  copy stays visible for the brief reveal window. Prevents a reload from
+   *  resurrecting an already-viewed message. */
+  onReveal?: (m: ChatMsg) => void;
   /** Cast a vote on a poll message at the given option index. */
   onPollVote?: (m: ChatMsg, optionIndex: number) => void;
   /** Number of thread replies to this message (only shown on parents). */
@@ -313,7 +319,12 @@ export function MessageBubble({
         <button
           type="button"
           className="view-once-cover"
-          onClick={() => setRevealed(true)}
+          onClick={() => {
+            // Purge the durable copy the instant it's revealed so a reload
+            // can't resurrect it; the in-memory copy stays for the countdown.
+            onReveal?.(msg);
+            setRevealed(true);
+          }}
           aria-label="Einmal-Nachricht öffnen — verschwindet nach dem Anschauen"
         >
           <IconLock size={14} />

@@ -2083,6 +2083,18 @@ export function ChatShell({
     rebuildDm(peer.id);
   }
 
+  /**
+   * Durably purge a just-revealed view-once message from IndexedDB without
+   * touching the rendered list — the in-memory copy stays visible for the
+   * short reveal countdown, but it can no longer be resurrected by a reload.
+   */
+  async function purgeRevealedViewOnceDm(m: ChatMsg) {
+    await idbDeleteDm(m.id).catch(() => {});
+  }
+  async function purgeRevealedViewOnceGroup(m: ChatMsg) {
+    await idbDeleteGroupMsg(m.id).catch(() => {});
+  }
+
   async function deleteGroup(m: ChatMsg) {
     if (!group) return;
     const refCid = m.plain.cid;
@@ -4425,6 +4437,7 @@ export function ChatShell({
                     onEdit={(x, body) => void editDm(x, body)}
                     onDelete={(x) => void deleteDm(x)}
                     onLocalDelete={(x) => void localDeleteDm(x)}
+                    onReveal={(x) => void purgeRevealedViewOnceDm(x)}
                     onPollVote={(x, idx) => void votePollDm(x, idx)}
                     onCopy={copyText}
                     onForward={(x) => setForwardTarget(x)}
@@ -5282,6 +5295,7 @@ export function ChatShell({
                   onEdit={(x, body) => void editGroup(x, body)}
                   onDelete={(x) => void deleteGroup(x)}
                   onLocalDelete={(x) => void localDeleteGroupMsg(x)}
+                  onReveal={(x) => void purgeRevealedViewOnceGroup(x)}
                   onPollVote={(x, idx) => void votePollGroup(x, idx)}
                   onCopy={copyText}
                   onForward={(x) => setForwardTarget(x)}
