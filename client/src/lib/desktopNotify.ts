@@ -53,6 +53,25 @@ export async function sendDesktopNotification(
 }
 
 /**
+ * Flash the taskbar/dock to request attention for a new message when the
+ * window isn't focused (Discord-style). No-op outside Tauri / when focused.
+ */
+export async function flashDesktopWindow(): Promise<void> {
+  if (!isTauri()) return;
+  try {
+    const { getCurrentWindow, UserAttentionType } = await import(
+      "@tauri-apps/api/window"
+    );
+    const w = getCurrentWindow();
+    if (!(await w.isFocused())) {
+      await w.requestUserAttention(UserAttentionType.Informational);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
  * Reflect the total unread count in the window/tab title (Discord-style
  * "(3) Umbra"). Updates the browser tab title everywhere, and additionally
  * the native window title + taskbar badge under Tauri. Best-effort.

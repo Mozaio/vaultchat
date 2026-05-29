@@ -107,6 +107,7 @@ import {
   isTauri,
   sendDesktopNotification,
   setUnreadBadge,
+  flashDesktopWindow,
 } from "../lib/desktopNotify";
 import {
   IconArrowDown,
@@ -621,6 +622,7 @@ export function ChatShell({
     // through the native OS notification channel.
     if (isTauri()) {
       void sendDesktopNotification(title, displayBody);
+      void flashDesktopWindow();
       return;
     }
     if (!("Notification" in window)) return;
