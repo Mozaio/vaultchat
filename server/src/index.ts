@@ -1215,7 +1215,21 @@ function flushMailboxToSocket(userId: string, ws: WebSocket) {
 }
 
 function recoveryEmailHash(email: string): string {
-  const pepper = process.env.VAULTCHAT_EMAIL_HASH_SECRET ?? process.env.VAULTCHAT_JWT_SECRET ?? "dev-email-hash-secret";
+  // Prefer a dedicated pepper; fall back to the JWT secret (always set and
+  // >=32 chars in production). The hardcoded dev string is ONLY permitted
+  // outside production — otherwise stored email hashes would be reversible
+  // via dictionary attack. In production we refuse it outright.
+  const pepper =
+    process.env.VAULTCHAT_EMAIL_HASH_SECRET ??
+    process.env.VAULTCHAT_JWT_SECRET ??
+    (process.env.NODE_ENV === "production"
+      ? null
+      : "dev-email-hash-secret");
+  if (!pepper) {
+    throw new Error(
+      "VAULTCHAT_EMAIL_HASH_SECRET (or VAULTCHAT_JWT_SECRET) must be set in production"
+    );
+  }
   return createHmac("sha256", pepper)
     .update(email.trim().toLowerCase())
     .digest("hex");
