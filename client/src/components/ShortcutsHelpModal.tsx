@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { SHORTCUTS } from "../lib/shortcuts";
+import { t, useLocale } from "../lib/i18n";
 import { IconX } from "./Icons";
 
 export function ShortcutsHelpModal({ onClose }: { onClose: () => void }) {
+  useLocale();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -29,14 +31,14 @@ export function ShortcutsHelpModal({ onClose }: { onClose: () => void }) {
             className="text-lg font-semibold"
             style={{ color: "var(--text)" }}
           >
-            Tastatur-Shortcuts
+            {t("shortcuts.title")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
             style={{ color: "var(--text-muted)" }}
-            aria-label="Schließen"
+            aria-label={t("common.close")}
           >
             <IconX size={18} />
           </button>

@@ -323,6 +323,17 @@ const DICT: Record<string, Dict> = {
     en: "Done", de: "Fertig", tr: "Bitti", es: "Listo", fr: "Terminé",
     pt: "Concluído", ru: "Готово", ar: "تم", zh: "完成", hi: "हो गया",
   },
+  "common.close": {
+    en: "Close", de: "Schließen", tr: "Kapat", es: "Cerrar", fr: "Fermer",
+    pt: "Fechar", ru: "Закрыть", ar: "إغلاق", zh: "关闭", hi: "बंद करें",
+  },
+  "shortcuts.title": {
+    en: "Keyboard shortcuts", de: "Tastatur-Shortcuts",
+    tr: "Klavye kısayolları", es: "Atajos de teclado",
+    fr: "Raccourcis clavier", pt: "Atalhos de teclado",
+    ru: "Горячие клавиши", ar: "اختصارات لوحة المفاتيح",
+    zh: "键盘快捷键", hi: "कीबोर्ड शॉर्टकट",
+  },
   "common.copied": {
     en: "Copied to clipboard", de: "In Zwischenablage kopiert",
     tr: "Panoya kopyalandı", es: "Copiado al portapapeles",
