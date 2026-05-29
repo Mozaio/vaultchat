@@ -94,10 +94,10 @@ export function SafetyNumberDialog({
 
         {/* Warning if key mismatch */}
         {pin?.state === "mismatch" && (
-          <div className="mb-4 rounded-xl border p-3 text-sm" style={{ 
-            borderColor: 'rgba(245,158,11,0.5)', 
-            background: 'var(--warning-soft, rgba(245,158,11,0.1))', 
-            color: 'var(--warning)' 
+          <div className="mb-4 rounded-xl border p-3 text-sm" style={{
+            borderColor: 'var(--warning)',
+            background: 'var(--warning-soft)',
+            color: 'var(--warning)'
           }}>
             <p className="font-semibold">⚠️ Der Sicherheitsschlüssel hat sich geändert.</p>
             <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>

@@ -307,8 +307,8 @@ export function SecuritySettings({
                       style={{
                         background: productionReady
                           ? "var(--accent-soft)"
-                          : "rgba(245, 158, 11, 0.12)",
-                        color: productionReady ? "var(--accent)" : "#f59e0b",
+                          : "var(--warning-soft)",
+                        color: productionReady ? "var(--accent)" : "var(--warning)",
                       }}
                     >
                       {productionReady ? (
@@ -1281,7 +1281,7 @@ function StatusRow({ ok, label, value }: { ok: boolean; label: string; value: st
       </span>
       <span
         className="max-w-[45%] truncate font-mono"
-        style={{ color: ok ? "var(--accent)" : "#f59e0b" }}
+        style={{ color: ok ? "var(--accent)" : "var(--warning)" }}
       >
         {value}
       </span>
