@@ -420,7 +420,7 @@ export function SecuritySettings({
                   Gerät & Schlüssel
                 </h3>
                 <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-                  Dein VaultChat-Konto ist an dieses Gerät gebunden. Ohne
+                  Dein Umbra-Konto ist an dieses Gerät gebunden. Ohne
                   verschlüsseltes Backup gibt es auf einem neuen Gerät keinen
                   Zugriff auf bestehende Chats.
                 </p>
@@ -832,7 +832,7 @@ export function SecuritySettings({
             <div className="space-y-4">
               <div>
                 <p className="text-base font-semibold" style={{ color: "var(--text)" }}>
-                  VaultChat
+                  Umbra
                 </p>
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                   Version {appVersion} · {import.meta.env.MODE === "production" ? "Production" : "Development"}
@@ -1186,10 +1186,10 @@ function PlanSettingsTab() {
           className="mt-1 text-xs leading-relaxed"
           style={{ color: "var(--text-muted)" }}
         >
-          VaultChat ist privat — der Server sieht keine Inhalte. Pro-Plan
+          Umbra ist privat — der Server sieht keine Inhalte. Pro-Plan
           schaltet höhere Limits frei (mehr Emojis, längere Sprachnachrichten,
           größere Gruppen). Bezahlung läuft über einen externen Anbieter
-          (Stripe), VaultChat selbst speichert keine Karten- oder
+          (Stripe), Umbra selbst speichert keine Karten- oder
           Rechnungsdaten.
         </p>
         <p

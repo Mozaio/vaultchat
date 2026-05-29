@@ -21,7 +21,7 @@ export function clearOnboardingPending(): void {
 
 const STEPS = [
   {
-    title: "Willkommen bei VaultChat",
+    title: "Willkommen bei Umbra",
     text: "Deine Chats sind Ende-zu-Ende verschlüsselt. Der Server sieht weder Inhalte noch den Absender bei Direktnachrichten (Sealed Sender).",
     icon: <IconShieldCheck size={36} />,
   },

@@ -99,7 +99,7 @@ function humanError(err: unknown): string {
   if (msg === "backup_unexpected_shape")
     return "Backup hat ein unerwartetes Format — vermutlich aus einer inkompatiblen Version.";
   if (msg === "backup_must_be_encrypted_v2")
-    return "Backup-Format wird nicht unterstützt. Erwartet: VaultChat-Backup v2.";
+    return "Backup-Format wird nicht unterstützt. Erwartet: Umbra-Backup v2.";
   if (msg === "backup_passphrase_required")
     return "Backup-Passphrase wurde nicht eingegeben.";
   return msg;
@@ -265,7 +265,7 @@ export function AuthPanel({
       <div className="auth-brand-panel" aria-hidden="true">
         <div className="auth-brand-top">
           <VaultChatLogo size={32} style={{ color: "#0d9488" }} />
-          <span className="auth-brand-top-name">VaultChat</span>
+          <span className="auth-brand-top-name">Umbra</span>
         </div>
 
         <div className="auth-brand-content">
@@ -334,7 +334,7 @@ export function AuthPanel({
         {/* Mobile-only compact brand header */}
         <div className="auth-form-panel-mobile-brand">
           <VaultChatLogo size={28} style={{ color: "var(--accent)" }} />
-          <span>VaultChat</span>
+          <span>Umbra</span>
         </div>
 
         <div className="auth-form-body">

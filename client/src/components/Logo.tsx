@@ -3,16 +3,19 @@ import type { SVGProps } from "react";
 type LogoProps = SVGProps<SVGSVGElement> & { size?: number };
 
 /**
- * VaultChat brand mark.
+ * Umbra brand mark.
  *
- * Composition:
- *   - rounded square in the brand accent (the "vault")
- *   - a chat-bubble silhouette cut out of it
- *   - a small lock at the lower right of the bubble
+ * Composition (an eclipse — the "umbra" is the full shadow):
+ *   - rounded square tile in the brand accent
+ *   - a faint corona ring
+ *   - a bright disc (the light) carved into a crescent by an offset disc
+ *     in the tile color — your messages slip into the shadow, unseen.
  *
- * The whole thing is stroke-only on the inner shape so it stays legible
- * at 16px (favicon size) up to 96px (landing hero). Single color, so
- * it follows the surrounding `color`/`var(--accent)` if used inverted.
+ * Single color (follows the surrounding `color` / `var(--accent)`), white
+ * detailing only. Stays legible from 16px (favicon) up to the landing hero.
+ *
+ * NB: the exported symbols keep their historical names so existing imports
+ * don't break; the product brand is "Umbra".
  */
 export function VaultChatLogo({ size = 48, ...props }: LogoProps) {
   return (
@@ -24,44 +27,28 @@ export function VaultChatLogo({ size = 48, ...props }: LogoProps) {
       aria-hidden="true"
       {...props}
     >
-      <rect
-        x="2"
-        y="2"
-        width="60"
-        height="60"
-        rx="14"
-        fill="currentColor"
-      />
-      {/* chat bubble */}
-      <path
-        d="M16 24c0-3.3 2.7-6 6-6h20c3.3 0 6 2.7 6 6v12c0 3.3-2.7 6-6 6H30l-7 6v-6h-1c-3.3 0-6-2.7-6-6V24z"
-        fill="white"
-        opacity="0.95"
-      />
-      {/* lock body */}
-      <rect
-        x="36"
-        y="32"
-        width="10"
-        height="8"
-        rx="1.4"
-        fill="currentColor"
-      />
-      {/* lock shackle */}
-      <path
-        d="M38 32v-2.2a3 3 0 0 1 6 0V32"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="currentColor" />
+      {/* faint corona */}
+      <circle
+        cx="32"
+        cy="32"
+        r="19"
+        stroke="white"
+        strokeWidth="1.5"
         fill="none"
+        opacity="0.35"
       />
+      {/* light disc */}
+      <circle cx="32" cy="32" r="15" fill="white" opacity="0.96" />
+      {/* umbra — carves the bright disc into a crescent */}
+      <circle cx="39" cy="27" r="14.5" fill="currentColor" />
     </svg>
   );
 }
 
 /**
  * Compact wordmark variant for tight headers (sidebar, etc.).
- * Renders the brand mark + the "VaultChat" wordmark inline.
+ * Renders the brand mark + the "Umbra" wordmark inline.
  */
 export function VaultChatWordmark({
   size = 22,
@@ -84,7 +71,7 @@ export function VaultChatWordmark({
           color: "var(--text)",
         }}
       >
-        VaultChat
+        Umbra
       </span>
     </span>
   );

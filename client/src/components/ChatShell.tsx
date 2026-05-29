@@ -684,7 +684,7 @@ export function ChatShell({
       (s, n) => s + (n || 0),
       0
     );
-    const base = "VaultChat";
+    const base = "Umbra";
     document.title =
       total > 0 ? `(${total > 99 ? "99+" : total}) ${base}` : base;
     return () => {
@@ -3046,7 +3046,7 @@ export function ChatShell({
           </span>
           <div className="notify-prompt-text">
             <strong>Benachrichtigungen aktivieren?</strong>
-            <span>VaultChat zeigt dir neue Nachrichten an, wenn das Fenster im Hintergrund ist.</span>
+            <span>Umbra zeigt dir neue Nachrichten an, wenn das Fenster im Hintergrund ist.</span>
           </div>
           <div className="notify-prompt-actions">
             <button
@@ -3296,7 +3296,7 @@ export function ChatShell({
             <VaultChatLogo size={32} style={{ color: "var(--accent)", flexShrink: 0 }} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold" style={{ color: "var(--text)" }}>
-                VaultChat
+                Umbra
               </p>
               <div className="sidebar-status-row">
                 {(() => {

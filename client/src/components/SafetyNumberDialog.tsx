@@ -146,7 +146,7 @@ export function SafetyNumberDialog({
             <div className="safety-qr-wrap">
               <QrCodeSvg digits={groups.join("")} size={232} />
               <p className="safety-qr-hint">
-                Scanne diesen Code im VaultChat des Gegenübers — die Nummer
+                Scanne diesen Code in Umbra des Gegenübers — die Nummer
                 stimmt überein, wenn beide Seiten denselben Code anzeigen.
               </p>
             </div>
