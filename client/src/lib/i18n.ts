@@ -1044,6 +1044,108 @@ const DICT: Record<string, Dict> = {
     zh: "未设置描述。", hi: "कोई विवरण सेट नहीं है।",
   },
 
+  // ── Group voice room ──────────────────────────────────────────────
+  "call.start": {
+    en: "Start voice room", de: "Sprach-Raum starten",
+    tr: "Sesli oda başlat", es: "Iniciar sala de voz",
+    fr: "Démarrer le salon vocal", pt: "Iniciar sala de voz",
+    ru: "Открыть голосовую комнату", ar: "بدء غرفة صوتية",
+    zh: "开启语音房间", hi: "वॉइस रूम शुरू करें",
+  },
+  "call.join": {
+    en: "Join", de: "Beitreten", tr: "Katıl", es: "Unirse",
+    fr: "Rejoindre", pt: "Entrar", ru: "Войти", ar: "انضمام",
+    zh: "加入", hi: "शामिल हों",
+  },
+  "call.talking": {
+    en: "{n} talking", de: "{n} sprechen", tr: "{n} konuşuyor",
+    es: "{n} hablando", fr: "{n} parlent", pt: "{n} falando",
+    ru: "{n} говорят", ar: "{n} يتحدثون", zh: "{n} 人在讲话",
+    hi: "{n} बोल रहे हैं",
+  },
+  "call.talkingOne": {
+    en: "1 talking", de: "1 spricht", tr: "1 konuşuyor",
+    es: "1 hablando", fr: "1 parle", pt: "1 falando",
+    ru: "1 говорит", ar: "شخص واحد يتحدث", zh: "1 人在讲话",
+    hi: "1 बोल रहा है",
+  },
+  "call.roomSelf": {
+    en: "Voice room · just you", de: "Sprachraum · nur du",
+    tr: "Sesli oda · yalnızca sen", es: "Sala de voz · solo tú",
+    fr: "Salon vocal · vous seul", pt: "Sala de voz · só você",
+    ru: "Голосовая · только вы", ar: "غرفة صوتية · أنت فقط",
+    zh: "语音房间 · 仅你", hi: "वॉइस रूम · केवल आप",
+  },
+  "call.roomConnected": {
+    en: "Voice room · {n} connected", de: "Sprachraum · {n} verbunden",
+    tr: "Sesli oda · {n} bağlı", es: "Sala de voz · {n} conectados",
+    fr: "Salon vocal · {n} connectés", pt: "Sala de voz · {n} conectados",
+    ru: "Голосовая · {n} на связи", ar: "غرفة صوتية · {n} متصلون",
+    zh: "语音房间 · {n} 人已连接", hi: "वॉइस रूम · {n} जुड़े",
+  },
+  "call.pttHint": {
+    en: "Space: talk", de: "Leertaste: sprechen", tr: "Boşluk: konuş",
+    es: "Espacio: hablar", fr: "Espace : parler", pt: "Espaço: falar",
+    ru: "Пробел: говорить", ar: "مسافة: تحدّث", zh: "空格：讲话",
+    hi: "स्पेस: बोलें",
+  },
+  "call.youShare": {
+    en: "You're sharing your screen", de: "Du teilst deinen Bildschirm",
+    tr: "Ekranını paylaşıyorsun", es: "Estás compartiendo tu pantalla",
+    fr: "Vous partagez votre écran", pt: "Você está compartilhando sua tela",
+    ru: "Вы демонстрируете экран", ar: "أنت تشارك شاشتك",
+    zh: "你正在共享屏幕", hi: "आप अपनी स्क्रीन साझा कर रहे हैं",
+  },
+  "call.peerShares": {
+    en: "{name} is sharing their screen", de: "{name} teilt den Bildschirm",
+    tr: "{name} ekranını paylaşıyor", es: "{name} comparte su pantalla",
+    fr: "{name} partage son écran", pt: "{name} está compartilhando a tela",
+    ru: "{name} демонстрирует экран", ar: "{name} يشارك شاشته",
+    zh: "{name} 正在共享屏幕", hi: "{name} अपनी स्क्रीन साझा कर रहे हैं",
+  },
+  "call.unmute": {
+    en: "Unmute microphone", de: "Mikrofon entstummen",
+    tr: "Mikrofonu aç", es: "Activar micrófono", fr: "Réactiver le micro",
+    pt: "Reativar microfone", ru: "Включить микрофон", ar: "إلغاء كتم الميكروفون",
+    zh: "取消静音", hi: "माइक्रोफ़ोन अनम्यूट करें",
+  },
+  "call.mute": {
+    en: "Mute microphone", de: "Mikrofon stummschalten",
+    tr: "Mikrofonu sustur", es: "Silenciar micrófono", fr: "Couper le micro",
+    pt: "Silenciar microfone", ru: "Выключить микрофон", ar: "كتم الميكروفون",
+    zh: "静音", hi: "माइक्रोफ़ोन म्यूट करें",
+  },
+  "call.muted": {
+    en: "muted", de: "stumm", tr: "sessiz", es: "silenciado",
+    fr: "coupé", pt: "silenciado", ru: "без звука", ar: "مكتوم",
+    zh: "已静音", hi: "म्यूट",
+  },
+  "call.stopShare": {
+    en: "Stop screen share", de: "Bildschirmteilen beenden",
+    tr: "Ekran paylaşımını durdur", es: "Detener pantalla compartida",
+    fr: "Arrêter le partage d'écran", pt: "Parar compartilhamento de tela",
+    ru: "Остановить показ экрана", ar: "إيقاف مشاركة الشاشة",
+    zh: "停止共享屏幕", hi: "स्क्रीन साझा करना बंद करें",
+  },
+  "call.share": {
+    en: "Share screen", de: "Bildschirm teilen", tr: "Ekran paylaş",
+    es: "Compartir pantalla", fr: "Partager l'écran", pt: "Compartilhar tela",
+    ru: "Показать экран", ar: "مشاركة الشاشة", zh: "共享屏幕",
+    hi: "स्क्रीन साझा करें",
+  },
+  "call.hangup": {
+    en: "Hang up", de: "Auflegen", tr: "Kapat", es: "Colgar",
+    fr: "Raccrocher", pt: "Desligar", ru: "Завершить", ar: "إنهاء",
+    zh: "挂断", hi: "कॉल समाप्त करें",
+  },
+  "call.fullscreen": {
+    en: "Click for fullscreen", de: "Klicken für Vollbild",
+    tr: "Tam ekran için tıkla", es: "Clic para pantalla completa",
+    fr: "Cliquer pour le plein écran", pt: "Clique para tela cheia",
+    ru: "Нажмите для полноэкранного режима", ar: "انقر لملء الشاشة",
+    zh: "点击全屏", hi: "पूर्ण स्क्रीन के लिए क्लिक करें",
+  },
+
   // ── Group management ──────────────────────────────────────────────
   "common.remove": {
     en: "Remove", de: "Entfernen", tr: "Kaldır", es: "Eliminar",

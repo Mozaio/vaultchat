@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GroupCallState } from "../lib/groupCall";
 import { IconMic, IconPhone, IconScreenShare, IconUsers } from "./Icons";
+import { t, useLocale } from "../lib/i18n";
 
 type Props = {
   /** Active call state (null = not in a call). */
@@ -46,6 +47,7 @@ export function GroupCallBar({
   occupants,
   qualityHint,
 }: Props) {
+  useLocale();
   const screenStream = state?.localScreenStream ?? null;
   const inCall = !!state;
 
@@ -86,10 +88,10 @@ export function GroupCallBar({
           type="button"
           className="group-call-join-btn"
           onClick={onJoin}
-          title="Sprach-Raum starten"
+          title={t("call.start")}
         >
           <IconMic size={16} aria-hidden />
-          <span>Sprach-Raum starten</span>
+          <span>{t("call.start")}</span>
         </button>
       </div>
     );
@@ -99,8 +101,10 @@ export function GroupCallBar({
     return (
       <div className="group-call-bar pending">
         <span className="group-call-occupants">
-          <IconUsers size={14} aria-hidden /> {occupants}{" "}
-          {occupants === 1 ? "Person spricht" : "Personen sprechen"}
+          <IconUsers size={14} aria-hidden />{" "}
+          {occupants === 1
+            ? t("call.talkingOne")
+            : t("call.talking", { n: occupants })}
         </span>
         <button
           type="button"
@@ -108,7 +112,7 @@ export function GroupCallBar({
           onClick={onJoin}
         >
           <IconMic size={16} aria-hidden />
-          <span>Beitreten</span>
+          <span>{t("call.join")}</span>
         </button>
       </div>
     );
@@ -123,14 +127,16 @@ export function GroupCallBar({
       <div className="group-call-header">
         <span className="group-call-header-status">
           <span className="gc-live-dot" aria-hidden />
-          {total === 1 ? "Sprachraum · nur du" : `Sprachraum · ${total} verbunden`}
+          {total === 1
+            ? t("call.roomSelf")
+            : t("call.roomConnected", { n: total })}
         </span>
-        <span className="group-call-header-hint">Leertaste: sprechen</span>
+        <span className="group-call-header-hint">{t("call.pttHint")}</span>
       </div>
       {screenStream && (
         <div className="group-call-screen">
           <span className="group-call-screen-badge">
-            <IconScreenShare size={12} aria-hidden /> Du teilst deinen Bildschirm
+            <IconScreenShare size={12} aria-hidden /> {t("call.youShare")}
           </span>
           <ScreenPreview stream={screenStream} />
         </div>
@@ -140,8 +146,8 @@ export function GroupCallBar({
         .map((p) => (
           <div key={`screen-${p.userId}`} className="group-call-screen">
             <span className="group-call-screen-badge">
-              <IconScreenShare size={12} aria-hidden /> {p.username} teilt den
-              Bildschirm
+              <IconScreenShare size={12} aria-hidden />{" "}
+              {t("call.peerShares", { name: p.username })}
             </span>
             <ScreenPreview stream={p.screenStream!} />
           </div>
@@ -171,11 +177,7 @@ export function GroupCallBar({
           type="button"
           className={`group-call-control mute${state?.localMuted ? " muted" : ""}`}
           onClick={onToggleMute}
-          title={
-            state?.localMuted
-              ? "Mikrofon entstummen"
-              : "Mikrofon stummschalten"
-          }
+          title={state?.localMuted ? t("call.unmute") : t("call.mute")}
         >
           <IconMic size={18} aria-hidden />
         </button>
@@ -184,9 +186,7 @@ export function GroupCallBar({
             type="button"
             className={`group-call-control screen${screenStream ? " active" : ""}`}
             onClick={onToggleScreenShare}
-            title={
-              screenStream ? "Bildschirmteilen beenden" : "Bildschirm teilen"
-            }
+            title={screenStream ? t("call.stopShare") : t("call.share")}
             aria-pressed={!!screenStream}
           >
             <IconScreenShare size={18} aria-hidden />
@@ -196,7 +196,7 @@ export function GroupCallBar({
           type="button"
           className="group-call-control hangup"
           onClick={onLeave}
-          title="Auflegen"
+          title={t("call.hangup")}
         >
           <IconPhone size={18} aria-hidden />
         </button>
@@ -250,7 +250,7 @@ function Tile({
       <div className="gc-tile-name">{label}</div>
       <div className="gc-tile-icons">
         {muted && (
-          <span className="gc-tile-icon muted" aria-label="stumm">
+          <span className="gc-tile-icon muted" aria-label={t("call.muted")}>
             <IconMic size={12} />
             <span className="gc-tile-mute-slash" aria-hidden />
           </span>
@@ -275,7 +275,7 @@ function ScreenPreview({ stream }: { stream: MediaStream }) {
       autoPlay
       muted
       playsInline
-      title="Klicken für Vollbild"
+      title={t("call.fullscreen")}
       onClick={() => {
         void ref.current?.requestFullscreen?.().catch(() => {});
       }}
