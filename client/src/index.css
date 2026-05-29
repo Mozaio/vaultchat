@@ -7616,6 +7616,20 @@ button:focus-visible,
   color: var(--text-muted);
 }
 
+/* Accent-color swatch picker (settings) */
+.accent-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-elevated);
+  outline-offset: 2px;
+  cursor: pointer;
+  transition: transform 0.12s var(--motion-spring, ease);
+}
+.accent-swatch:hover {
+  transform: scale(1.12);
+}
+
 /* @mention chip in message text */
 .mention {
   color: var(--accent);

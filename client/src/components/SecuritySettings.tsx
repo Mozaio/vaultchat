@@ -33,6 +33,12 @@ import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { t, useLocale } from "../lib/i18n";
 import {
+  ACCENTS,
+  loadAccent,
+  saveAccent,
+  type AccentId,
+} from "../lib/accentStore";
+import {
   loadCustomEmojis,
   removeCustomEmoji,
   addCustomEmojiFromFile,
@@ -144,6 +150,7 @@ export function SecuritySettings({
   onRequestNotificationPermission,
 }: SecuritySettingsProps) {
   useLocale(); // re-render on language change
+  const [accent, setAccent] = useState<AccentId>(() => loadAccent());
   const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
@@ -304,6 +311,43 @@ export function SecuritySettings({
                   </p>
                 </div>
                 <LanguageSwitcher />
+              </div>
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  {t("accent.label")}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {ACCENTS.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => {
+                        setAccent(a.id);
+                        saveAccent(a.id);
+                      }}
+                      title={a.label}
+                      aria-label={a.label}
+                      aria-pressed={accent === a.id}
+                      className="accent-swatch"
+                      style={{
+                        background: a.color,
+                        outline:
+                          accent === a.id
+                            ? "2px solid var(--text)"
+                            : "2px solid transparent",
+                      }}
+                    />
+                  ))}
+                </div>
               </div>
               <div
                 className="rounded-lg border p-3"

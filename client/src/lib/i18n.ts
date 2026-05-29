@@ -370,6 +370,12 @@ const DICT: Record<string, Dict> = {
     pt: "Fazer backup agora", ru: "Создать копию сейчас",
     ar: "النسخ الاحتياطي الآن", zh: "立即备份", hi: "अभी बैकअप लें",
   },
+  "accent.label": {
+    en: "Accent color", de: "Akzentfarbe", tr: "Vurgu rengi",
+    es: "Color de acento", fr: "Couleur d'accent", pt: "Cor de destaque",
+    ru: "Акцентный цвет", ar: "لون التمييز", zh: "强调色",
+    hi: "एक्सेंट रंग",
+  },
 };
 
 const STORAGE_KEY = "vaultchat.locale";
