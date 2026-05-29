@@ -3902,19 +3902,28 @@ export function ChatShell({
         } u-panel u-panel-chat min-h-0 min-w-0 flex-1 flex-col border-[var(--border)] bg-[var(--bg-chat)] md:flex md:border-0 h-full`}
       >
         {incomingOffer && (
-          <div className="flex items-center justify-between border-b border-amber-900/50 bg-amber-950/40 px-4 py-2 text-sm text-amber-100">
+          <div
+            className="flex items-center justify-between border-b px-4 py-2 text-sm"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-elevated)",
+              color: "var(--text)",
+            }}
+          >
             <span>Anruf von {incomingOffer.from.username}</span>
             <div className="flex gap-2">
               <button
                 type="button"
-                className="rounded-lg bg-emerald-600 px-3 py-1"
+                className="rounded-lg px-3 py-1 font-medium"
+                style={{ background: "var(--success)", color: "white" }}
                 onClick={() => void acceptIncoming()}
               >
                 Annehmen
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-zinc-700 px-3 py-1"
+                className="rounded-lg px-3 py-1"
+                style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}
                 onClick={() => {
                   setIncomingOffer(null);
                   setCallStatus("ended");
@@ -4183,13 +4192,27 @@ export function ChatShell({
                 </div>
               </div>
               {peerPin?.state === "mismatch" && (
-                <div className="mt-2 rounded-lg border border-red-800/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+                <div
+                  className="mt-2 rounded-lg px-3 py-2 text-xs"
+                  style={{
+                    border: "1px solid var(--danger)",
+                    background: "var(--danger-soft)",
+                    color: "var(--danger)",
+                  }}
+                >
                   Der Identity-Key dieses Peers hat sich geändert. Nachrichten
                   werden blockiert, bis du die Sicherheitsnummer neu geprüft hast.
                 </div>
               )}
               {blockedPeers.has(peer.id) && (
-                <div className="mt-2 rounded-lg border border-amber-800/60 bg-amber-950/40 px-3 py-2 text-xs text-amber-100">
+                <div
+                  className="mt-2 rounded-lg px-3 py-2 text-xs"
+                  style={{
+                    border: "1px solid var(--warning)",
+                    background: "var(--danger-soft)",
+                    color: "var(--warning)",
+                  }}
+                >
                   Dieser Kontakt ist blockiert. Eingehende Nachrichten werden lokal verworfen.
                 </div>
               )}
@@ -4220,7 +4243,7 @@ export function ChatShell({
                 <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg bg-[var(--accent-soft)] backdrop-blur-sm border-2 border-dashed border-[var(--accent)] m-2">
                   <div className="text-center">
                     <p className="text-2xl mb-2">📎</p>
-                    <p className="text-sm font-medium text-emerald-100">Dateien hier ablegen</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--accent)" }}>Dateien hier ablegen</p>
                   </div>
                 </div>
               )}
@@ -4366,7 +4389,11 @@ export function ChatShell({
             </div>
 
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {error && (
+                <p className="mb-2 text-sm" style={{ color: "var(--danger)" }}>
+                  {error}
+                </p>
+              )}
               {pollDm && (
                 <div className="poll-composer">
                   <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>
@@ -5095,7 +5122,7 @@ export function ChatShell({
                 <div className="absolute inset-0 z-50 m-2 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--accent)] bg-[var(--accent-soft)] backdrop-blur-sm">
                   <div className="text-center">
                     <p className="mb-2 text-2xl">📎</p>
-                    <p className="text-sm font-medium text-emerald-100">Dateien in die Gruppe legen</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--accent)" }}>Dateien in die Gruppe legen</p>
                   </div>
                 </div>
               )}
@@ -5232,7 +5259,11 @@ export function ChatShell({
               })()}
             </div>
             <footer className="chat-input-area !flex-wrap !pb-[calc(env(safe-area-inset-bottom,0px)+12px)] !pt-3">
-              {error && <p className="mb-2 text-sm text-red-400">{error}</p>}
+              {error && (
+                <p className="mb-2 text-sm" style={{ color: "var(--danger)" }}>
+                  {error}
+                </p>
+              )}
               {pollGroup && (
                 <div className="poll-composer">
                   <p className="text-xs font-semibold" style={{ color: "var(--text-secondary)" }}>

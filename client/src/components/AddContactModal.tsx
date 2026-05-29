@@ -134,7 +134,10 @@ export function AddContactModal({
               aria-label="Kontakt nach Username suchen"
             />
             {isSearching && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">
+              <span
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                style={{ color: "var(--text-muted)" }}
+              >
                 ...
               </span>
             )}
@@ -145,7 +148,10 @@ export function AddContactModal({
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-900/30 p-3 text-sm text-red-300">
+          <div
+            className="mb-4 rounded-lg p-3 text-sm"
+            style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
+          >
             {error}
           </div>
         )}
