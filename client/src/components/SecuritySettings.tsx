@@ -131,6 +131,8 @@ interface SecuritySettingsProps {
   onNotificationPreviewChange?: (value: boolean) => void;
   notificationPermission?: NotificationPermission | "unsupported";
   onRequestNotificationPermission?: () => void | Promise<void>;
+  blockedContacts?: { id: string; username: string }[];
+  onUnblockContact?: (id: string) => void;
 }
 
 export function SecuritySettings({
@@ -151,6 +153,8 @@ export function SecuritySettings({
   onNotificationPreviewChange,
   notificationPermission = "default",
   onRequestNotificationPermission,
+  blockedContacts = [],
+  onUnblockContact,
 }: SecuritySettingsProps) {
   useLocale(); // re-render on language change
   const installAvailable = useInstallAvailable();
@@ -844,6 +848,68 @@ export function SecuritySettings({
                       </span>
                     </label>
                   </>
+                )}
+              </div>
+
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-1 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  {t("settings.blockedTitle")}
+                </h3>
+                <p
+                  className="mb-3 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t("settings.blockedDesc")}
+                </p>
+                {blockedContacts.length === 0 ? (
+                  <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                    {t("settings.blockedEmpty")}
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {blockedContacts.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
+                            style={{ background: "var(--text-muted)" }}
+                          >
+                            {c.username.slice(0, 1).toUpperCase()}
+                          </span>
+                          <span
+                            className="truncate text-sm"
+                            style={{ color: "var(--text)" }}
+                          >
+                            {c.username}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-lg border px-3 py-1 text-xs font-medium transition-colors"
+                          style={{
+                            borderColor: "var(--border)",
+                            color: "var(--text)",
+                            background: "var(--bg-sidebar)",
+                          }}
+                          onClick={() => onUnblockContact?.(c.id)}
+                        >
+                          {t("chat.unblock")}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             </div>

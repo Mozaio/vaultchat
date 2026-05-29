@@ -311,6 +311,25 @@ export function ChatShell({
   const [requestPeers, setRequestPeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.requests.peers")
   );
+  // Display-name cache for blocked peers so the "Blocked contacts" manager can
+  // show names even after the peer leaves the in-memory contact list (e.g.
+  // after a reload or after deleting a blocked request).
+  const [blockedNames, setBlockedNames] = useState<Record<string, string>>(
+    () => {
+      try {
+        const raw = localStorage.getItem("vaultchat.blocked.names");
+        if (!raw) return {};
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          if (typeof v === "string") out[k] = v;
+        }
+        return out;
+      } catch {
+        return {};
+      }
+    }
+  );
   // Online status tracking
   const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
@@ -832,6 +851,8 @@ export function ChatShell({
 
   /** Block a requesting sender and drop them from the requests area. */
   const blockRequestPeer = useCallback((userId: string) => {
+    const uname = usersRef.current.find((u) => u.id === userId)?.username;
+    if (uname) rememberBlockedName(userId, uname);
     setBlockedPeers((prev) => {
       const next = new Set(prev);
       next.add(userId);
@@ -871,6 +892,33 @@ export function ChatShell({
       setPeer(null);
       setInfoOpen(false);
     }
+  }, []);
+
+  /** Cache a blocked peer's display name so the blocked-contacts manager can
+   *  show it after reloads / after the peer leaves the contact list. */
+  const rememberBlockedName = useCallback((userId: string, username: string) => {
+    if (!username) return;
+    setBlockedNames((prev) => {
+      if (prev[userId] === username) return prev;
+      const next = { ...prev, [userId]: username };
+      try {
+        localStorage.setItem("vaultchat.blocked.names", JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  /** Unblock a peer (from the central blocked-contacts manager). */
+  const unblockPeer = useCallback((userId: string) => {
+    setBlockedPeers((prev) => {
+      if (!prev.has(userId)) return prev;
+      const next = new Set(prev);
+      next.delete(userId);
+      saveStringSet("vaultchat.blocked.peers", next);
+      return next;
+    });
   }, []);
 
   const loadGroups = useCallback(async () => {
@@ -3406,6 +3454,23 @@ export function ChatShell({
     [filteredUsers, requestPeerIds, lastDmPreviewByPeer]
   );
 
+  // Flat list for the central "Blocked contacts" manager. Names resolve from
+  // the live contact list first, then the persisted name cache, then a
+  // truncated id as last resort.
+  const blockedContacts = useMemo(
+    () =>
+      Array.from(blockedPeers)
+        .map((id) => ({
+          id,
+          username:
+            users.find((u) => u.id === id)?.username ??
+            blockedNames[id] ??
+            id.slice(0, 8),
+        }))
+        .sort((a, b) => a.username.localeCompare(b.username)),
+    [blockedPeers, users, blockedNames]
+  );
+
   const visibleUsers = useMemo(() => {
     let arr: api.ApiUser[];
     if (sidebarFilter === "group") return [];
@@ -3711,6 +3776,8 @@ export function ChatShell({
             setSendReadReceipts(value);
             localStorage.setItem("vaultchat.privacy.receipts", value ? "on" : "off");
           }}
+          blockedContacts={blockedContacts}
+          onUnblockContact={unblockPeer}
           onExportBackup={async () => {
             const local = loadLocalIdentity();
             if (!local) return;
@@ -4822,6 +4889,9 @@ export function ChatShell({
                           type="button"
                           className="chat-menu-item danger"
                           onClick={() => {
+                            if (!blockedPeers.has(peer.id)) {
+                              rememberBlockedName(peer.id, peer.username);
+                            }
                             setBlockedPeers((prev) => {
                               const next = new Set(prev);
                               if (next.has(peer.id)) next.delete(peer.id);
@@ -6518,6 +6588,9 @@ export function ChatShell({
             isBlocked={Boolean(peer && blockedPeers.has(peer.id))}
             onToggleBlocked={() => {
               if (!peer) return;
+              if (!blockedPeers.has(peer.id)) {
+                rememberBlockedName(peer.id, peer.username);
+              }
               setBlockedPeers((prev) => {
                 const next = new Set(prev);
                 if (next.has(peer.id)) next.delete(peer.id);
@@ -6594,6 +6667,9 @@ export function ChatShell({
               isBlocked={Boolean(peer && blockedPeers.has(peer.id))}
               onToggleBlocked={() => {
                 if (!peer) return;
+                if (!blockedPeers.has(peer.id)) {
+                  rememberBlockedName(peer.id, peer.username);
+                }
                 setBlockedPeers((prev) => {
                   const next = new Set(prev);
                   if (next.has(peer.id)) next.delete(peer.id);
