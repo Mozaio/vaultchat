@@ -1385,6 +1385,33 @@ select:focus-visible {
   font-size: 3.1rem;
 }
 
+/* Inline-Timestamp (Signal/WhatsApp-Style): bei reinen Text-Nachrichten sitzt
+   die Uhrzeit/Meta unten rechts INLINE an der letzten Textzeile statt auf einer
+   eigenen Zeile darunter — kurze Nachrichten bleiben so kompakt (eine Zeile)
+   statt klobig/quadratisch. Lange Nachrichten brechen sauber um (Meta unten
+   rechts). Link-Vorschau und "Mehr anzeigen" nehmen jeweils die volle Breite,
+   damit sie nicht in die Inline-Zeile rutschen. */
+.message-bubble.is-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  column-gap: 0.5rem;
+  row-gap: 0;
+}
+.message-bubble.is-text > .bubble-text {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.message-bubble.is-text > .bubble-meta {
+  margin: 0 0 0 auto;
+  align-self: flex-end;
+  transform: translateY(2px);
+}
+.message-bubble.is-text > .bubble-expand-toggle,
+.message-bubble.is-text > .link-preview-stack {
+  flex-basis: 100%;
+}
+
 .bubble-deleted {
   display: inline-flex;
   align-items: center;

@@ -446,8 +446,10 @@ export function MessageBubble({
           } max-w-full ${msg.deleted ? "is-deleted" : ""} ${
             isGrouped ? "grouped" : ""
           } ${isLastInGroup ? "tail" : ""} ${isImage ? "is-image" : ""}${
-            flipUp ? " menu-flip-up" : ""
-          }`}
+            msg.plain.kind === "text" && !msg.deleted && !editing
+              ? " is-text"
+              : ""
+          }${flipUp ? " menu-flip-up" : ""}`}
           onDoubleClick={(e) => {
             if (!msg.deleted && msg.plain.kind === "text") {
               e.stopPropagation();
