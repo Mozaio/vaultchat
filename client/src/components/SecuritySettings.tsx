@@ -42,6 +42,11 @@ import {
   type AccentId,
 } from "../lib/accentStore";
 import {
+  loadDensity,
+  saveDensity,
+  type DensityId,
+} from "../lib/densityStore";
+import {
   loadCustomEmojis,
   removeCustomEmoji,
   addCustomEmojiFromFile,
@@ -161,6 +166,7 @@ export function SecuritySettings({
   const desktop = isTauri();
   const [screenSec, setScreenSec] = useState(() => loadScreenSecurity());
   const [accent, setAccent] = useState<AccentId>(() => loadAccent());
+  const [density, setDensity] = useState<DensityId>(() => loadDensity());
   const [tab, setTab] = useState<SettingsTabId>("general");
   const [level, setLevel] = useState<SecurityLevel>(loadSecurityLevel);
   const [autoLockMinutes, setAutoLockMinutes] = useState<number>(() =>
@@ -358,6 +364,52 @@ export function SecuritySettings({
                     />
                   ))}
                 </div>
+              </div>
+              <div
+                className="rounded-lg border p-3"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <h3
+                  className="mb-2 text-sm font-medium"
+                  style={{ color: "var(--text)" }}
+                >
+                  {t("density.label")}
+                </h3>
+                <div className="flex gap-2">
+                  {(["cozy", "compact"] as DensityId[]).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => {
+                        setDensity(d);
+                        saveDensity(d);
+                      }}
+                      aria-pressed={density === d}
+                      className="flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
+                      style={{
+                        borderColor:
+                          density === d ? "var(--accent)" : "var(--border)",
+                        background:
+                          density === d
+                            ? "var(--accent-soft)"
+                            : "var(--bg-sidebar)",
+                        color:
+                          density === d ? "var(--accent)" : "var(--text)",
+                      }}
+                    >
+                      {d === "cozy" ? t("density.cozy") : t("density.compact")}
+                    </button>
+                  ))}
+                </div>
+                <p
+                  className="mt-2 text-xs"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t("density.desc")}
+                </p>
               </div>
               <div
                 className="rounded-lg border p-3"

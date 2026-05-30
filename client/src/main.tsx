@@ -5,6 +5,7 @@ import { App } from "./App";
 import { TitleBar } from "./components/TitleBar";
 import { initTheme } from "./lib/themeStore";
 import { initAccent } from "./lib/accentStore";
+import { initDensity } from "./lib/densityStore";
 import { registerServiceWorker } from "./lib/serviceWorker";
 import { initInstallPrompt } from "./lib/installPrompt";
 import { ensureDesktopNotifyPermission } from "./lib/desktopNotify";
@@ -13,6 +14,7 @@ import { initScreenSecurity } from "./lib/screenSecurity";
 
 initTheme();
 initAccent();
+initDensity();
 registerServiceWorker();
 initInstallPrompt();
 // Desktop app: native-app feel (no browser menu/zoom), apply saved screen

@@ -2447,6 +2447,33 @@ const DICT: Record<string, Dict> = {
     ru: "Акцентный цвет", ar: "لون التمييز", zh: "强调色",
     hi: "एक्सेंट रंग",
   },
+  "density.label": {
+    en: "Message density", de: "Nachrichten-Dichte", tr: "Mesaj yoğunluğu",
+    es: "Densidad de mensajes", fr: "Densité des messages",
+    pt: "Densidade das mensagens", ru: "Плотность сообщений",
+    ar: "كثافة الرسائل", zh: "消息密度", hi: "संदेश घनत्व",
+  },
+  "density.cozy": {
+    en: "Cozy", de: "Gemütlich", tr: "Ferah", es: "Cómodo", fr: "Confortable",
+    pt: "Confortável", ru: "Просторно", ar: "مريح", zh: "舒适", hi: "आरामदायक",
+  },
+  "density.compact": {
+    en: "Compact", de: "Kompakt", tr: "Sıkışık", es: "Compacto",
+    fr: "Compact", pt: "Compacto", ru: "Компактно", ar: "مضغوط",
+    zh: "紧凑", hi: "संक्षिप्त",
+  },
+  "density.desc": {
+    en: "Compact fits more messages on screen with tighter spacing.",
+    de: "Kompakt zeigt mit engerem Abstand mehr Nachrichten auf einmal.",
+    tr: "Kompakt, daha dar aralıkla ekrana daha çok mesaj sığdırır.",
+    es: "Compacto muestra más mensajes con menos espacio.",
+    fr: "Compact affiche plus de messages avec un espacement réduit.",
+    pt: "Compacto mostra mais mensagens com menos espaçamento.",
+    ru: "Компактный режим вмещает больше сообщений за счёт меньших отступов.",
+    ar: "الوضع المضغوط يعرض رسائل أكثر بمسافات أضيق.",
+    zh: "紧凑模式以更小的间距在屏幕上显示更多消息。",
+    hi: "संक्षिप्त मोड कम जगह में अधिक संदेश दिखाता है।",
+  },
 
   // ── Message actions (per-message menu, very high frequency) ───────
   "msg.reply": {
