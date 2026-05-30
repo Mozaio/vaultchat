@@ -925,7 +925,13 @@ select:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  min-width: min(20rem, 80vw);
+  /* Wunschbreite 20rem, aber NIE breiter als die Bubble (max-width:100%) und
+     min-width:0, damit der Inhalt auf schmalen Spalten nicht aus der Bubble
+     herausragt. (Vorher erzwang min-width:20rem Überlauf, wenn die Bubble-
+     max-width kleiner war als 20rem.) */
+  min-width: 0;
+  width: 20rem;
+  max-width: 100%;
 }
 .poll-question {
   font-weight: 600;
@@ -1740,7 +1746,11 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  min-width: 14rem;
+  /* Wie .poll-card: Wunschbreite, aber nie breiter als die Bubble — sonst
+     ragte die Waveform auf schmalen Spalten aus der Bubble heraus. */
+  min-width: 0;
+  width: 14rem;
+  max-width: 100%;
   padding: 0.2rem 0;
 }
 
