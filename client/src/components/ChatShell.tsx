@@ -6370,43 +6370,44 @@ export function ChatShell({
                         !group.createdByUserId ||
                         group.createdByUserId === session.user.id;
                       return (
-                        <li
-                          key={mid}
-                          className="flex items-center justify-between gap-2 rounded px-2 py-1"
-                          style={{ background: "var(--bg-hover)" }}
-                        >
-                          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                            <span className="truncate">{label}</span>
-                            {isFounder && (
-                              <span
-                                className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                                style={{
-                                  background: "var(--accent-soft)",
-                                  color: "var(--accent)",
-                                }}
-                              >
-                                {t("group.founder")}
-                              </span>
-                            )}
+                        <li key={mid} className="gmember-row">
+                          <span
+                            className="gmember-av"
+                            style={{ background: userGradient(mid) }}
+                            aria-hidden
+                          >
+                            {label.slice(0, 1).toUpperCase()}
                           </span>
+                          <span className="gmember-name">{label}</span>
+                          {isFounder ? (
+                            <span className="gmember-role founder">
+                              {t("group.founder")}
+                            </span>
+                          ) : mid === session.user.id ? (
+                            <span className="gmember-role you">
+                              {t("chat.you")}
+                            </span>
+                          ) : null}
                           {mid !== session.user.id && canManageMembers && (
                             <button
                               type="button"
                               onClick={() => void removeMember(mid)}
-                              className="btn btn-danger shrink-0 !px-2 !py-0.5 !text-[10px]"
+                              className="gmember-remove"
+                              title={t("common.remove")}
+                              aria-label={t("common.remove")}
                             >
-                              {t("common.remove")}
+                              <IconX size={15} />
                             </button>
                           )}
                         </li>
                       );
                     })}
                   </ul>
-                  <div className="flex gap-2">
+                  <div className="mt-2 flex gap-2">
                     <select
                       value={addMemberId}
                       onChange={(e) => setAddMemberId(e.target.value)}
-                      className="app-input flex-1 !py-1 !text-xs"
+                      className="app-input flex-1 !py-1.5 !text-xs"
                     >
                       <option value="">{t("group.pickMember")}</option>
                       {users
@@ -6421,18 +6422,18 @@ export function ChatShell({
                       type="button"
                       onClick={() => void addMember()}
                       disabled={!addMemberId}
-                      className="btn btn-primary !px-2 !py-1 !text-[10px] disabled:opacity-40"
+                      className="btn btn-primary shrink-0 !px-3 !py-1.5 !text-xs disabled:opacity-40"
                     >
                       {t("common.add")}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void leaveCurrentGroup()}
-                      className="btn btn-danger !px-2 !py-1 !text-[10px]"
-                    >
-                      {t("group.leave")}
-                    </button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => void leaveCurrentGroup()}
+                    className="gmember-leave"
+                  >
+                    {t("group.leave")}
+                  </button>
                 </div>
               )}
             </header>

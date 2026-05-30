@@ -1349,6 +1349,94 @@ select:focus-visible {
   line-height: 1;
 }
 
+/* Gruppen-Mitglieder-Panel: Avatar-Zeilen, Rollen-Chips, dezente Aktionen. */
+.gmember-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 10px;
+  transition: background 0.12s ease;
+}
+.gmember-row:hover {
+  background: var(--bg-hover);
+}
+.gmember-av {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.gmember-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+.gmember-role {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+}
+.gmember-role.founder {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.gmember-role.you {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+.gmember-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 8px;
+  opacity: 0.55;
+  transition: opacity 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.gmember-row:hover .gmember-remove {
+  opacity: 1;
+}
+.gmember-remove:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+.gmember-leave {
+  margin-top: 0.6rem;
+  width: 100%;
+  padding: 0.45rem;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.gmember-leave:hover {
+  background: var(--danger-soft);
+}
+
 .status-icon .read {
   color: #93c5fd;
 }
