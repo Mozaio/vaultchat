@@ -258,6 +258,64 @@ export async function idbCountUnreadByPeer(
   });
 }
 
+/** Distinct group IDs with stored history (unencrypted index field). */
+export async function idbListGroupIds(): Promise<string[]> {
+  const db = await openDb();
+  const ids = await new Promise<Set<string>>((resolve, reject) => {
+    const out = new Set<string>();
+    const tx = db.transaction("groupMsg", "readonly");
+    const req = tx.objectStore("groupMsg").openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(out);
+        return;
+      }
+      const v = c.value as GroupRecord;
+      if (v.groupId) out.add(v.groupId);
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  return Array.from(ids);
+}
+
+/**
+ * Per-group unread count: messages from someone other than me, newer than the
+ * per-group "seen" marker. Index-only (groupId/fromUserId/at), no decryption —
+ * so group unread badges survive a reload like DM ones.
+ */
+export async function idbCountUnreadByGroup(
+  seenByGroup: Record<string, number>,
+  myUserId: string
+): Promise<Record<string, number>> {
+  const db = await openDb();
+  const now = Date.now();
+  return new Promise<Record<string, number>>((resolve, reject) => {
+    const counts: Record<string, number> = {};
+    const tx = db.transaction("groupMsg", "readonly");
+    const req = tx.objectStore("groupMsg").openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(counts);
+        return;
+      }
+      const v = c.value as GroupRecord;
+      if (
+        v.fromUserId &&
+        v.fromUserId !== myUserId &&
+        (!v.expiresAt || v.expiresAt > now) &&
+        v.at > (seenByGroup[v.groupId] ?? 0)
+      ) {
+        counts[v.groupId] = (counts[v.groupId] ?? 0) + 1;
+      }
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function idbListAllDm(): Promise<StoredDmMessage[]> {
   assertKey();
   const db = await openDb();

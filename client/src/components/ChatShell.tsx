@@ -17,12 +17,14 @@ import {
   type PlainPayload,
 } from "../lib/crypto";
 import {
+  idbCountUnreadByGroup,
   idbCountUnreadByPeer,
   idbDeleteDm,
   idbDeleteGroupMsg,
   idbListDm,
   idbListDmPeerIds,
   idbListGroup,
+  idbListGroupIds,
   idbPutDm,
   idbPutGroupMsg,
   idbPurgeExpired,
@@ -992,6 +994,26 @@ export function ChatShell({
         if (pid === openId || c <= 0) continue;
         // Only seed where we don't already have a (live) count.
         if (next[pid] === undefined || next[pid] === 0) next[pid] = c;
+      }
+      return next;
+    });
+
+    // Same reconstruction for group unread badges.
+    const gids = await idbListGroupIds().catch(() => [] as string[]);
+    const gSeen: Record<string, number> = {};
+    for (const gid of gids) {
+      const raw = await metaGet(`seen:group:${gid}`).catch(() => null);
+      gSeen[gid] = raw ? Number(raw) || 0 : 0;
+    }
+    const gCounts = await idbCountUnreadByGroup(gSeen, session.user.id).catch(
+      () => ({}) as Record<string, number>
+    );
+    const openGid = groupRef.current?.id;
+    setUnreadByGroup((prev) => {
+      const next = { ...prev };
+      for (const [gid, c] of Object.entries(gCounts)) {
+        if (gid === openGid || c <= 0) continue;
+        if (next[gid] === undefined || next[gid] === 0) next[gid] = c;
       }
       return next;
     });
