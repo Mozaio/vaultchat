@@ -63,6 +63,41 @@ export const QUICK_EMOJIS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 export { previewForPayload } from "../lib/messagePreview";
 
+const EMOJI_PICTO_RE = /\p{Extended_Pictographic}/u;
+
+/**
+ * Discord/iMessage-Style "jumbo emoji": eine Nachricht, die nur aus wenigen
+ * Emojis besteht, wird größer gerendert. Liefert ein Größen-Level (0 = normal,
+ * 3 = am größten). Gemischter Text (Buchstaben/Ziffern) oder >6 Emojis ⇒ 0.
+ */
+function jumboEmojiLevel(text: string): 0 | 1 | 2 | 3 {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 80) return 0;
+  if (!EMOJI_PICTO_RE.test(trimmed)) return 0;
+  let clusters: string[];
+  try {
+    const seg = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+    clusters = Array.from(seg.segment(trimmed), (s) => s.segment);
+  } catch {
+    clusters = Array.from(trimmed);
+  }
+  let emoji = 0;
+  for (const c of clusters) {
+    if (/^\s+$/u.test(c)) continue;
+    if (EMOJI_PICTO_RE.test(c)) {
+      emoji++;
+      continue;
+    }
+    // A visible, non-emoji cluster (letter, digit, punctuation) ⇒ not emoji-only.
+    return 0;
+  }
+  if (emoji === 0) return 0;
+  if (emoji <= 2) return 3;
+  if (emoji <= 4) return 2;
+  if (emoji <= 6) return 1;
+  return 0;
+}
+
 /** Deterministische, harmlos zufällige Wellenform aus dem Cid-String. */
 function useWaveform(seed: string, bars = 28): number[] {
   return useMemo(() => {
@@ -580,7 +615,18 @@ export function MessageBubble({
             })()
           ) : (
             <>
-              <p className="bubble-text">{renderInlineMarkdown(body)}</p>
+              {(() => {
+                const jumbo = msg.deleted ? 0 : jumboEmojiLevel(body);
+                return (
+                  <p
+                    className={`bubble-text${
+                      jumbo ? ` emoji-jumbo emoji-jumbo-${jumbo}` : ""
+                    }`}
+                  >
+                    {renderInlineMarkdown(body)}
+                  </p>
+                );
+              })()}
               {(() => {
                 if (msg.deleted || msg.plain.viewOnce) return null;
                 const links = extractLinks(body, 2);

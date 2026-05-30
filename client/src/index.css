@@ -1304,6 +1304,20 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+/* Discord/iMessage-style jumbo emoji for emoji-only messages. */
+.bubble-text.emoji-jumbo {
+  line-height: 1.15;
+}
+.bubble-text.emoji-jumbo-1 {
+  font-size: 1.7rem;
+}
+.bubble-text.emoji-jumbo-2 {
+  font-size: 2.3rem;
+}
+.bubble-text.emoji-jumbo-3 {
+  font-size: 3.1rem;
+}
+
 .bubble-deleted {
   display: inline-flex;
   align-items: center;
