@@ -19,6 +19,7 @@ import {
   IconFileText,
   IconForward,
   IconImage,
+  IconLink,
   IconLock,
   IconMessageSquare,
   IconPause,
@@ -675,7 +676,9 @@ export function MessageBubble({
                           className="link-preview-card"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <span className="link-preview-host">{host}</span>
+                          <span className="link-preview-host">
+                            <IconLink size={11} aria-hidden /> {host}
+                          </span>
                           {path && (
                             <span className="link-preview-path">{path}</span>
                           )}

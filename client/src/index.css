@@ -1090,9 +1090,16 @@ select:focus-visible {
   background: rgba(255, 255, 255, 0.08);
 }
 .link-preview-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-weight: 600;
   font-size: 0.78rem;
   color: var(--accent);
+}
+.link-preview-host svg {
+  flex-shrink: 0;
+  opacity: 0.85;
 }
 .message-bubble.sent .link-preview-host {
   color: #fff;
