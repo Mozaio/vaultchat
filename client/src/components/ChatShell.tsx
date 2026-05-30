@@ -6473,6 +6473,11 @@ export function ChatShell({
                         : "show"
                   }
                   groupReadTotal={Math.max(0, group.memberIds.length - 1)}
+                  groupReadNames={(m.readByUserIds ?? [])
+                    .map(
+                      (uid) => users.find((u) => u.id === uid)?.username
+                    )
+                    .filter((n): n is string => Boolean(n))}
                   replyToPreview={replyPreviewForMessage(
                     groupMessages,
                     m,

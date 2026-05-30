@@ -223,6 +223,7 @@ export function MessageBubble({
   onOpenThread,
   groupAvatar,
   groupReadTotal,
+  groupReadNames,
 }: {
   msg: ChatMsg;
   peerLabel: string;
@@ -234,6 +235,9 @@ export function MessageBubble({
    *  set on a sent message, the meta shows "Gelesen N/M" instead of the
    *  single read tick. */
   groupReadTotal?: number;
+  /** Group chats only: display names of members who have read this message
+   *  (for the hover tooltip on the read indicator). */
+  groupReadNames?: string[];
   replyToPreview?: { author: string; text: string; cid?: string } | null;
   isGrouped?: boolean;
   isLastInGroup?: boolean;
@@ -769,10 +773,14 @@ export function MessageBubble({
                 return (
                   <span
                     className="status-icon"
-                    title={t("msg.groupReadTitle", {
-                      n: String(readCount),
-                      total: String(groupReadTotal),
-                    })}
+                    title={
+                      groupReadNames && groupReadNames.length > 0
+                        ? `${t("msg.read")}: ${groupReadNames.join(", ")}`
+                        : t("msg.groupReadTitle", {
+                            n: String(readCount),
+                            total: String(groupReadTotal),
+                          })
+                    }
                   >
                     <IconCheckCheck
                       size={13}
