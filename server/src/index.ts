@@ -295,15 +295,26 @@ const LoginBody = z.object({
   password: z.string().min(1),
 });
 
-/** Roughly 100 KB of base64 — enough for a 256x256 PNG/JPEG avatar. */
-const MAX_GROUP_AVATAR_LENGTH = 100_000;
+// E2EE-Gruppen-Metadaten: Avatar/Name/Beschreibung werden client-seitig mit
+// dem Group-Master-Key verschlüsselt und als `GMETA1:{epoch}:{base64}`-Blob
+// abgelegt — der Server sieht weder Bild noch Text. Das Limit deckt einen
+// verschlüsselten ~100-KB-Avatar ab (crypto_secretbox + base64 ≈ 1.34×).
+const GMETA_CIPHERTEXT_RE = /^GMETA1:\d+:[A-Za-z0-9+\/=]+$/;
+const MAX_GROUP_AVATAR_LENGTH = 150_000;
 const AvatarString = z
   .string()
   .max(MAX_GROUP_AVATAR_LENGTH)
   .refine(
-    (v) => v === "" || /^data:image\/(png|jpeg|webp);base64,/.test(v),
-    { message: "avatar_must_be_data_image" }
+    (v) =>
+      v === "" ||
+      /^data:image\/(png|jpeg|webp);base64,/.test(v) ||
+      GMETA_CIPHERTEXT_RE.test(v),
+    { message: "avatar_must_be_data_image_or_e2ee_blob" }
   );
+
+// Beschreibung: Klartext bleibt kurz (UI-seitig ≤280), der GMETA1-Ciphertext
+// eines 280-Zeichen-Texts ist jedoch länger (Nonce+MAC+base64) — daher 1024.
+const DescriptionString = z.string().max(1024);
 
 // name darf bis 2048 Zeichen lang sein: bei E2EE-Gruppen enthält das Feld
 // statt Klartext einen GMETA1-Ciphertext-Blob (Server kann den Namen nicht
@@ -311,13 +322,13 @@ const AvatarString = z
 const CreateGroupBody = z.object({
   name: z.string().min(1).max(2048),
   memberIds: z.array(z.string().uuid()).min(1),
-  description: z.string().max(280).optional(),
+  description: DescriptionString.optional(),
   avatar: AvatarString.optional(),
 });
 
 const UpdateGroupBody = z.object({
   name: z.string().min(1).max(2048).optional(),
-  description: z.string().max(280).optional(),
+  description: DescriptionString.optional(),
   avatar: AvatarString.optional(),
 });
 

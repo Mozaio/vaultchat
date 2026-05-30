@@ -972,16 +972,34 @@ export function ChatShell({
     });
   }, []);
 
-  /** Entschlüsselt verschlüsselte Gruppennamen (GMETA1) für die Anzeige.
-   *  Ohne GMK (z.B. neues Mitglied) → lokalisierter Platzhalter; sobald der
-   *  GMK ankommt, lädt der Receive-Handler die Liste neu. */
+  /** Entschlüsselt verschlüsselte Gruppen-Metadaten (Name/Beschreibung/Avatar,
+   *  alle GMETA1) für die Anzeige. Ohne GMK (z.B. neues Mitglied) → Name wird
+   *  zum lokalisierten Platzhalter, Beschreibung/Avatar werden ausgeblendet
+   *  (kein kaputtes Bild); sobald der GMK ankommt, lädt der Receive-Handler die
+   *  Liste neu. Legacy-Klartext-Felder (kein GMETA1-Präfix) bleiben unberührt. */
   const decryptGroupList = useCallback(
     async (list: api.ApiGroup[]): Promise<api.ApiGroup[]> => {
       return Promise.all(
         list.map(async (g) => {
-          if (!isEncryptedGroupMeta(g.name)) return g;
-          const dec = await decryptGroupMeta(g.id, g.name).catch(() => null);
-          return { ...g, name: dec ?? t("chat.encryptedGroup") };
+          let next = g;
+          if (isEncryptedGroupMeta(g.name)) {
+            const dn = await decryptGroupMeta(g.id, g.name).catch(() => null);
+            next = { ...next, name: dn ?? t("chat.encryptedGroup") };
+          }
+          if (isEncryptedGroupMeta(g.description)) {
+            const dd = await decryptGroupMeta(g.id, g.description!).catch(
+              () => null
+            );
+            // Unentschlüsselbar → Feld leeren, nicht den Ciphertext zeigen.
+            next = { ...next, description: dd ?? undefined };
+          }
+          if (isEncryptedGroupMeta(g.avatar)) {
+            const da = await decryptGroupMeta(g.id, g.avatar!).catch(() => null);
+            // Unentschlüsselbar → kein Avatar (Initialen-Fallback), kein
+            // kaputtes <img src="GMETA1:...">.
+            next = { ...next, avatar: da ?? undefined };
+          }
+          return next;
         })
       );
     },
@@ -3051,24 +3069,35 @@ export function ChatShell({
     // Phase 1: Gruppe mit Platzhalter-Namen anlegen (Server sieht den echten
     // Namen NIE), dann GMK erzeugen, Namen verschlüsseln und als Ciphertext
     // nachreichen. Worst case (Krypto-Hiccup): Fallback auf Klartext-Name.
+    // Server bekommt NIE Klartext: mit Platzhalter-Namen anlegen (ohne
+    // Beschreibung/Avatar im Klartext), dann GMK erzeugen und Name +
+    // Beschreibung + Avatar verschlüsselt nachreichen.
     const { group: g } = await api.createGroup(session.token, {
       name: GROUP_NAME_PLACEHOLDER,
       memberIds,
-      ...(description ? { description } : {}),
-      ...(newGroupAvatar ? { avatar: newGroupAvatar } : {}),
     });
     try {
       await ensureGroupSecret(g.id);
       const encName = await encryptGroupMeta(g.id, realName);
-      if (encName) {
-        await api.updateGroupProfile(session.token, g.id, { name: encName });
-      } else {
-        // Kein GMK → Klartext setzen, damit die Gruppe nicht "🔒" heißt.
-        await api.updateGroupProfile(session.token, g.id, { name: realName });
-      }
+      const encDesc = description
+        ? await encryptGroupMeta(g.id, description)
+        : null;
+      const encAvatar = newGroupAvatar
+        ? await encryptGroupMeta(g.id, newGroupAvatar)
+        : null;
+      await api.updateGroupProfile(session.token, g.id, {
+        name: encName ?? realName,
+        ...(description ? { description: encDesc ?? description } : {}),
+        ...(newGroupAvatar ? { avatar: encAvatar ?? newGroupAvatar } : {}),
+      });
     } catch {
+      // Krypto-Hiccup → Klartext-Fallback, damit die Gruppe nutzbar bleibt.
       await api
-        .updateGroupProfile(session.token, g.id, { name: realName })
+        .updateGroupProfile(session.token, g.id, {
+          name: realName,
+          ...(description ? { description } : {}),
+          ...(newGroupAvatar ? { avatar: newGroupAvatar } : {}),
+        })
         .catch(() => {});
     }
     await loadGroups();
@@ -3076,8 +3105,13 @@ export function ChatShell({
     setNewGroupMembers([]);
     setNewGroupDescription("");
     setNewGroupAvatar("");
-    // Lokal mit Klartext-Namen anzeigen (Server hat nur Platzhalter+Ciphertext).
-    setGroup({ ...g, name: realName });
+    // Lokal Klartext anzeigen (Server hat nur Platzhalter+Ciphertext).
+    setGroup({
+      ...g,
+      name: realName,
+      ...(description ? { description } : {}),
+      ...(newGroupAvatar ? { avatar: newGroupAvatar } : {}),
+    });
     setTab("group");
     await loadGroups();
   }
@@ -3296,23 +3330,45 @@ export function ChatShell({
       const avatarUpdate = groupEditAvatarRemoved
         ? ""
         : groupEditAvatar || undefined;
-      // Namen verschlüsseln (GMETA1) — der Server speichert nur den Ciphertext.
-      // Fallback auf Klartext, falls (noch) kein GMK vorliegt.
+      // Name + Beschreibung + Avatar verschlüsseln (GMETA1) — der Server
+      // speichert nur Ciphertext. Fallback auf Klartext, falls (noch) kein GMK.
       const encName = await encryptGroupMeta(group.id, trimmedName).catch(
         () => null
       );
+      const encDesc = trimmedDesc
+        ? await encryptGroupMeta(group.id, trimmedDesc).catch(() => null)
+        : null;
+      let avatarToSend = avatarUpdate;
+      if (avatarUpdate && avatarUpdate !== "") {
+        const encAv = await encryptGroupMeta(group.id, avatarUpdate).catch(
+          () => null
+        );
+        avatarToSend = encAv ?? avatarUpdate;
+      }
       const { group: updated } = await api.updateGroupProfile(
         session.token,
         group.id,
         {
           name: encName ?? trimmedName,
-          description: trimmedDesc,
-          ...(avatarUpdate !== undefined ? { avatar: avatarUpdate } : {}),
+          description: trimmedDesc ? encDesc ?? trimmedDesc : "",
+          ...(avatarUpdate !== undefined ? { avatar: avatarToSend } : {}),
         }
       );
-      // Lokal den Klartext-Namen anzeigen (Server hat nur den Ciphertext).
+      // Lokal Klartext anzeigen (Server hat nur Ciphertext). Bei UNVERÄNDERTEM
+      // Avatar den bisherigen lokalen Klartext behalten — `updated.avatar` wäre
+      // sonst der GMETA1-Ciphertext (kaputtes Bild).
       setGroup((prev) =>
-        prev && prev.id === updated.id ? { ...updated, name: trimmedName } : prev
+        prev && prev.id === updated.id
+          ? {
+              ...updated,
+              name: trimmedName,
+              description: trimmedDesc || undefined,
+              avatar:
+                avatarUpdate !== undefined
+                  ? avatarUpdate || undefined
+                  : prev.avatar,
+            }
+          : prev
       );
       await loadGroups();
       setGroupEditMode(false);
