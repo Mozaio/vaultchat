@@ -3699,14 +3699,14 @@ export function ChatShell({
               className="btn btn-secondary !px-3 !py-1 !text-xs"
               onClick={handleDismissNotifyPrompt}
             >
-              Nicht jetzt
+              {t("chat.notifLater")}
             </button>
             <button
               type="button"
               className="btn btn-primary !px-3 !py-1 !text-xs"
               onClick={() => void handleEnableNotifications()}
             >
-              Erlauben
+              {t("chat.notifAllow")}
             </button>
           </div>
         </div>
@@ -4208,7 +4208,7 @@ export function ChatShell({
                       className="contact-preview"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Notizen für dich
+                      {t("chat.notesForYou")}
                     </p>
                   </div>
                 </button>
@@ -4761,7 +4761,7 @@ export function ChatShell({
                           className="header-status"
                           style={{ color: "var(--text-muted)" }}
                         >
-                          Notizen für dich
+                          {t("chat.notesForYou")}
                         </p>
                       ) : typing ? (
                         <p className="header-status typing">
@@ -4770,7 +4770,7 @@ export function ChatShell({
                             <span></span>
                             <span></span>
                           </span>
-                          schreibt…
+                          {t("chat.typing")}
                         </p>
                       ) : (
                         <p
@@ -5515,10 +5515,10 @@ export function ChatShell({
                       );
                       const label =
                         names.length === 1
-                          ? `${names[0]} schreibt…`
+                          ? t("chat.typingName", { name: names[0]! })
                           : names.length === 2
-                            ? `${names[0]} und ${names[1]} schreiben…`
-                            : `${names.length} schreiben…`;
+                            ? t("chat.typingTwo", { a: names[0]!, b: names[1]! })
+                            : t("chat.typingMany", { n: String(names.length) });
                       return (
                         <p className="header-status typing text-xs">
                           <span className="typing-indicator">

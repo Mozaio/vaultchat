@@ -687,7 +687,7 @@ export function SecuritySettings({
                   className="mb-2 text-sm font-medium"
                   style={{ color: "var(--text)" }}
                 >
-                  Metadaten & Anrufe
+                  {t("settings.metadataCalls")}
                 </h3>
                 <label
                   className="flex cursor-pointer items-start gap-3 text-sm"
@@ -700,13 +700,12 @@ export function SecuritySettings({
                     className="mt-1"
                   />
                   <span>
-                    Anrufe nur über TURN (Relay)
+                    {t("settings.relayOnly")}
                     <span
                       className="mt-0.5 block text-xs"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Verbirgt direkte Peer-Verbindungen, kann die Qualität
-                      reduzieren.
+                      {t("settings.relayOnlyDesc")}
                     </span>
                   </span>
                 </label>
@@ -723,12 +722,12 @@ export function SecuritySettings({
                     className="mt-1"
                   />
                   <span>
-                    Tippstatus senden
+                    {t("settings.typingIndicators")}
                     <span
                       className="mt-0.5 block text-xs"
                       style={{ color: "var(--text-muted)" }}
                     >
-                      Optional; ausgeschaltet weniger sichtbare Aktivität.
+                      {t("settings.typingDesc")}
                     </span>
                   </span>
                 </label>
