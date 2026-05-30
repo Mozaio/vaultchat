@@ -118,6 +118,17 @@ function readNotifyPreview(): boolean {
   }
 }
 
+/** Sealed-Sender für Gruppen (#26): Absender vor dem Server verbergen.
+ *  Default aus (Opt-in). */
+const SEALED_GROUP_STORAGE_KEY = "vaultchat.privacy.sealedGroup";
+function readSealedGroup(): boolean {
+  try {
+    return localStorage.getItem(SEALED_GROUP_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
 interface SecuritySettingsProps {
   onClose: () => void;
   relayOnly?: boolean;
@@ -176,6 +187,7 @@ export function SecuritySettings({
   const [replayStats, setReplayStats] = useState(getReplayStats());
   const [desktopNotify, setDesktopNotify] = useState(readNotifyEnabled);
   const [notifyPreview, setNotifyPreview] = useState(readNotifyPreview);
+  const [sealedGroup, setSealedGroup] = useState(readSealedGroup);
   const [notifyPermission, setNotifyPermission] = useState<
     NotificationPermission | "unsupported"
   >(
@@ -236,6 +248,16 @@ export function SecuritySettings({
     try {
       if (enabled) localStorage.removeItem(NOTIFY_PREVIEW_STORAGE_KEY);
       else localStorage.setItem(NOTIFY_PREVIEW_STORAGE_KEY, "off");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const setSealedGroupStored = (enabled: boolean) => {
+    setSealedGroup(enabled);
+    try {
+      if (enabled) localStorage.setItem(SEALED_GROUP_STORAGE_KEY, "on");
+      else localStorage.removeItem(SEALED_GROUP_STORAGE_KEY);
     } catch {
       /* ignore */
     }
@@ -802,6 +824,26 @@ export function SecuritySettings({
                       style={{ color: "var(--text-muted)" }}
                     >
                       {t("settings.readReceiptsDesc")}
+                    </span>
+                  </span>
+                </label>
+                <label
+                  className="mt-3 flex cursor-pointer items-start gap-3 text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={sealedGroup}
+                    onChange={(e) => setSealedGroupStored(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    {t("settings.sealedGroup")}
+                    <span
+                      className="mt-0.5 block text-xs"
+                      style={{ color: "var(--text-muted)" }}
+                    >
+                      {t("settings.sealedGroupDesc")}
                     </span>
                   </span>
                 </label>
