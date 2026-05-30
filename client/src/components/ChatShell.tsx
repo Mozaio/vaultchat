@@ -1983,21 +1983,33 @@ export function ChatShell({
             // Refresh the group list so the new member appears.
             const { groups: latest } = await api.listGroups(session.token);
             setGroups(latest);
-            // Phase 5: Megolm-Rotation. Der Joiner ist jetzt im member-Set;
-            // die nächste sendGroupWire-Operation verteilt automatisch den
-            // frischen Megolm-Session-Key (megolmDistributedRef wurde geleert).
             const updatedGroup = latest.find((x) => x.id === gid);
             if (
               updatedGroup &&
-              updatedGroup.createdByUserId === session.user.id
+              updatedGroup.memberIds.includes(session.user.id)
             ) {
-              try {
-                await rotateForMemberRemoval(updatedGroup.id);
-                megolmDistributedRef.current.delete(updatedGroup.id);
-              } catch {
-                /* Olm not available — group send will surface the error */
+              // SECURITY (Signal-Sender-Keys-Modell): bei JEDER
+              // Mitgliedschaftsänderung — auch beim Hinzufügen — rotiert JEDES
+              // bestehende Mitglied seine Outbound-Session. So beginnt eine neue
+              // Schlüssel-Epoche AB dem Beitrittspunkt; der gecachte Index-0-Key
+              // ist dann der Beitrittspunkt → das neue Mitglied kann NUR ab
+              // Beitritt lesen, nicht die History davor (strenge
+              // Join-Forward-Secrecy wie bei Signal). Das neue Mitglied selbst
+              // (newMemberId === self) rotiert nicht — es hat keine Vor-Epoche.
+              if (newMemberId !== session.user.id) {
+                try {
+                  await rotateForMemberRemoval(updatedGroup.id);
+                  megolmDistributedRef.current.delete(updatedGroup.id);
+                } catch {
+                  /* Olm not available — group send will surface the error */
+                }
               }
-              if (newMemberId) {
+              // Nur der Ersteller postet die System-Nachricht (sonst N-fach).
+              if (
+                updatedGroup.createdByUserId === session.user.id &&
+                newMemberId &&
+                newMemberId !== session.user.id
+              ) {
                 const memberLabel =
                   usersRef.current.find((u) => u.id === newMemberId)?.username ??
                   t("chat.memberFallback");
