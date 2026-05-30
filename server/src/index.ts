@@ -297,15 +297,18 @@ const AvatarString = z
     { message: "avatar_must_be_data_image" }
   );
 
+// name darf bis 2048 Zeichen lang sein: bei E2EE-Gruppen enthält das Feld
+// statt Klartext einen GMETA1-Ciphertext-Blob (Server kann den Namen nicht
+// lesen). Plaintext-Namen sind UI-seitig weiterhin kurz.
 const CreateGroupBody = z.object({
-  name: z.string().min(1).max(64),
+  name: z.string().min(1).max(2048),
   memberIds: z.array(z.string().uuid()).min(1),
   description: z.string().max(280).optional(),
   avatar: AvatarString.optional(),
 });
 
 const UpdateGroupBody = z.object({
-  name: z.string().min(1).max(64).optional(),
+  name: z.string().min(1).max(2048).optional(),
   description: z.string().max(280).optional(),
   avatar: AvatarString.optional(),
 });

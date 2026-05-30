@@ -12,6 +12,18 @@ import {
   parseMegolmEnvelope,
   rotateForMemberRemoval,
 } from "../lib/megolmSession";
+import {
+  getGroupSecret,
+  adoptGroupSecret,
+  ensureGroupSecret,
+  encryptGroupMeta,
+  decryptGroupMeta,
+  isEncryptedGroupMeta,
+} from "../lib/groupSecret";
+
+/** Server-sichtbarer Platzhalter-Name, während der echte Name als
+ *  GMETA1-Ciphertext nachgereicht wird (Server sieht den echten Namen nie). */
+const GROUP_NAME_PLACEHOLDER = "🔒";
 import { getWsUrl } from "../lib/wsUrl";
 import {
   fingerprintFromPublicKeyB64,
@@ -960,10 +972,26 @@ export function ChatShell({
     });
   }, []);
 
+  /** Entschlüsselt verschlüsselte Gruppennamen (GMETA1) für die Anzeige.
+   *  Ohne GMK (z.B. neues Mitglied) → lokalisierter Platzhalter; sobald der
+   *  GMK ankommt, lädt der Receive-Handler die Liste neu. */
+  const decryptGroupList = useCallback(
+    async (list: api.ApiGroup[]): Promise<api.ApiGroup[]> => {
+      return Promise.all(
+        list.map(async (g) => {
+          if (!isEncryptedGroupMeta(g.name)) return g;
+          const dec = await decryptGroupMeta(g.id, g.name).catch(() => null);
+          return { ...g, name: dec ?? t("chat.encryptedGroup") };
+        })
+      );
+    },
+    []
+  );
+
   const loadGroups = useCallback(async () => {
     const { groups: g } = await api.listGroups(session.token);
-    setGroups(g);
-  }, [session.token]);
+    setGroups(await decryptGroupList(g));
+  }, [session.token, decryptGroupList]);
 
   const refreshPendingCount = useCallback(async () => {
     try {
@@ -1598,6 +1626,11 @@ export function ChatShell({
       //    `megolm_session_key`-Frame über Olm-1:1.
       // 2) Eigentliche Nachricht via Megolm-Ratchet (VCG6).
       const distribution = await buildSessionKeyDistribution(g.id);
+      // Geteiltes Gruppen-Geheimnis (GMK) auf der Verteilung mitschicken, falls
+      // wir es haben — so erhalten alle Mitglieder den Schlüssel zum
+      // Entschlüsseln der Gruppen-Metadaten (Name/Avatar). Nur der Ersteller
+      // erzeugt es (createGroup); andere übernehmen es passiv (adoptGroupSecret).
+      const gmk = await getGroupSecret(g.id).catch(() => null);
       const sent = megolmDistributedRef.current.get(g.id) ?? new Set<string>();
       const needed = g.memberIds.filter(
         (mid) => mid !== session.user.id && !sent.has(mid)
@@ -1636,6 +1669,9 @@ export function ChatShell({
             megolmSessionId: distribution.sessionId,
             megolmSessionKey: distribution.sessionKey,
             senderUserId: session.user.id,
+            ...(gmk
+              ? { groupSecretKey: gmk.keyB64, groupSecretEpoch: gmk.epoch }
+              : {}),
           };
           // Best-effort + quiet: a member without an Olm bundle doesn't block
           // the group and must NOT pop a user-facing error toast.
@@ -1981,7 +2017,8 @@ export function ChatShell({
             const newMemberId =
               typeof data.memberId === "string" ? data.memberId : null;
             // Refresh the group list so the new member appears.
-            const { groups: latest } = await api.listGroups(session.token);
+            const { groups: latestRaw } = await api.listGroups(session.token);
+            const latest = await decryptGroupList(latestRaw);
             setGroups(latest);
             const updatedGroup = latest.find((x) => x.id === gid);
             if (
@@ -2027,7 +2064,8 @@ export function ChatShell({
           ) {
             const gid = data.groupId;
             // Refresh the group list so the removed member disappears.
-            const { groups: latest } = await api.listGroups(session.token);
+            const { groups: latestRaw } = await api.listGroups(session.token);
+            const latest = await decryptGroupList(latestRaw);
             setGroups(latest);
             // SECURITY: forward secrecy on removal. The departed member still
             // holds every member's OLD Megolm key, so EVERY remaining member
@@ -2091,6 +2129,22 @@ export function ChatShell({
                   err: err instanceof Error ? err.message : String(err),
                 });
                 return;
+              }
+              // Geteiltes Gruppen-Geheimnis (GMK) übernehmen, falls mitgeschickt
+              // — damit wir Gruppen-Metadaten (Name/Avatar) entschlüsseln können.
+              if (
+                typeof plain.groupSecretKey === "string" &&
+                plain.groupSecretKey &&
+                typeof plain.groupSecretEpoch === "number"
+              ) {
+                await adoptGroupSecret(
+                  plain.groupId,
+                  plain.groupSecretKey,
+                  plain.groupSecretEpoch
+                ).catch(() => {});
+                // Gruppenliste neu aufbauen, damit ein bisher als Platzhalter
+                // angezeigter verschlüsselter Name jetzt entschlüsselt erscheint.
+                void loadGroups().catch(() => {});
               }
               // Pending VCG6-Cipher für diese Gruppe nochmal versuchen.
               const pending = pendingGroupCipherRef.current.get(plain.groupId);
@@ -2898,18 +2952,37 @@ export function ChatShell({
       return;
     }
     const description = newGroupDescription.trim();
+    const realName = newGroupName.trim();
+    // Phase 1: Gruppe mit Platzhalter-Namen anlegen (Server sieht den echten
+    // Namen NIE), dann GMK erzeugen, Namen verschlüsseln und als Ciphertext
+    // nachreichen. Worst case (Krypto-Hiccup): Fallback auf Klartext-Name.
     const { group: g } = await api.createGroup(session.token, {
-      name: newGroupName.trim(),
+      name: GROUP_NAME_PLACEHOLDER,
       memberIds,
       ...(description ? { description } : {}),
       ...(newGroupAvatar ? { avatar: newGroupAvatar } : {}),
     });
+    try {
+      await ensureGroupSecret(g.id);
+      const encName = await encryptGroupMeta(g.id, realName);
+      if (encName) {
+        await api.updateGroupProfile(session.token, g.id, { name: encName });
+      } else {
+        // Kein GMK → Klartext setzen, damit die Gruppe nicht "🔒" heißt.
+        await api.updateGroupProfile(session.token, g.id, { name: realName });
+      }
+    } catch {
+      await api
+        .updateGroupProfile(session.token, g.id, { name: realName })
+        .catch(() => {});
+    }
     await loadGroups();
     setNewGroupName("");
     setNewGroupMembers([]);
     setNewGroupDescription("");
     setNewGroupAvatar("");
-    setGroup(g);
+    // Lokal mit Klartext-Namen anzeigen (Server hat nur Platzhalter+Ciphertext).
+    setGroup({ ...g, name: realName });
     setTab("group");
     await loadGroups();
   }
@@ -3068,7 +3141,8 @@ export function ChatShell({
     void (async () => {
       try {
         const { groupId } = await api.redeemGroupInvite(session.token, token);
-        const { groups: latest } = await api.listGroups(session.token);
+        const { groups: latestRaw } = await api.listGroups(session.token);
+        const latest = await decryptGroupList(latestRaw);
         setGroups(latest);
         const target = latest.find((g) => g.id === groupId);
         if (target) {
@@ -3127,16 +3201,24 @@ export function ChatShell({
       const avatarUpdate = groupEditAvatarRemoved
         ? ""
         : groupEditAvatar || undefined;
+      // Namen verschlüsseln (GMETA1) — der Server speichert nur den Ciphertext.
+      // Fallback auf Klartext, falls (noch) kein GMK vorliegt.
+      const encName = await encryptGroupMeta(group.id, trimmedName).catch(
+        () => null
+      );
       const { group: updated } = await api.updateGroupProfile(
         session.token,
         group.id,
         {
-          name: trimmedName,
+          name: encName ?? trimmedName,
           description: trimmedDesc,
           ...(avatarUpdate !== undefined ? { avatar: avatarUpdate } : {}),
         }
       );
-      setGroup((prev) => (prev && prev.id === updated.id ? updated : prev));
+      // Lokal den Klartext-Namen anzeigen (Server hat nur den Ciphertext).
+      setGroup((prev) =>
+        prev && prev.id === updated.id ? { ...updated, name: trimmedName } : prev
+      );
       await loadGroups();
       setGroupEditMode(false);
       setGroupEditAvatar("");

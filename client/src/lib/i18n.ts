@@ -2232,6 +2232,12 @@ const DICT: Record<string, Dict> = {
     en: "Member", de: "Mitglied", tr: "Üye", es: "Miembro", fr: "Membre",
     pt: "Membro", ru: "Участник", ar: "عضو", zh: "成员", hi: "सदस्य",
   },
+  "chat.encryptedGroup": {
+    en: "Encrypted group", de: "Verschlüsselte Gruppe",
+    tr: "Şifreli grup", es: "Grupo cifrado", fr: "Groupe chiffré",
+    pt: "Grupo criptografado", ru: "Зашифрованная группа",
+    ar: "مجموعة مشفّرة", zh: "加密群组", hi: "एन्क्रिप्टेड समूह",
+  },
   "chat.contactFallback": {
     en: "Contact", de: "Kontakt", tr: "Kişi", es: "Contacto", fr: "Contact",
     pt: "Contato", ru: "Контакт", ar: "جهة اتصال", zh: "联系人", hi: "संपर्क",

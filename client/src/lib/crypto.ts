@@ -166,6 +166,11 @@ export type PlainPayload = {
    *  InboundGroupSession aufzubauen. */
   megolmSessionId?: string;
   megolmSessionKey?: string;
+  /** Optional auf dem megolm_session_key-Frame mitgeschickt: das geteilte
+   *  Gruppen-Geheimnis (Group Master Key) zum E2EE-Verschlüsseln von
+   *  Gruppen-Metadaten (Name/Avatar). epoch versioniert Rotationen. */
+  groupSecretKey?: string;
+  groupSecretEpoch?: number;
   /** Nur bei kind === "voice_announce": ephemerale Voice-Room-Koordination
    *  (Beitreten/Verlassen/Anwesend). Wird NICHT gespeichert oder gerendert,
    *  sondern an den GroupCallController weitergereicht. */
