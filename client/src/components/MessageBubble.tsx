@@ -52,6 +52,9 @@ export type ChatMsg = {
   edited?: boolean;
   readByPeer?: boolean;
   deliveredToPeer?: boolean;
+  /** Gruppen: IDs der Mitglieder, die diese Nachricht gelesen haben (für
+   *  "Gelesen von N/M"). Bei DMs ungenutzt (dort zählt readByPeer). */
+  readByUserIds?: string[];
   /** Nur bei kind === "poll": votes pro Option-Index, gesammelt aus
    *  poll-vote frames. Letzter vote pro voter gewinnt. */
   pollVotes?: number[];
@@ -218,6 +221,7 @@ export function MessageBubble({
   threadUnreadCount,
   onOpenThread,
   groupAvatar,
+  groupReadTotal,
 }: {
   msg: ChatMsg;
   peerLabel: string;
@@ -225,6 +229,10 @@ export function MessageBubble({
    *  of a received run; "space" indents continuation bubbles to align. DMs
    *  pass nothing (kept clean). */
   groupAvatar?: "show" | "space";
+  /** Group chats only: number of OTHER members (memberIds minus self). When
+   *  set on a sent message, the meta shows "Gelesen N/M" instead of the
+   *  single read tick. */
+  groupReadTotal?: number;
   replyToPreview?: { author: string; text: string; cid?: string } | null;
   isGrouped?: boolean;
   isLastInGroup?: boolean;
@@ -728,7 +736,7 @@ export function MessageBubble({
                 minute: "2-digit",
               })}
             </span>
-            {msg.fromMe && !msg.deleted && (
+            {msg.fromMe && !msg.deleted && groupReadTotal === undefined && (
               <span
                 className="status-icon"
                 title={
@@ -748,6 +756,33 @@ export function MessageBubble({
                 )}
               </span>
             )}
+            {msg.fromMe &&
+              !msg.deleted &&
+              groupReadTotal !== undefined &&
+              (() => {
+                // Gruppen-Lese-Status: "Gelesen N/M" (Signal MessageDetail-lite).
+                const readCount = msg.readByUserIds?.length ?? 0;
+                const allRead = groupReadTotal > 0 && readCount >= groupReadTotal;
+                return (
+                  <span
+                    className="status-icon"
+                    title={t("msg.groupReadTitle", {
+                      n: String(readCount),
+                      total: String(groupReadTotal),
+                    })}
+                  >
+                    <IconCheckCheck
+                      size={13}
+                      className={allRead ? "read" : "delivered"}
+                    />
+                    {groupReadTotal > 0 && (
+                      <span className="group-read-count">
+                        {readCount}/{groupReadTotal}
+                      </span>
+                    )}
+                  </span>
+                );
+              })()}
           </div>
 
           {!msg.deleted && !isViewOnce && (

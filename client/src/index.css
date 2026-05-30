@@ -1333,6 +1333,15 @@ select:focus-visible {
   color: currentColor;
 }
 
+/* Gruppen-Lese-Status "N/M" neben dem Häkchen (Signal MessageDetail-lite). */
+.group-read-count {
+  margin-left: 0.15rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 .status-icon .read {
   color: #93c5fd;
 }

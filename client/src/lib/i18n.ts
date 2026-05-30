@@ -2689,6 +2689,13 @@ const DICT: Record<string, Dict> = {
     en: "Read", de: "Gelesen", tr: "Okundu", es: "Leído", fr: "Lu",
     pt: "Lido", ru: "Прочитано", ar: "مقروء", zh: "已读", hi: "पढ़ा गया",
   },
+  "msg.groupReadTitle": {
+    en: "Read by {n} of {total}", de: "Gelesen von {n} von {total}",
+    tr: "{total} kişiden {n} kişi okudu", es: "Leído por {n} de {total}",
+    fr: "Lu par {n} sur {total}", pt: "Lido por {n} de {total}",
+    ru: "Прочитано {n} из {total}", ar: "قرأها {n} من {total}",
+    zh: "{total} 人中 {n} 人已读", hi: "{total} में से {n} ने पढ़ा",
+  },
   "msg.delivered": {
     en: "Delivered", de: "Zugestellt", tr: "İletildi", es: "Entregado",
     fr: "Distribué", pt: "Entregue", ru: "Доставлено", ar: "تم التسليم",

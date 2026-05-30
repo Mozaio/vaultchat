@@ -23,6 +23,9 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
     ChatMsg & {
       _reactByUser: Map<string, string>;
       _pollVoteByUser: Map<string, number>;
+      /** Gruppen: Mitglieder-IDs, die diese Nachricht gelesen haben (für
+       *  "Gelesen von N/M" — Signal-Style). DMs nutzen weiter den Boolean. */
+      _readByUser: Set<string>;
     }
   >();
 
@@ -48,6 +51,7 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
       const next: ChatMsg & {
         _reactByUser: Map<string, string>;
         _pollVoteByUser: Map<string, number>;
+        _readByUser: Set<string>;
       } = {
         id: r.id,
         fromMe: r.fromMe,
@@ -65,6 +69,7 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
         myPollVote: prev?.myPollVote,
         _reactByUser: prev?._reactByUser ?? new Map(),
         _pollVoteByUser: prev?._pollVoteByUser ?? new Map(),
+        _readByUser: prev?._readByUser ?? new Set(),
       };
       byCid.set(p.cid, next);
       continue;
@@ -156,6 +161,12 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
       if (!r.fromMe) {
         if (p.receiptKind === "read") prev.readByPeer = true;
         if (p.receiptKind === "delivered") prev.deliveredToPeer = true;
+        // Gruppen: pro lesendem Mitglied merken (für "Gelesen von N/M"). Die
+        // Leser-ID ist der Absender des Receipt-Frames. Bei DMs ist fromUserId
+        // nicht gesetzt → Set bleibt leer, der Boolean oben genügt.
+        if (p.receiptKind === "read" && r.fromUserId) {
+          prev._readByUser.add(r.fromUserId);
+        }
       }
       continue;
     }
@@ -169,10 +180,10 @@ export function reduceChatMessages(records: Authored[]): ChatMsg[] {
         m.plain = { ...m.plain, replyPreview: undefined };
       }
     }
-    const { _reactByUser, _pollVoteByUser, ...rest } = m;
+    const { _reactByUser, _pollVoteByUser, _readByUser, ...rest } = m;
     void _reactByUser;
     void _pollVoteByUser;
-    return rest;
+    return { ...rest, readByUserIds: Array.from(_readByUser) };
   });
   return out.sort((a, b) => a.at - b.at);
 }

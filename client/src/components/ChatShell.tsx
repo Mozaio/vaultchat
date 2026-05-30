@@ -6472,6 +6472,7 @@ export function ChatShell({
                         ? "space"
                         : "show"
                   }
+                  groupReadTotal={Math.max(0, group.memberIds.length - 1)}
                   replyToPreview={replyPreviewForMessage(
                     groupMessages,
                     m,
