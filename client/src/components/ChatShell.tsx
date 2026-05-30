@@ -880,6 +880,10 @@ export function ChatShell({
     const rows = rawDmRef.current.get(userId) ?? [];
     for (const r of rows) await idbDeleteDm(r.id).catch(() => {});
     rawDmRef.current.delete(userId);
+    // Reset the read marker so that if this sender writes again, the new
+    // request reliably shows an unread badge (a stale high marker from a
+    // prior open could otherwise suppress it).
+    await metaSet(`seen:dm:${userId}`, "0").catch(() => {});
     setRequestPeers((prev) => {
       if (!prev.has(userId)) return prev;
       const next = new Set(prev);
@@ -1191,10 +1195,15 @@ export function ChatShell({
       dmUnreadDividerCapRef.current = Date.now();
       dmScrollToUnreadRef.current = dmUnreadDividerAtRef.current > 0;
       await loadDmLocal(peer);
-      await metaSet(
-        `seen:dm:${peer.id}`,
-        String(dmUnreadDividerCapRef.current)
-      ).catch(() => {});
+      // Mark read up to the latest message actually present. Using
+      // max(now, newest incoming `at`) keeps the marker in the stored-`at`
+      // clock domain so a server/peer clock ahead of ours can't leave a
+      // just-read message counted as unread after a reload.
+      let seenUpTo = dmUnreadDividerCapRef.current;
+      for (const r of rawDmRef.current.get(peer.id) ?? []) {
+        if (!r.fromMe && r.at > seenUpTo) seenUpTo = r.at;
+      }
+      await metaSet(`seen:dm:${peer.id}`, String(seenUpTo)).catch(() => {});
       setUnreadByPeer((m) => ({ ...m, [peer.id]: 0 }));
     })();
   }, [peer, session.secretKey, loadDmLocal]);
@@ -2026,21 +2035,31 @@ export function ChatShell({
             rawDmRef.current.set(peerUser.id, arr);
             if (peerRef.current?.id === peerUser.id) {
               rebuildDm(peerUser.id);
-              // Seen live in the open chat: advance the read marker to "now"
-              // (monotonic — a re-delivered old frame can't regress it) so a
-              // later reload doesn't resurrect this as unread.
-              void metaSet(`seen:dm:${peerUser.id}`, String(Date.now())).catch(
-                () => {}
-              );
+              // Seen live in the open chat: advance the read marker past this
+              // message. Use max(now, createdAt) so it stays in the same clock
+              // domain as the stored `at` (a server/peer clock ahead of ours
+              // would otherwise resurrect a just-read message as unread on
+              // reload) while remaining monotonic against re-delivered frames.
+              void metaSet(
+                `seen:dm:${peerUser.id}`,
+                String(Math.max(Date.now(), createdAt))
+              ).catch(() => {});
             }
 
             // Message request gate: a real message from a sender we haven't
             // accepted (and haven't blocked) surfaces in the requests area,
             // not the main chat list. Group-key/receipt/typing frames don't
-            // count — only user-visible content does.
+            // count — only user-visible content does. Until the one-time
+            // migration has seeded existing contacts as accepted, treat every
+            // sender as accepted so an established contact can't be transiently
+            // mislabeled as a request (and have its receipt suppressed) in the
+            // brief window before migration commits.
+            const migrated =
+              localStorage.getItem("vaultchat.requests.migrated") === "1";
+            const treatAsAccepted =
+              !migrated || acceptedPeersRef.current.has(peerUser.id);
             const isUnacceptedSender =
-              !acceptedPeersRef.current.has(peerUser.id) &&
-              !blockedPeersRef.current.has(peerUser.id);
+              !treatAsAccepted && !blockedPeersRef.current.has(peerUser.id);
             if (isUnacceptedSender && isRequestContentKind(plain.kind)) {
               addRequestPeer(peerUser.id);
             }
@@ -2071,11 +2090,13 @@ export function ChatShell({
 
             // Privacy: do NOT auto-acknowledge (read/delivered) to a sender we
             // haven't accepted — that would confirm activity to a stranger.
+            // (Pre-migration, treatAsAccepted is true so established contacts
+            // still get their receipts.)
             if (
               sendReadReceipts &&
               plain.kind !== "receipt" &&
               plain.cid &&
-              acceptedPeersRef.current.has(peerUser.id)
+              treatAsAccepted
             ) {
               const receipt: PlainPayload = {
                 v: 2,
