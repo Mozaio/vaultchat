@@ -994,6 +994,12 @@ select:focus-visible {
   font-size: 0.72rem;
   color: var(--text-muted);
 }
+/* Auf gesendeten (orangenen) Bubbles ist --text-muted (grau) zu blass —
+   Umfrage-Summe + Zähler heller setzen, damit sie lesbar bleiben. */
+.message-bubble.sent .poll-total,
+.message-bubble.sent .poll-option-count {
+  color: rgba(255, 255, 255, 0.82);
+}
 
 /* Compose-poll dialog (inline above the chat composer). */
 .poll-composer {
