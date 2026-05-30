@@ -222,6 +222,42 @@ export async function idbListDmPeerIds(): Promise<string[]> {
   return Array.from(ids);
 }
 
+/**
+ * Zählt pro Peer die ungelesenen eingehenden Nachrichten: eingehend
+ * (`fromMe === false`) und neuer als der zuletzt gesehene Zeitpunkt
+ * (`seenByPeer[peerId]`). Nutzt nur die unverschlüsselten Index-Felder
+ * (peerId/fromMe/at) — keine Entschlüsselung, daher günstig und auch ohne
+ * geladene Konversation nutzbar. So überleben Ungelesen-Badges einen Reload.
+ */
+export async function idbCountUnreadByPeer(
+  seenByPeer: Record<string, number>
+): Promise<Record<string, number>> {
+  const db = await openDb();
+  const now = Date.now();
+  return new Promise<Record<string, number>>((resolve, reject) => {
+    const counts: Record<string, number> = {};
+    const tx = db.transaction("dm", "readonly");
+    const req = tx.objectStore("dm").openCursor();
+    req.onsuccess = () => {
+      const c = req.result;
+      if (!c) {
+        resolve(counts);
+        return;
+      }
+      const v = c.value as DmRecord;
+      if (
+        !v.fromMe &&
+        (!v.expiresAt || v.expiresAt > now) &&
+        v.at > (seenByPeer[v.peerId] ?? 0)
+      ) {
+        counts[v.peerId] = (counts[v.peerId] ?? 0) + 1;
+      }
+      c.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function idbListAllDm(): Promise<StoredDmMessage[]> {
   assertKey();
   const db = await openDb();

@@ -17,6 +17,7 @@ import {
   type PlainPayload,
 } from "../lib/crypto";
 import {
+  idbCountUnreadByPeer,
   idbDeleteDm,
   idbDeleteGroupMsg,
   idbListDm,
@@ -940,12 +941,39 @@ export function ChatShell({
     }
   }, []);
 
+  /** Rebuild unread badges from persisted history so counts survive a reload.
+   *  Uses only unencrypted index fields (peerId/fromMe/at) vs. the per-peer
+   *  "last seen" marker — no decryption, no live-state clobbering. */
+  const initUnread = useCallback(async () => {
+    const ids = await idbListDmPeerIds().catch(() => [] as string[]);
+    const seen: Record<string, number> = {};
+    for (const id of ids) {
+      if (id === session.user.id) continue;
+      const raw = await metaGet(`seen:dm:${id}`).catch(() => null);
+      seen[id] = raw ? Number(raw) || 0 : 0;
+    }
+    const counts = await idbCountUnreadByPeer(seen).catch(
+      () => ({}) as Record<string, number>
+    );
+    const openId = peerRef.current?.id;
+    setUnreadByPeer((prev) => {
+      const next = { ...prev };
+      for (const [pid, c] of Object.entries(counts)) {
+        if (pid === openId || c <= 0) continue;
+        // Only seed where we don't already have a (live) count.
+        if (next[pid] === undefined || next[pid] === 0) next[pid] = c;
+      }
+      return next;
+    });
+  }, [session.user.id]);
+
   useEffect(() => {
     void loadContacts();
     void loadGroups();
     void idbPurgeExpired().catch(() => {});
     void refreshPendingCount();
-  }, [loadContacts, loadGroups, refreshPendingCount]);
+    void initUnread();
+  }, [loadContacts, loadGroups, refreshPendingCount, initUnread]);
 
   /** Title-bar badge: shows total unread count when the tab is in the
    *  background, e.g. "(3) VaultChat". Reverts to plain "VaultChat"
@@ -1979,7 +2007,15 @@ export function ChatShell({
               ...(ttl ? { expiresAt: createdAt + ttl } : {}),
             });
             rawDmRef.current.set(peerUser.id, arr);
-            if (peerRef.current?.id === peerUser.id) rebuildDm(peerUser.id);
+            if (peerRef.current?.id === peerUser.id) {
+              rebuildDm(peerUser.id);
+              // Seen live in the open chat: advance the read marker to "now"
+              // (monotonic — a re-delivered old frame can't regress it) so a
+              // later reload doesn't resurrect this as unread.
+              void metaSet(`seen:dm:${peerUser.id}`, String(Date.now())).catch(
+                () => {}
+              );
+            }
 
             // Message request gate: a real message from a sender we haven't
             // accepted (and haven't blocked) surfaces in the requests area,
