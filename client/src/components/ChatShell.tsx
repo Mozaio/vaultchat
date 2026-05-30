@@ -1635,6 +1635,16 @@ export function ChatShell({
       const needed = g.memberIds.filter(
         (mid) => mid !== session.user.id && !sent.has(mid)
       );
+      // DIAGNOSE: welche sessionId + welchen Ratchet-Index verteilen wir? Index
+      // 0 = deckt die erste Nachricht ab. >0 = frühere Nachrichten gehen für
+      // spät empfangende Mitglieder verloren.
+      // eslint-disable-next-line no-console
+      console.debug("[vaultchat:megolm] dist", {
+        groupId: g.id.slice(0, 8),
+        sessionId: distribution.sessionId.slice(0, 12),
+        idx: distribution.messageIndex,
+        needed: needed.length,
+      });
       if (needed.length > 0) {
         // Resolve member profiles. CRITICAL: a group member may NOT be in our
         // local contact list (usersRef) — e.g. they were added by someone else
@@ -2136,11 +2146,18 @@ export function ChatShell({
             ) {
               // Megolm-Inbound-Session aus dem 1:1-Olm-Channel aufbauen.
               try {
-                await ingestSessionKey(
+                const ing = await ingestSessionKey(
                   plain.groupId,
                   dec.senderUserId,
                   plain.megolmSessionKey
                 );
+                // DIAGNOSE: welche sessionId haben wir von wem übernommen?
+                // eslint-disable-next-line no-console
+                console.debug("[vaultchat:megolm] ingest_ok", {
+                  groupId: plain.groupId.slice(0, 8),
+                  from: dec.senderUserId.slice(0, 8),
+                  sessionId: ing.sessionId.slice(0, 12),
+                });
               } catch (err) {
                 // eslint-disable-next-line no-console
                 console.debug("[vaultchat:megolm] ingest_failed", {
@@ -2398,6 +2415,14 @@ export function ChatShell({
               plain = JSON.parse(r.plaintext) as PlainPayload;
               if (!plain.senderUserId) plain.senderUserId = r.senderUuid;
             } catch {
+              // DIAGNOSE: warum konnten wir nicht entschlüsseln? Loggt den
+              // (Klartext-)VCG6-Header des Ciphers — senderUuid + sessionId —
+              // damit man sieht, ob uns der Key dieser sessionId fehlt.
+              // eslint-disable-next-line no-console
+              console.debug("[vaultchat:megolm] decrypt_miss", {
+                groupId: gid.slice(0, 8),
+                env: parseMegolmEnvelope(ct),
+              });
               // Buffer this ciphertext: der passende Session-Key
               // (megolm_session_key oder group_key) ist evtl. noch nicht
               // angekommen. Wird beim Eintreffen erneut verarbeitet.
