@@ -2228,6 +2228,13 @@ const DICT: Record<string, Dict> = {
     ru: "{member} присоединился(ась) по ссылке-приглашению", ar: "{member} انضم عبر رابط الدعوة",
     zh: "{member} 通过邀请链接加入", hi: "{member} आमंत्रण लिंक से शामिल हुए",
   },
+  "chat.sysGroupCreated": {
+    en: "{user} created the group", de: "{user} hat die Gruppe erstellt",
+    tr: "{user} grubu oluşturdu", es: "{user} creó el grupo",
+    fr: "{user} a créé le groupe", pt: "{user} criou o grupo",
+    ru: "{user} создал(а) группу", ar: "{user} أنشأ المجموعة",
+    zh: "{user} 创建了群组", hi: "{user} ने समूह बनाया",
+  },
   "chat.memberFallback": {
     en: "Member", de: "Mitglied", tr: "Üye", es: "Miembro", fr: "Membre",
     pt: "Membro", ru: "Участник", ar: "عضو", zh: "成员", hi: "सदस्य",

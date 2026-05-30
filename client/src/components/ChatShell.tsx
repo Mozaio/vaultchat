@@ -3100,6 +3100,13 @@ export function ChatShell({
         })
         .catch(() => {});
     }
+    // Bootstrap: "Gruppe erstellt"-Systemnachricht verteilt GMK + Megolm-Key
+    // sofort an alle initialen Mitglieder — so sehen sie den echten Namen/
+    // Avatar (statt Platzhalter) ohne auf die erste echte Nachricht zu warten.
+    await sendGroupSystemMessage(
+      g,
+      t("chat.sysGroupCreated", { user: session.user.username })
+    ).catch(() => {});
     await loadGroups();
     setNewGroupName("");
     setNewGroupMembers([]);
