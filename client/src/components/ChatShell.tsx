@@ -916,6 +916,23 @@ export function ChatShell({
     });
   }, []);
 
+  /** Mark a conversation as unread (Signal/WhatsApp-style). Rewinds the "seen"
+   *  marker to just before the last incoming message and shows a badge; the
+   *  chat is deselected so the badge is visible in the list. Persists across
+   *  reload via the seen marker. */
+  const markChatUnread = useCallback((p: api.ApiUser) => {
+    const rows = rawDmRef.current.get(p.id) ?? [];
+    let lastIncomingAt = 0;
+    for (const r of rows) {
+      if (!r.fromMe && r.at > lastIncomingAt) lastIncomingAt = r.at;
+    }
+    if (lastIncomingAt === 0) return; // nothing incoming to mark
+    void metaSet(`seen:dm:${p.id}`, String(lastIncomingAt - 1)).catch(() => {});
+    setUnreadByPeer((m) => ({ ...m, [p.id]: Math.max(1, m[p.id] ?? 0) }));
+    setPeer(null);
+    setInfoOpen(false);
+  }, []);
+
   /** Unblock a peer (from the central blocked-contacts manager). */
   const unblockPeer = useCallback((userId: string) => {
     setBlockedPeers((prev) => {
@@ -4952,6 +4969,18 @@ export function ChatShell({
                         <button type="button" className="chat-menu-item" onClick={() => { setDmMenuOpen(false); setSearchOpen(true); }}>
                           <IconSearch size={16} /> {t("chat.searchInConvo")}
                         </button>
+                        {peer.id !== session.user.id && (
+                          <button
+                            type="button"
+                            className="chat-menu-item"
+                            onClick={() => {
+                              setDmMenuOpen(false);
+                              markChatUnread(peer);
+                            }}
+                          >
+                            <IconBell size={16} /> {t("chat.markUnread")}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="chat-menu-item danger"

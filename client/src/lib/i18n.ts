@@ -1962,6 +1962,13 @@ const DICT: Record<string, Dict> = {
     ru: "Поиск в разговоре", ar: "البحث في المحادثة",
     zh: "在对话中搜索", hi: "बातचीत में खोजें",
   },
+  "chat.markUnread": {
+    en: "Mark as unread", de: "Als ungelesen markieren",
+    tr: "Okunmadı olarak işaretle", es: "Marcar como no leído",
+    fr: "Marquer comme non lu", pt: "Marcar como não lida",
+    ru: "Отметить как непрочитанное", ar: "وضع علامة كغير مقروء",
+    zh: "标记为未读", hi: "अपठित के रूप में चिह्नित करें",
+  },
   "chat.block": {
     en: "Block contact", de: "Kontakt blockieren", tr: "Kişiyi engelle",
     es: "Bloquear contacto", fr: "Bloquer le contact", pt: "Bloquear contato",
