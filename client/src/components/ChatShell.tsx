@@ -1441,10 +1441,14 @@ export function ChatShell({
     async (
       toUser: api.ApiUser,
       payload: PlainPayload,
-      suppressLocal = false
+      suppressLocal = false,
+      // quiet: keine Fehler-Toasts. Für Hintergrund-Ops (Megolm-Key-Verteilung
+      // / Key-Requests), bei denen ein noch-nicht-gebooteter Empfänger keinen
+      // sichtbaren Fehler auslösen soll.
+      quiet = false
     ): Promise<string | null> => {
       if (blockedPeers.has(toUser.id)) {
-        setError(t("chat.errContactBlocked"));
+        if (!quiet) setError(t("chat.errContactBlocked"));
         return null;
       }
       // Phase 5: auditiertes Olm (Matrix.org) ist der einzige Krypto-Pfad
@@ -1461,11 +1465,13 @@ export function ChatShell({
       } catch (olmErr) {
         const reason =
           olmErr instanceof Error ? olmErr.message : String(olmErr);
-        setError(
-          reason === "no_olm_bundle"
-            ? t("chat.errNoOlmBundle")
-            : t("chat.errOlmFailed", { reason })
-        );
+        if (!quiet) {
+          setError(
+            reason === "no_olm_bundle"
+              ? t("chat.errNoOlmBundle")
+              : t("chat.errOlmFailed", { reason })
+          );
+        }
         return null;
       }
       const envelope = await sealSender(
@@ -1631,17 +1637,23 @@ export function ChatShell({
             megolmSessionKey: distribution.sessionKey,
             senderUserId: session.user.id,
           };
-          // Best-effort: a member without an Olm bundle doesn't block the group
-          // — their next boot publishes one, then they join the distribution
-          // list on the following send.
-          await sendDmWire(member, keyPayload, true).catch((err: unknown) => {
-            // eslint-disable-next-line no-console
-            console.debug("[vaultchat:megolm] dist_failed", {
-              member: memberId.slice(0, 8),
-              err: err instanceof Error ? err.message : String(err),
-            });
-          });
-          sent.add(memberId);
+          // Best-effort + quiet: a member without an Olm bundle doesn't block
+          // the group and must NOT pop a user-facing error toast.
+          const res = await sendDmWire(member, keyPayload, true, true).catch(
+            (err: unknown) => {
+              // eslint-disable-next-line no-console
+              console.debug("[vaultchat:megolm] dist_failed", {
+                member: memberId.slice(0, 8),
+                err: err instanceof Error ? err.message : String(err),
+              });
+              return null;
+            }
+          );
+          // Only mark as distributed on ACTUAL success — otherwise retry on the
+          // next send (Signal: sender-key distribution is idempotent + retried
+          // on failure). sendDmWire returns null on failure (e.g. no Olm bundle)
+          // WITHOUT throwing, so check the return value, not just the catch.
+          if (res) sent.add(memberId);
         }
         megolmDistributedRef.current.set(g.id, sent);
       }
@@ -1723,7 +1735,7 @@ export function ChatShell({
         megolmSessionId: sessionId,
         senderUserId: session.user.id,
       };
-      await sendDmWire(sender, reqPayload, true).catch(() => {});
+      await sendDmWire(sender, reqPayload, true, true).catch(() => {});
     },
     [session.user.id, session.token, sendDmWire]
   );
@@ -2172,7 +2184,9 @@ export function ChatShell({
                   megolmSessionKey: dist.sessionKey,
                   senderUserId: session.user.id,
                 };
-                await sendDmWire(peerUser, keyPayload, true).catch(() => {});
+                await sendDmWire(peerUser, keyPayload, true, true).catch(
+                  () => {}
+                );
                 const set =
                   megolmDistributedRef.current.get(plain.groupId) ??
                   new Set<string>();
