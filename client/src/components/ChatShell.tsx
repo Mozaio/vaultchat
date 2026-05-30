@@ -1149,6 +1149,25 @@ export function ChatShell({
     })();
   }, [peer, session.secretKey, loadDmLocal]);
 
+  // Per-chat composer drafts (Discord/Signal-style): switching conversations
+  // preserves each chat's unsent text instead of bleeding it across chats.
+  // Kept in-memory only — drafts must not survive a lock/logout (no at-rest
+  // plaintext draft leak).
+  const draftsRef = useRef<Map<string, string>>(new Map());
+  const lastDraftPeerIdRef = useRef<string | null>(null);
+  const textRef = useRef(text);
+  textRef.current = text;
+  useEffect(() => {
+    const prevId = lastDraftPeerIdRef.current;
+    const nextId = peer?.id ?? null;
+    if (prevId === nextId) return;
+    // Save the outgoing chat's draft (textRef still holds the pre-switch text).
+    if (prevId) draftsRef.current.set(prevId, textRef.current);
+    // Restore the incoming chat's draft (empty if none).
+    setText(nextId ? draftsRef.current.get(nextId) ?? "" : "");
+    lastDraftPeerIdRef.current = nextId;
+  }, [peer?.id]);
+
   useEffect(() => {
     if (!group) {
       setGroupMessages([]);
@@ -2235,6 +2254,7 @@ export function ChatShell({
       await sendDmWire(peer, payload);
     }
     setText("");
+    draftsRef.current.delete(peer.id);
     resetTextarea(dmInputRef.current);
     setReplyDm(null);
     setViewOnceDm(false);
