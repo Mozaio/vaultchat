@@ -768,6 +768,20 @@ app.post("/api/groups/:id/members", groupLimiter, async (req, res) => {
     res.status(400).json({ error: "cannot_add" });
     return;
   }
+  // Notify all OTHER members AND the newly-added member so everyone refreshes
+  // the member list and (re-)distributes the Megolm group key to the joiner.
+  // Without this, a directly-added member sits in memberIds on the server but
+  // nobody learns to send them the session key → they can never decrypt the
+  // group's messages (root cause of "new members don't see anything"). Mirrors
+  // the invite-redeem notification path.
+  for (const memberId of g.memberIds) {
+    if (memberId === jwtUser.userId) continue;
+    sendToUser(memberId, {
+      type: "group_member_added",
+      groupId,
+      memberId: parsed.data.memberId,
+    });
+  }
   log.info("group_member_added", {
     reqId: req.id,
     groupId,

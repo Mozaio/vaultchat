@@ -1590,31 +1590,55 @@ export function ChatShell({
       const needed = g.memberIds.filter(
         (mid) => mid !== session.user.id && !sent.has(mid)
       );
-      for (const memberId of needed) {
-        const member = usersRef.current.find((u) => u.id === memberId);
-        if (!member) continue;
-        const keyPayload: PlainPayload = {
-          v: 2,
-          cid: newCid(),
-          kind: "megolm_session_key",
-          groupId: g.id,
-          megolmSessionId: distribution.sessionId,
-          megolmSessionKey: distribution.sessionKey,
-          senderUserId: session.user.id,
-        };
-        // Best-effort: ein Mitglied ohne Olm-Bundle blockiert die Gruppe
-        // nicht — sein nächstes Boot publisht eines, dann gehört es zur
-        // Distribution-Liste beim nächsten Send.
-        await sendDmWire(member, keyPayload, true).catch((err: unknown) => {
-          // eslint-disable-next-line no-console
-          console.debug("[vaultchat:megolm] dist_failed", {
-            member: memberId.slice(0, 8),
-            err: err instanceof Error ? err.message : String(err),
+      if (needed.length > 0) {
+        // Resolve member profiles. CRITICAL: a group member may NOT be in our
+        // local contact list (usersRef) — e.g. they were added by someone else
+        // and we never DM'd them. They STILL need our Megolm session key or they
+        // cannot decrypt our messages. This was the root cause of "A's messages
+        // reach B but not C" and "newly-added members see nothing": the old code
+        // did `usersRef.find(...) ?? continue`, silently skipping any member who
+        // wasn't already a local contact. Fetch the missing profiles instead.
+        const profiles = new Map(usersRef.current.map((u) => [u.id, u]));
+        const missing = needed.filter((id) => !profiles.has(id));
+        if (missing.length > 0) {
+          try {
+            const { users: fetched } = await api.listUsers(
+              session.token,
+              missing
+            );
+            for (const u of fetched) profiles.set(u.id, u);
+          } catch {
+            /* best-effort — unresolved members are retried on the next send */
+          }
+        }
+        for (const memberId of needed) {
+          const member = profiles.get(memberId);
+          // Profile still unresolved (server hiccup / not yet registered) — do
+          // NOT mark as sent, so the next send retries the distribution.
+          if (!member) continue;
+          const keyPayload: PlainPayload = {
+            v: 2,
+            cid: newCid(),
+            kind: "megolm_session_key",
+            groupId: g.id,
+            megolmSessionId: distribution.sessionId,
+            megolmSessionKey: distribution.sessionKey,
+            senderUserId: session.user.id,
+          };
+          // Best-effort: a member without an Olm bundle doesn't block the group
+          // — their next boot publishes one, then they join the distribution
+          // list on the following send.
+          await sendDmWire(member, keyPayload, true).catch((err: unknown) => {
+            // eslint-disable-next-line no-console
+            console.debug("[vaultchat:megolm] dist_failed", {
+              member: memberId.slice(0, 8),
+              err: err instanceof Error ? err.message : String(err),
+            });
           });
-        });
-        sent.add(memberId);
+          sent.add(memberId);
+        }
+        megolmDistributedRef.current.set(g.id, sent);
       }
-      megolmDistributedRef.current.set(g.id, sent);
       const ciphertext = await megolmEncryptGroup(
         g.id,
         session.user.id,
@@ -1710,6 +1734,14 @@ export function ChatShell({
         // eslint-disable-next-line no-console
         console.warn("[vaultchat] flushOutbox failed:", msg);
       });
+
+      // Auf (Re)Connect Kontakte + Gruppen auffrischen: passiert offline eine
+      // Mitgliedschaftsänderung (z.B. ein Mitglied wird einer Gruppe
+      // hinzugefügt), verpassen wir das WS-Event. Ohne Refresh würden wir den
+      // Gruppen-Schlüssel weiter an einen veralteten Member-Satz verteilen und
+      // neue Mitglieder nie beschicken.
+      void loadContacts().catch(() => {});
+      void loadGroups().catch(() => {});
 
       // Starte Cover Traffic (Dummy-Envelopes bei Inaktivität)
       const peerList = usersRef.current.map((u) => ({
