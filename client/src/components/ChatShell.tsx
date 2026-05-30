@@ -1170,6 +1170,9 @@ export function ChatShell({
     if (prevId) draftsRef.current.set(prevId, textRef.current);
     // Restore the incoming chat's draft (empty if none).
     setText(nextId ? draftsRef.current.get(nextId) ?? "" : "");
+    // A reply target belongs to the chat it was started in — don't let it
+    // bleed into the next conversation.
+    if (prevId) setReplyDm(null);
     lastDraftPeerIdRef.current = nextId;
   }, [peer?.id]);
 
