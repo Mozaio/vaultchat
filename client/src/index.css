@@ -1338,6 +1338,34 @@ select:focus-visible {
   line-height: 1.45;
 }
 
+/* Collapse long messages (Discord-style) with a soft fade + toggle. */
+.bubble-text.clamped {
+  max-height: 15.5em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}
+
+.bubble-expand-toggle {
+  display: inline-block;
+  margin-top: 0.15rem;
+  padding: 0.1rem 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.bubble-expand-toggle:hover {
+  text-decoration: underline;
+}
+
+.message-bubble.sent .bubble-expand-toggle {
+  color: rgba(255, 255, 255, 0.92);
+}
+
 /* Discord/iMessage-style jumbo emoji for emoji-only messages. */
 .bubble-text.emoji-jumbo {
   line-height: 1.15;

@@ -2544,6 +2544,16 @@ const DICT: Record<string, Dict> = {
     fr: "modifié", pt: "editado", ru: "изменено", ar: "معدّل",
     zh: "已编辑", hi: "संपादित",
   },
+  "msg.showMore": {
+    en: "Show more", de: "Mehr anzeigen", tr: "Daha fazla göster",
+    es: "Mostrar más", fr: "Afficher plus", pt: "Mostrar mais",
+    ru: "Показать ещё", ar: "عرض المزيد", zh: "显示更多", hi: "और दिखाएं",
+  },
+  "msg.showLess": {
+    en: "Show less", de: "Weniger anzeigen", tr: "Daha az göster",
+    es: "Mostrar menos", fr: "Afficher moins", pt: "Mostrar menos",
+    ru: "Свернуть", ar: "عرض أقل", zh: "收起", hi: "कम दिखाएं",
+  },
   "msg.react": {
     en: "React", de: "Reagieren", tr: "Tepki ver", es: "Reaccionar",
     fr: "Réagir", pt: "Reagir", ru: "Реакция", ar: "تفاعل", zh: "回应",

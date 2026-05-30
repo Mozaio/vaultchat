@@ -265,6 +265,7 @@ export function MessageBubble({
     computeTtlLeft(msg.expiresAt)
   );
   const [imageOpen, setImageOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [viewOnceLeftMs, setViewOnceLeftMs] = useState<number | null>(null);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
@@ -617,14 +618,34 @@ export function MessageBubble({
             <>
               {(() => {
                 const jumbo = msg.deleted ? 0 : jumboEmojiLevel(body);
+                // Collapse walls of text (Discord-style) so they don't dominate
+                // the thread. Long = many chars or many lines.
+                const isLong =
+                  !msg.deleted &&
+                  !jumbo &&
+                  (body.length > 700 || body.split("\n").length > 18);
                 return (
-                  <p
-                    className={`bubble-text${
-                      jumbo ? ` emoji-jumbo emoji-jumbo-${jumbo}` : ""
-                    }`}
-                  >
-                    {renderInlineMarkdown(body)}
-                  </p>
+                  <>
+                    <p
+                      className={`bubble-text${
+                        jumbo ? ` emoji-jumbo emoji-jumbo-${jumbo}` : ""
+                      }${isLong && !expanded ? " clamped" : ""}`}
+                    >
+                      {renderInlineMarkdown(body)}
+                    </p>
+                    {isLong && (
+                      <button
+                        type="button"
+                        className="bubble-expand-toggle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpanded((v) => !v);
+                        }}
+                      >
+                        {expanded ? t("msg.showLess") : t("msg.showMore")}
+                      </button>
+                    )}
+                  </>
                 );
               })()}
               {(() => {
