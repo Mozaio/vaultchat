@@ -1626,6 +1626,18 @@ const DICT: Record<string, Dict> = {
     ru: "Сквозное шифрование с {name}.", ar: "مشفّر من طرف إلى طرف مع {name}.",
     zh: "与 {name} 端到端加密。", hi: "{name} के साथ एंड-टू-एंड एन्क्रिप्टेड।",
   },
+  "chat.e2eeGroup": {
+    en: "Messages in this group are end-to-end encrypted.",
+    de: "Nachrichten in dieser Gruppe sind Ende-zu-Ende verschlüsselt.",
+    tr: "Bu gruptaki mesajlar uçtan uca şifrelidir.",
+    es: "Los mensajes de este grupo están cifrados de extremo a extremo.",
+    fr: "Les messages de ce groupe sont chiffrés de bout en bout.",
+    pt: "As mensagens deste grupo são criptografadas de ponta a ponta.",
+    ru: "Сообщения в этой группе защищены сквозным шифрованием.",
+    ar: "الرسائل في هذه المجموعة مشفّرة من طرف إلى طرف.",
+    zh: "此群组中的消息经过端到端加密。",
+    hi: "इस समूह के संदेश एंड-टू-एंड एन्क्रिप्टेड हैं।",
+  },
   "chat.verifyHint": {
     en: " Verify the safety number for maximum trust.",
     de: " Sicherheitsnummer prüfen für maximale Vertrauenswürdigkeit.",

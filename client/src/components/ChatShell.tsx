@@ -6341,6 +6341,12 @@ export function ChatShell({
                   </div>
                 </div>
               )}
+              {groupMessages.length > 0 && (
+                <div className="e2ee-hint" key="group-e2ee-hint">
+                  <IconShieldCheck size={14} />
+                  <span>{t("chat.e2eeGroup")}</span>
+                </div>
+              )}
               {pinnedGroupBanner && groupBannerKey && (
                 <button
                   type="button"
