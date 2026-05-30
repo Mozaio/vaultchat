@@ -1254,6 +1254,23 @@ export function ChatShell({
     })();
   }, [group, loadGroupLocal]);
 
+  // Per-group composer drafts + reply hygiene, mirroring the DM behaviour:
+  // switching groups preserves each group's unsent text and never carries a
+  // reply target into the next group. In-memory only (no at-rest draft leak).
+  const groupDraftsRef = useRef<Map<string, string>>(new Map());
+  const lastDraftGroupIdRef = useRef<string | null>(null);
+  const groupTextRef = useRef(groupText);
+  groupTextRef.current = groupText;
+  useEffect(() => {
+    const prevId = lastDraftGroupIdRef.current;
+    const nextId = group?.id ?? null;
+    if (prevId === nextId) return;
+    if (prevId) groupDraftsRef.current.set(prevId, groupTextRef.current);
+    setGroupText(nextId ? groupDraftsRef.current.get(nextId) ?? "" : "");
+    if (prevId) setReplyGroup(null);
+    lastDraftGroupIdRef.current = nextId;
+  }, [group?.id]);
+
   // Auto-scroll: nur wenn der User bereits unten war ODER neue Nachricht reinkommt
   // Mit smooth scrolling und verbesserter Bottom-Erkennung
   useEffect(() => {
@@ -2434,6 +2451,7 @@ export function ChatShell({
     };
     await sendGroupWire(group, payload);
     setGroupText("");
+    groupDraftsRef.current.delete(group.id);
     resetTextarea(groupInputRef.current);
     setReplyGroup(null);
     setViewOnceGroup(false);
