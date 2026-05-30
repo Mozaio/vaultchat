@@ -321,10 +321,6 @@ const UpdateGroupBody = z.object({
   avatar: AvatarString.optional(),
 });
 
-const SealedGroupBody = z.object({
-  ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
-});
-
 type GroupResponse = {
   id: string;
   name: string;
@@ -1183,6 +1179,12 @@ const MAX_B64_CIPHERTEXT = Number(
   process.env.VAULTCHAT_MAX_B64_CIPHERTEXT_BYTES ?? 16 * 1024 * 1024
 );
 const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 4 * 1024 * 1024;
+
+// Sealed-Sender-Body (#26): hier definiert, weil es MAX_B64_CIPHERTEXT braucht
+// (das erst hier deklariert ist). Der Route-Handler oben nutzt es lazy.
+const SealedGroupBody = z.object({
+  ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
+});
 
 const wss = new WebSocketServer({
   server,
