@@ -399,7 +399,7 @@ export function MessageBubble({
       aria-label={ariaLabel}
       className={`message-wrapper group ${msg.fromMe ? "sent" : "received"}${
         isHighlighted ? " highlighted" : ""
-      }${groupAvatar ? " with-av" : ""}`}
+      }${groupAvatar ? " with-av" : ""}${isGrouped ? " grouped" : ""}`}
     >
       {groupAvatar === "show" && (
         <div

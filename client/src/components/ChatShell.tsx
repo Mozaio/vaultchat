@@ -155,6 +155,11 @@ type SidebarFilter =
   | `folder:${string}`;
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
 
+// Consecutive messages from the same author within this window are visually
+// grouped (tight spacing, shared corner). Beyond it they get breathing room —
+// Signal/WhatsApp-style time-aware grouping.
+const MSG_GROUP_WINDOW_MS = 5 * 60_000;
+
 function isBackupReminderDismissed(): boolean {
   try {
     return localStorage.getItem("vaultchat.backupReminder.dismissed") === "1";
@@ -5122,10 +5127,15 @@ export function ChatShell({
                   <MessageBubble
                     key={m.plain.cid ?? m.id}
                     msg={m}
-                    isGrouped={i > 0 && mainDmMsgs[i - 1].fromMe === m.fromMe}
+                    isGrouped={
+                      i > 0 &&
+                      mainDmMsgs[i - 1].fromMe === m.fromMe &&
+                      m.at - mainDmMsgs[i - 1].at < MSG_GROUP_WINDOW_MS
+                    }
                     isLastInGroup={
                       i === mainDmMsgs.length - 1 ||
-                      mainDmMsgs[i + 1].fromMe !== m.fromMe
+                      mainDmMsgs[i + 1].fromMe !== m.fromMe ||
+                      mainDmMsgs[i + 1].at - m.at >= MSG_GROUP_WINDOW_MS
                     }
                     threadReplyCount={
                       m.plain.cid ? dmThreadCounts.get(m.plain.cid) : undefined
@@ -6037,11 +6047,13 @@ export function ChatShell({
                   isGrouped={
                     i > 0 &&
                     mainMsgs[i - 1].fromUserId === m.fromUserId &&
-                    mainMsgs[i - 1].fromMe === m.fromMe
+                    mainMsgs[i - 1].fromMe === m.fromMe &&
+                    m.at - mainMsgs[i - 1].at < MSG_GROUP_WINDOW_MS
                   }
                   isLastInGroup={
                     i === mainMsgs.length - 1 ||
-                    mainMsgs[i + 1].fromUserId !== m.fromUserId
+                    mainMsgs[i + 1].fromUserId !== m.fromUserId ||
+                    mainMsgs[i + 1].at - m.at >= MSG_GROUP_WINDOW_MS
                   }
                   threadReplyCount={
                     m.plain.cid ? threadCounts.get(m.plain.cid) : undefined
