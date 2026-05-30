@@ -204,6 +204,14 @@ const keysLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+// Strenger Limiter für den UNAUTHENTIFIZIERTEN Sealed-Sender-Endpunkt (#26):
+// begrenzt die DoS-Verstärkung (1 Request → N Zustellungen) pro IP.
+const sealedGroupLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 app.use("/api", apiLimiter);
 
 app.get("/healthz", (_req, res) => {
@@ -311,6 +319,10 @@ const UpdateGroupBody = z.object({
   name: z.string().min(1).max(2048).optional(),
   description: z.string().max(280).optional(),
   avatar: AvatarString.optional(),
+});
+
+const SealedGroupBody = z.object({
+  ciphertext: z.string().min(1).max(MAX_B64_CIPHERTEXT),
 });
 
 type GroupResponse = {
@@ -728,6 +740,56 @@ app.get("/api/groups", async (req, res) => {
   }
   const list = listGroupsForUser(jwtUser.userId).map(shapeGroup);
   res.json({ groups: list });
+});
+
+// SEALED-SENDER für Gruppen (#26): BEWUSST UNAUTHENTIFIZIERT — der Server
+// lernt so NIE, WER die Nachricht gesendet hat (Metadaten-Privatsphäre). Nur
+// wer die (hochentropische) groupId kennt, kann senden; Missbrauch ist durch
+// Rate-Limit + Größencap begrenzt, und Empfänger verwerfen nicht
+// entschlüsselbaren Müll (Megolm). Der Server leitet nur opaken Ciphertext an
+// alle Mitglieder weiter — online via WS, offline via Mailbox.
+app.post("/api/groups/:id/sealed", sealedGroupLimiter, (req, res) => {
+  const parsed = SealedGroupBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const groupId = String(req.params.id);
+  const g = getGroup(groupId);
+  // Existenz nicht leaken: bei unbekannter Gruppe einfach 204 (no-op).
+  if (!g) {
+    res.status(204).end();
+    return;
+  }
+  // Replay-Dedup pro Gruppe (OHNE Sender-Identität).
+  if (!markEnvelopeIfNew(`sealed:${groupId}`, parsed.data.ciphertext)) {
+    res.status(204).end();
+    return;
+  }
+  const id = randomUUID();
+  const createdAt = Date.now();
+  // An ALLE Mitglieder verteilen — wir kennen den Absender nicht, also können
+  // wir ihn nicht ausschließen; sein eigener Client dedupliziert per cid.
+  for (const mid of g.memberIds) {
+    const frame = {
+      type: "group",
+      id,
+      groupId,
+      ciphertext: parsed.data.ciphertext,
+      createdAt,
+    };
+    const n = sendToUser(mid, frame);
+    if (n === 0) {
+      enqueueMailboxGroup({
+        id,
+        toUserId: mid,
+        groupId,
+        ciphertext: parsed.data.ciphertext,
+        createdAt,
+      });
+    }
+  }
+  res.status(204).end();
 });
 
 app.patch("/api/groups/:id", groupLimiter, async (req, res) => {

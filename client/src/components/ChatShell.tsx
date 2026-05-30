@@ -1722,8 +1722,27 @@ export function ChatShell({
         });
         rawGroupRef.current.set(g.id, arr);
         if (groupRef.current?.id === g.id) rebuildGroup(g.id);
+        // Eigene cid vormarkieren: im Sealed-Pfad (#26) verteilt der Server an
+        // ALLE inkl. uns selbst — so wird das Echo der eigenen Nachricht per
+        // Dedup verworfen statt doppelt angezeigt. (Im WS-Pfad ein No-op, da
+        // der Server den Absender dort ausschließt.)
+        if (p.cid) isGroupMessageDuplicate(g.id, p.cid);
       }
-      ws.send(JSON.stringify({ type: "group", groupId: g.id, ciphertext }));
+      // Sealed-Sender (#26, opt-in): Ciphertext OHNE Auth-Token über HTTP
+      // senden → der Server lernt den Absender nicht. Standard bleibt der
+      // (authentifizierte) WS-Pfad. Bei Sealed-Fehler Fallback auf WS.
+      let sealedSent = false;
+      try {
+        if (localStorage.getItem("vaultchat.privacy.sealedGroup") === "on") {
+          await api.sendSealedGroup(g.id, ciphertext);
+          sealedSent = true;
+        }
+      } catch {
+        sealedSent = false;
+      }
+      if (!sealedSent) {
+        ws.send(JSON.stringify({ type: "group", groupId: g.id, ciphertext }));
+      }
       coverRef.current?.markRealActivity();
       return tmpId;
     },

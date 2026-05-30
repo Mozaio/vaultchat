@@ -254,6 +254,23 @@ export async function listGroups(token: string) {
 }
 
 /**
+ * Sealed-Sender für Gruppen (#26): sendet einen Gruppen-Ciphertext OHNE
+ * Auth-Token → der Server lernt den Absender NICHT (Metadaten-Privatsphäre).
+ * Best-effort (kein Outbox/Retry); der Empfänger-Pfad ist unverändert.
+ */
+export async function sendSealedGroup(
+  groupId: string,
+  ciphertext: string
+): Promise<void> {
+  const base = apiBase();
+  await fetch(`${base}/api/groups/${encodeURIComponent(groupId)}/sealed`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ciphertext }),
+  });
+}
+
+/**
  * Sealed-Sender DM-Relay. Der Server setzt KEIN `fromUserId` — dieses wird
  * aus dem Envelope vom Empfänger extrahiert.
  */
