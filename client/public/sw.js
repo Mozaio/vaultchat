@@ -20,7 +20,11 @@
  *    double up.
  */
 
-const BUILD_TAG = "vaultchat-2026-06";
+// ⚠️ Bei JEDEM Deploy bumpen (z.B. Datum-Suffix erhöhen). Ändert die sw.js-
+// Bytes → Browser installiert den neuen SW → activate löscht alte Caches →
+// kein hängengebliebener Stale-Build mehr. Prefix muss "vaultchat-" bleiben
+// (der activate-Cleanup-Filter unten matcht darauf).
+const BUILD_TAG = "vaultchat-2026-05-30b";
 const STATIC_CACHE = `${BUILD_TAG}-static-v1`;
 
 self.addEventListener("install", (event) => {
