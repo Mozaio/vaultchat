@@ -78,7 +78,7 @@ class ChunkErrorBoundary extends React.Component<
     );
   }
 }
-import { idbPurgeExpired, setIdbAccountScope } from "./lib/idb";
+import { idbPurgeExpired, idbWipeMessageData, setIdbAccountScope } from "./lib/idb";
 import {
   loadAutoLockMinutes,
   subscribeAutoLockMinutes,
@@ -110,6 +110,42 @@ import { clearMegolmPickleCache } from "./lib/megolmSessionStore";
 import { t, useLocale } from "./lib/i18n";
 
 export type { Session };
+
+/**
+ * Entfernt den pro-Account-spezifischen Social-Graph + Chat-State aus
+ * localStorage. Wird beim Wechsel auf einen ANDEREN Account aufgerufen,
+ * damit der neue Account keine fremden Kontakte/Blockierungen/Favoriten/
+ * Ordner/Ungelesen-Marker erbt. Geräte-/UI-Präferenzen (Theme, Akzent,
+ * Dichte, Sprache, Sicherheits-Level, Benachrichtigungen, Auto-Lock,
+ * Code-Hash-Pin) bleiben bewusst erhalten.
+ */
+function clearAccountScopedLocalState(): void {
+  const keys = [
+    "vaultchat.accepted.peers",
+    "vaultchat.requests.peers",
+    "vaultchat.requests.migrated",
+    "vaultchat.blocked.peers",
+    "vaultchat.blocked.names",
+    "vaultchat.favorites.peers",
+    "vaultchat.pinned.peers",
+    "vaultchat.pinned.messages",
+    "vaultchat.muted.peers",
+    "vaultchat.muted.groups",
+    "vaultchat.starred.cids",
+    "vaultchat.folders",
+    "vaultchat.threads.lastSeen.v1",
+    "vaultchat.plan.v1",
+    "vaultchat.onboarding.pending",
+    "vaultchat.backupReminder.dismissed",
+  ];
+  for (const k of keys) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 export function App() {
   useLocale();
@@ -405,6 +441,25 @@ export function App() {
                   saveLocalIdentity(local);
                   await setLocalKeyFromSecret(s.secretKey);
                   setIdbAccountScope(s.user.id);
+
+                  // Account-Wechsel auf demselben Browser: dm/groupMsg/outbox
+                  // liegen global (nicht pro Account) in IndexedDB, und der
+                  // Social-Graph (accepted/blocked/favorites/… peers) steckt
+                  // global in localStorage. Loggt sich ein ANDERER Account
+                  // ein, würde er sonst fremde Kontakte + Ungelesen-Badges +
+                  // Metadaten (peerId/Zeitstempel) erben. Beim erkannten
+                  // Wechsel daher wipen. Fehlt der Marker (Erst-Adoption),
+                  // NICHT wipen — bestehende Single-Account-Daten bleiben.
+                  try {
+                    const prevOwner = localStorage.getItem("vaultchat.dataOwner");
+                    if (prevOwner && prevOwner !== s.user.id) {
+                      await idbWipeMessageData().catch(() => {});
+                      clearAccountScopedLocalState();
+                    }
+                    localStorage.setItem("vaultchat.dataOwner", s.user.id);
+                  } catch {
+                    /* localStorage nicht verfügbar — überspringen */
+                  }
 
                   // Verification-Key setzen, aber bei pinned_mismatch nur warnen
                   // (der rote Integrity-Banner bleibt sichtbar als Warnung)

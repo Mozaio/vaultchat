@@ -316,6 +316,31 @@ export async function idbCountUnreadByGroup(
   });
 }
 
+/**
+ * Löscht ALLE lokal gespeicherten Nachrichten-Daten (dm/groupMsg/outbox).
+ *
+ * Hintergrund: dm/groupMsg/outbox sind global (nicht pro Account) abgelegt,
+ * während `meta` (inkl. seen-Marker) pro Account gescoped ist (acct:<id>:…).
+ * Loggt sich auf demselben Browser ein ANDERER Account ein, blutet die
+ * History des vorherigen Accounts durch → Phantom-Kontakte/-Ungelesen und
+ * ein Metadaten-Leak (peerId/Zeitstempel über Accounts hinweg). Der Caller
+ * (App.tsx, beim Account-Wechsel) ruft das hier auf, um sauber zu starten.
+ * `meta` bleibt erhalten — es ist bereits korrekt isoliert. Braucht keinen
+ * Local-Key (clear() entschlüsselt nichts).
+ */
+export async function idbWipeMessageData(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(["dm", "groupMsg", "outbox"], "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+    tx.objectStore("dm").clear();
+    tx.objectStore("groupMsg").clear();
+    tx.objectStore("outbox").clear();
+  });
+}
+
 export async function idbListAllDm(): Promise<StoredDmMessage[]> {
   assertKey();
   const db = await openDb();
