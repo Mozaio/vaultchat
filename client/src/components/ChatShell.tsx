@@ -428,6 +428,11 @@ export function ChatShell({
   // memos (list preview, recency sort, starred peers) recompute even when a
   // message lands in a chat that isn't currently open.
   const [dmRev, setDmRev] = useState(0);
+  const [unreadByGroup, setUnreadByGroup] = useState<Record<string, number>>(
+    {}
+  );
+  // Same idea as dmRev, for the group store (rawGroupRef).
+  const [groupRev, setGroupRev] = useState(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [groupEmojiOpen, setGroupEmojiOpen] = useState(false);
   const [groupDragOver, setGroupDragOver] = useState(false);
@@ -1004,17 +1009,16 @@ export function ChatShell({
    *  background, e.g. "(3) VaultChat". Reverts to plain "VaultChat"
    *  on unmount or when there is nothing unread. */
   useEffect(() => {
-    const total = Object.values(unreadByPeer).reduce(
-      (s, n) => s + (n || 0),
-      0
-    );
+    const sum = (r: Record<string, number>) =>
+      Object.values(r).reduce((s, n) => s + (n || 0), 0);
+    const total = sum(unreadByPeer) + sum(unreadByGroup);
     const base = "Umbra";
     document.title =
       total > 0 ? `(${total > 99 ? "99+" : total}) ${base}` : base;
     return () => {
       document.title = base;
     };
-  }, [unreadByPeer]);
+  }, [unreadByPeer, unreadByGroup]);
 
   /**
    * Olm-Identity + 50 OTKs initial publishen. Phase 5: keine Legacy-
@@ -1251,12 +1255,14 @@ export function ChatShell({
       groupUnreadDividerCapRef.current = Date.now();
       groupScrollToUnreadRef.current = groupUnreadDividerAtRef.current > 0;
       await loadGroupLocal(group);
-      await metaSet(
-        `seen:group:${group.id}`,
-        String(groupUnreadDividerCapRef.current)
-      ).catch(() => {});
+      let seenUpTo = groupUnreadDividerCapRef.current;
+      for (const r of rawGroupRef.current.get(group.id) ?? []) {
+        if (r.fromUserId !== session.user.id && r.at > seenUpTo) seenUpTo = r.at;
+      }
+      await metaSet(`seen:group:${group.id}`, String(seenUpTo)).catch(() => {});
+      setUnreadByGroup((m) => ({ ...m, [group.id]: 0 }));
     })();
-  }, [group, loadGroupLocal]);
+  }, [group, loadGroupLocal, session.user.id]);
 
   // Per-group composer drafts + reply hygiene, mirroring the DM behaviour:
   // switching groups preserves each group's unsent text and never carries a
@@ -1350,12 +1356,10 @@ export function ChatShell({
   // (Discord-style "(3) Umbra"). Browser tab everywhere, native window/badge
   // under Tauri.
   useEffect(() => {
-    const total = Object.values(unreadByPeer).reduce(
-      (a, b) => a + (b || 0),
-      0
-    );
-    void setUnreadBadge(total);
-  }, [unreadByPeer]);
+    const sum = (r: Record<string, number>) =>
+      Object.values(r).reduce((a, b) => a + (b || 0), 0);
+    void setUnreadBadge(sum(unreadByPeer) + sum(unreadByGroup));
+  }, [unreadByPeer, unreadByGroup]);
 
   // Clear the title badge when the chat unmounts (logout / lock).
   useEffect(() => {
@@ -2015,6 +2019,7 @@ export function ChatShell({
                         : {}),
                     });
                     rawGroupRef.current.set(plain.groupId, arr);
+                    setGroupRev((x) => x + 1);
                     if (groupRef.current?.id === plain.groupId) {
                       rebuildGroup(plain.groupId);
                     }
@@ -2194,7 +2199,35 @@ export function ChatShell({
               ...(ttl ? { expiresAt: at + ttl } : {}),
             });
             rawGroupRef.current.set(gid, arr);
-            if (groupRef.current?.id === gid) rebuildGroup(gid);
+            setGroupRev((x) => x + 1);
+            const isGroupContent =
+              fromUserId !== session.user.id &&
+              (plain.kind === "text" ||
+                plain.kind === "file" ||
+                plain.kind === "voice" ||
+                plain.kind === "poll" ||
+                plain.kind === "system");
+            if (groupRef.current?.id === gid) {
+              rebuildGroup(gid);
+              // Seen live: advance the read marker (same clock domain as `at`).
+              void metaSet(
+                `seen:group:${gid}`,
+                String(Math.max(Date.now(), at))
+              ).catch(() => {});
+            } else if (isGroupContent) {
+              void (async () => {
+                const seenRaw = await metaGet(`seen:group:${gid}`).catch(
+                  () => null
+                );
+                const seenAt = seenRaw ? Number(seenRaw) || 0 : 0;
+                if (at > seenAt) {
+                  setUnreadByGroup((m) => ({
+                    ...m,
+                    [gid]: (m[gid] ?? 0) + 1,
+                  }));
+                }
+              })();
+            }
             // @mention: notify the mentioned user even if the group is muted
             // (Discord behaviour). Word-boundary, case-insensitive match on
             // the decrypted body — the mention lives inside the E2EE payload.
@@ -3471,6 +3504,43 @@ export function ChatShell({
     return out;
   }, [messages.length, users.length, peer?.id, dmRev]);
 
+  const lastGroupPreviewByGroup = useMemo(() => {
+    const out = new Map<
+      string,
+      { text: string; at: number; fromMe: boolean; author: string }
+    >();
+    for (const [gid, msgs] of rawGroupRef.current.entries()) {
+      const last = [...msgs].reverse().find((r) => {
+        try {
+          const p = JSON.parse(r.plainJson) as PlainPayload;
+          return (
+            p.kind === "text" ||
+            p.kind === "file" ||
+            p.kind === "voice" ||
+            p.kind === "poll" ||
+            p.kind === "system"
+          );
+        } catch {
+          return false;
+        }
+      });
+      if (!last) continue;
+      let text = "";
+      try {
+        text = previewForPayload(JSON.parse(last.plainJson) as PlainPayload);
+      } catch {
+        text = "";
+      }
+      const fromMe = last.fromUserId === session.user.id;
+      const author = fromMe
+        ? t("chat.you")
+        : usersRef.current.find((u) => u.id === last.fromUserId)?.username ??
+          t("chat.memberFallback");
+      out.set(gid, { text, at: last.at, fromMe, author });
+    }
+    return out;
+  }, [groupMessages.length, groups.length, group?.id, groupRev, session.user.id]);
+
   const fmtListTime = useCallback((at?: number) => {
     if (!at) return "";
     const d = new Date(at);
@@ -3642,19 +3712,34 @@ export function ChatShell({
   const visibleGroups = useMemo(() => {
     if (
       sidebarFilter === "dm" ||
-      sidebarFilter === "unread" ||
       sidebarFilter === "fav" ||
       sidebarFilter === "requests"
     )
       return [];
-    if (sidebarFilter === "star")
-      return filteredGroups.filter((g) => groupsWithStars.has(g.id));
-    if (activeFolder) {
+    let arr: api.ApiGroup[];
+    if (sidebarFilter === "unread") {
+      arr = filteredGroups.filter((g) => (unreadByGroup[g.id] ?? 0) > 0);
+    } else if (sidebarFilter === "star") {
+      arr = filteredGroups.filter((g) => groupsWithStars.has(g.id));
+    } else if (activeFolder) {
       const keys = new Set(activeFolder.chatKeys);
-      return filteredGroups.filter((g) => keys.has(`group:${g.id}`));
+      arr = filteredGroups.filter((g) => keys.has(`group:${g.id}`));
+    } else {
+      arr = filteredGroups;
     }
-    return filteredGroups;
-  }, [filteredGroups, sidebarFilter, groupsWithStars, activeFolder]);
+    return [...arr].sort((a, b) => {
+      const ta = lastGroupPreviewByGroup.get(a.id)?.at ?? a.createdAt ?? 0;
+      const tb = lastGroupPreviewByGroup.get(b.id)?.at ?? b.createdAt ?? 0;
+      return tb - ta;
+    });
+  }, [
+    filteredGroups,
+    sidebarFilter,
+    groupsWithStars,
+    activeFolder,
+    unreadByGroup,
+    lastGroupPreviewByGroup,
+  ]);
 
   const sharedMediaItems = useMemo<SharedMediaItem[]>(() => {
     const rows =
@@ -3758,6 +3843,8 @@ export function ChatShell({
       visibleGroups.map((g) => {
         const gTyping = groupTypingMap.get(g.id);
         const showGTyping = Boolean(gTyping && gTyping.size > 0);
+        const gPrev = lastGroupPreviewByGroup.get(g.id);
+        const gUnread = unreadByGroup[g.id] ?? 0;
         return (
           <button
             key={g.id}
@@ -3797,15 +3884,33 @@ export function ChatShell({
                     <span></span>
                     {t("chat.typing")}
                   </span>
+                ) : gPrev ? (
+                  `${gPrev.author}: ${gPrev.text}`
                 ) : (
                   t("chat.memberCount", { n: g.memberIds.length })
                 )}
               </p>
             </div>
+            <div className="contact-meta">
+              <span className="contact-time">{fmtListTime(gPrev?.at)}</span>
+              {gUnread > 0 ? (
+                <span className="unread-badge">
+                  {gUnread > 99 ? "99+" : gUnread}
+                </span>
+              ) : null}
+            </div>
           </button>
         );
       }),
-    [visibleGroups, group, tab, groupTypingMap]
+    [
+      visibleGroups,
+      group,
+      tab,
+      groupTypingMap,
+      lastGroupPreviewByGroup,
+      unreadByGroup,
+      fmtListTime,
+    ]
   );
 
   return (
@@ -4202,14 +4307,15 @@ export function ChatShell({
 
         <div className="filter-chips mx-3 mt-3">
           {(() => {
-            const totalUnread = Object.values(unreadByPeer).reduce(
-              (a, b) => a + (b > 0 ? 1 : 0),
-              0
-            );
+            const countChats = (r: Record<string, number>) =>
+              Object.values(r).reduce((a, b) => a + (b > 0 ? 1 : 0), 0);
+            const dmUnread = countChats(unreadByPeer);
+            const groupUnread = countChats(unreadByGroup);
+            const totalUnread = dmUnread + groupUnread;
             return [
               ["all", t("filter.all"), totalUnread],
-              ["dm", t("filter.dms"), totalUnread],
-              ["group", t("filter.groups"), 0],
+              ["dm", t("filter.dms"), dmUnread],
+              ["group", t("filter.groups"), groupUnread],
               ["fav", t("filter.favorites"), 0],
               ["unread", t("filter.unread"), totalUnread],
               ["star", t("filter.starred"), 0],
@@ -4564,10 +4670,12 @@ export function ChatShell({
         {(sidebarFilter === "all" ||
           sidebarFilter === "group" ||
           sidebarFilter === "star" ||
+          sidebarFilter === "unread" ||
           activeFolder !== null) && (
           <div className="flex-1 overflow-y-auto p-2">
             {(sidebarFilter === "all" ||
               sidebarFilter === "star" ||
+              sidebarFilter === "unread" ||
               activeFolder !== null) &&
               visibleGroups.length > 0 && (
               <p className="px-2 pb-1 pt-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
