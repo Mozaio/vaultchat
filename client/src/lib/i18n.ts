@@ -4226,6 +4226,12 @@ const DICT: Record<string, Dict> = {
     fr: "coupé", pt: "silenciado", ru: "без звука", ar: "مكتوم",
     zh: "已静音", hi: "म्यूट",
   },
+  "call.reconnecting": {
+    en: "Reconnecting…", de: "Verbindung…", tr: "Yeniden bağlanılıyor…",
+    es: "Reconectando…", fr: "Reconnexion…", pt: "Reconectando…",
+    ru: "Переподключение…", ar: "إعادة الاتصال…", zh: "正在重连…",
+    hi: "पुनः कनेक्ट हो रहा है…",
+  },
   "call.stopShare": {
     en: "Stop screen share", de: "Bildschirmteilen beenden",
     tr: "Ekran paylaşımını durdur", es: "Detener pantalla compartida",

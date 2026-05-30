@@ -248,6 +248,9 @@ function Tile({
         <span aria-hidden>{initials || "?"}</span>
       </div>
       <div className="gc-tile-name">{label}</div>
+      {connectionWarning && (
+        <div className="gc-tile-reconnecting">{t("call.reconnecting")}</div>
+      )}
       <div className="gc-tile-icons">
         {muted && (
           <span className="gc-tile-icon muted" aria-label={t("call.muted")}>

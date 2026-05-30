@@ -457,38 +457,45 @@ export class GroupCallController {
       });
     };
 
-    let disconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    // A failed/blocked media path (e.g. NAT without a TURN server) or a
+    // transient network blip must NOT make the peer look like they "left".
+    // We keep the tile (the UI shows a reconnecting indicator) and keep
+    // trying ICE restarts. A peer is only removed by an explicit voice_leave
+    // announce, a closed PC, or after a long dead period (zombie reap).
+    let deadTimer: ReturnType<typeof setTimeout> | null = null;
+    let restartAttempts = 0;
+    const DEAD_AFTER_MS = 60_000;
+    const armDeadTimer = () => {
+      if (deadTimer) return;
+      deadTimer = setTimeout(() => {
+        deadTimer = null;
+        const cur = pc.iceConnectionState;
+        if (cur === "failed" || cur === "disconnected" || cur === "closed") {
+          gcDebug("peer_dead_reaped", { peer: otherUserId, ice: cur });
+          this.dropPeer(otherUserId);
+        }
+      }, DEAD_AFTER_MS);
+    };
     pc.oniceconnectionstatechange = () => {
       const s = pc.iceConnectionState;
+      gcDebug("ice_state", { peer: otherUserId, state: s });
       if (s === "failed") {
-        try {
-          pc.restartIce();
-        } catch {
-          /* noop */
+        if (restartAttempts < 5) {
+          restartAttempts += 1;
+          try {
+            pc.restartIce();
+          } catch {
+            /* noop */
+          }
         }
-        if (!disconnectTimer) {
-          disconnectTimer = setTimeout(() => {
-            disconnectTimer = null;
-            const cur = pc.iceConnectionState;
-            if (cur === "failed" || cur === "disconnected" || cur === "closed") {
-              this.dropPeer(otherUserId);
-            }
-          }, 8000);
-        }
+        armDeadTimer();
       } else if (s === "disconnected") {
-        if (!disconnectTimer) {
-          disconnectTimer = setTimeout(() => {
-            disconnectTimer = null;
-            const cur = pc.iceConnectionState;
-            if (cur === "disconnected" || cur === "failed" || cur === "closed") {
-              this.dropPeer(otherUserId);
-            }
-          }, 8000);
-        }
+        armDeadTimer();
       } else if (s === "connected" || s === "completed") {
-        if (disconnectTimer) {
-          clearTimeout(disconnectTimer);
-          disconnectTimer = null;
+        restartAttempts = 0;
+        if (deadTimer) {
+          clearTimeout(deadTimer);
+          deadTimer = null;
         }
       } else if (s === "closed") {
         this.dropPeer(otherUserId);
@@ -497,10 +504,21 @@ export class GroupCallController {
     };
 
     pc.onconnectionstatechange = () => {
-      this.publishState();
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+      gcDebug("conn_state", { peer: otherUserId, state: pc.connectionState });
+      // Surface the state to the UI, but do NOT drop on "failed" — that made
+      // remote participants vanish mid-call when the media path couldn't
+      // establish. ICE restarts + the dead-timer (above) handle recovery and
+      // eventual reaping; explicit voice_leave handles real departures.
+      if (pc.connectionState === "failed") {
+        try {
+          pc.restartIce();
+        } catch {
+          /* noop */
+        }
+      } else if (pc.connectionState === "closed") {
         this.dropPeer(otherUserId);
       }
+      this.publishState();
     };
 
     this.peers.set(otherUserId, slot);

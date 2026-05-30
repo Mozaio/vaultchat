@@ -6839,6 +6839,13 @@ button:focus-visible,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.gc-tile-reconnecting {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--warning);
+  margin-top: 1px;
+  letter-spacing: 0.02em;
+}
 
 .gc-tile-icons {
   position: absolute;

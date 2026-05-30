@@ -954,7 +954,14 @@ app.get("/api/rtc/config", async (req, res) => {
     ? []
     : splitEnvList(process.env.VAULTCHAT_STUN_URL).length
       ? splitEnvList(process.env.VAULTCHAT_STUN_URL)
-      : ["stun:stun.l.google.com:19302"];
+      : [
+          // Multiple public STUN servers improve srflx candidate discovery.
+          // NOTE: STUN alone cannot traverse symmetric NAT / strict mobile
+          // networks (e.g. CGNAT) — set VAULTCHAT_TURN_URL for those.
+          "stun:stun.l.google.com:19302",
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+        ];
   const servers: { urls: string | string[]; username?: string; credential?: string }[] =
     stunUrls.map((urls) => ({ urls }));
   for (const turnUrl of turnUrls) {
