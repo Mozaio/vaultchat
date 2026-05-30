@@ -46,6 +46,34 @@ function outKey(groupId: string): string {
 function inKey(groupId: string, senderId: string, sessionId: string): string {
   return `megolmIn:${groupId}:${senderId}:${sessionId}`;
 }
+/** Gecachter Index-0-Session-Key der eigenen Outbound-Session (s.
+ *  exportOutboundForRecipient). */
+function outKey0(groupId: string): string {
+  return `megolmOutKey0:${groupId}`;
+}
+
+/**
+ * Cacht den Session-Key der Outbound-Session bei Ratchet-Index 0 (also direkt
+ * nach Erzeugung/Rotation, BEVOR die erste Nachricht verschlüsselt wurde).
+ * Dieser Key erlaubt dem Empfänger, die Session ab der ALLERERSTEN Nachricht
+ * zu entschlüsseln — entscheidend, wenn der Key spät ankommt (Glare-Recovery /
+ * Key-Request-Selbstheilung), denn session_key() am aktuellen Index würde nur
+ * ab dort vorwärts entschlüsseln und frühe Nachrichten verlieren.
+ */
+async function cacheOutboundIndex0(
+  groupId: string,
+  session: OutboundGroupSession
+): Promise<void> {
+  try {
+    const k0 = exportGroupSessionKey(session); // direkt nach Erzeugung == Index 0
+    await metaSet(
+      outKey0(groupId),
+      JSON.stringify({ sessionId: k0.sessionId, sessionKey: k0.sessionKey })
+    );
+  } catch {
+    /* best-effort */
+  }
+}
 
 /**
  * Lädt oder erzeugt die eigene OutboundGroupSession für eine Gruppe.
@@ -65,6 +93,7 @@ export async function ensureOutbound(groupId: string): Promise<OutboundGroupSess
   }
   const fresh = await createOutboundGroupSession();
   await saveOutbound(groupId, fresh);
+  await cacheOutboundIndex0(groupId, fresh);
   return fresh;
 }
 
@@ -84,6 +113,7 @@ export async function saveOutbound(
 export async function rotateOutbound(groupId: string): Promise<OutboundGroupSession> {
   const fresh = await createOutboundGroupSession();
   await saveOutbound(groupId, fresh);
+  await cacheOutboundIndex0(groupId, fresh);
   return fresh;
 }
 
@@ -149,7 +179,36 @@ export async function exportOutboundForRecipient(
 ): Promise<{ sessionId: string; sessionKey: string; messageIndex: number }> {
   const out = await ensureOutbound(groupId);
   try {
-    return exportGroupSessionKey(out);
+    const liveId = out.session_id();
+    // Bevorzugt den gecachten Index-0-Key der AKTUELLEN Session, damit auch
+    // spät empfangende Mitglieder ab der ersten Nachricht entschlüsseln können.
+    const cached = await metaGet(outKey0(groupId));
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached) as {
+          sessionId?: string;
+          sessionKey?: string;
+        };
+        if (parsed.sessionId === liveId && parsed.sessionKey) {
+          return {
+            sessionId: parsed.sessionId,
+            sessionKey: parsed.sessionKey,
+            messageIndex: 0,
+          };
+        }
+      } catch {
+        /* defekter Cache → unten neu schreiben */
+      }
+    }
+    // Kein gültiger Index-0-Cache (z.B. Session vor diesem Fix erzeugt):
+    // aktuellen Key exportieren und für künftige Verteilungen cachen, damit ab
+    // jetzt wenigstens ein konsistenter Schlüssel verteilt wird.
+    const k = exportGroupSessionKey(out);
+    await metaSet(
+      outKey0(groupId),
+      JSON.stringify({ sessionId: k.sessionId, sessionKey: k.sessionKey })
+    );
+    return k;
   } finally {
     out.free();
   }
