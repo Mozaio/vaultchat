@@ -173,18 +173,42 @@ export async function olmDecryptJson(
   let session = await loadOlmSession(peerId);
   const account = await ensureOlmAccount();
   try {
-    if (!session) {
-      if (type !== 0) {
-        throw new Error("no_olm_session_and_not_prekey");
+    let needsFreshInbound = false;
+    if (type === 0) {
+      // Pre-Key-Message. Wir brauchen eine INBOUND-Session, die zu genau
+      // dieser Nachricht passt. Wichtig bei "Glare": bauen beide Seiten
+      // gleichzeitig eine Outbound-Session auf (passiert in Gruppen, wenn alle
+      // Mitglieder zeitgleich ihren Megolm-Key verteilen), passt die
+      // eingehende Pre-Key-Message NICHT zur eigenen Outbound-Session. Dann
+      // (oder wenn gar keine Session existiert) eine frische Inbound-Session
+      // aus der Pre-Key-Message bauen — sonst scheitert die Entschlüsselung
+      // still und der Schlüssel geht verloren (Ursache der Gruppen-Bugs).
+      if (!session) {
+        needsFreshInbound = true;
+      } else {
+        let matches = false;
+        try {
+          matches = session.matches_inbound(body);
+        } catch {
+          matches = false;
+        }
+        if (!matches) {
+          session.free();
+          session = null;
+          needsFreshInbound = true;
+        }
       }
-      // Receiver-Side: inbound Session aus dem Pre-Key-Message bauen.
+    } else if (!session) {
+      throw new Error("no_olm_session_and_not_prekey");
+    }
+    if (needsFreshInbound) {
       session = new olm.Session();
       session.create_inbound(account, body);
       account.remove_one_time_keys(session);
       await saveOlmAccount(account);
     }
-    const plain = olmDecrypt(session, type, body);
-    await saveOlmSession(peerId, session);
+    const plain = olmDecrypt(session!, type, body);
+    await saveOlmSession(peerId, session!);
     return plain;
   } finally {
     account.free();
