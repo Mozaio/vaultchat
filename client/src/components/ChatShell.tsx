@@ -1639,7 +1639,7 @@ export function ChatShell({
       // 0 = deckt die erste Nachricht ab. >0 = frühere Nachrichten gehen für
       // spät empfangende Mitglieder verloren.
       // eslint-disable-next-line no-console
-      console.debug("[vaultchat:megolm] dist", {
+      console.log("[vaultchat:megolm] dist", {
         groupId: g.id.slice(0, 8),
         sessionId: distribution.sessionId.slice(0, 12),
         idx: distribution.messageIndex,
@@ -2153,7 +2153,7 @@ export function ChatShell({
                 );
                 // DIAGNOSE: welche sessionId haben wir von wem übernommen?
                 // eslint-disable-next-line no-console
-                console.debug("[vaultchat:megolm] ingest_ok", {
+                console.log("[vaultchat:megolm] ingest_ok", {
                   groupId: plain.groupId.slice(0, 8),
                   from: dec.senderUserId.slice(0, 8),
                   sessionId: ing.sessionId.slice(0, 12),
@@ -2419,7 +2419,7 @@ export function ChatShell({
               // (Klartext-)VCG6-Header des Ciphers — senderUuid + sessionId —
               // damit man sieht, ob uns der Key dieser sessionId fehlt.
               // eslint-disable-next-line no-console
-              console.debug("[vaultchat:megolm] decrypt_miss", {
+              console.log("[vaultchat:megolm] decrypt_miss", {
                 groupId: gid.slice(0, 8),
                 env: parseMegolmEnvelope(ct),
               });
