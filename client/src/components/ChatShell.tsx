@@ -424,6 +424,10 @@ export function ChatShell({
 
   useEffect(() => subscribeFolders(setFolders), []);
   const [unreadByPeer, setUnreadByPeer] = useState<Record<string, number>>({});
+  // Bumped whenever the in-memory DM store (rawDmRef) mutates, so derived
+  // memos (list preview, recency sort, starred peers) recompute even when a
+  // message lands in a chat that isn't currently open.
+  const [dmRev, setDmRev] = useState(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [groupEmojiOpen, setGroupEmojiOpen] = useState(false);
   const [groupDragOver, setGroupDragOver] = useState(false);
@@ -1460,6 +1464,7 @@ export function ChatShell({
           ...(ttl ? { expiresAt: at + ttl } : {}),
         });
         rawDmRef.current.set(toUser.id, arr);
+        setDmRev((x) => x + 1);
         if (peerRef.current?.id === toUser.id) rebuildDm(toUser.id);
         // Sending a real message to someone implies accepting them — keep them
         // out of the requests area. Receipts/typing (suppressLocal) don't count.
@@ -2050,6 +2055,7 @@ export function ChatShell({
               ...(ttl ? { expiresAt: createdAt + ttl } : {}),
             });
             rawDmRef.current.set(peerUser.id, arr);
+            setDmRev((x) => x + 1);
             if (peerRef.current?.id === peerUser.id) {
               rebuildDm(peerUser.id);
               // Seen live in the open chat: advance the read marker past this
@@ -3463,7 +3469,7 @@ export function ChatShell({
       out.set(pid, { text, at: last.at, fromMe: last.fromMe });
     }
     return out;
-  }, [messages.length, users.length, peer?.id]);
+  }, [messages.length, users.length, peer?.id, dmRev]);
 
   const fmtListTime = useCallback((at?: number) => {
     if (!at) return "";
@@ -3528,7 +3534,7 @@ export function ChatShell({
       }
     }
     return out;
-  }, [starredCids, messages.length, users.length]);
+  }, [starredCids, messages.length, users.length, dmRev]);
 
   const groupsWithStars = useMemo(() => {
     const out = new Set<string>();
