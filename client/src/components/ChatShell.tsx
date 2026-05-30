@@ -9,6 +9,7 @@ import {
   isMegolmGroupCiphertext,
   megolmDecryptGroup,
   megolmEncryptGroup,
+  parseMegolmEnvelope,
   rotateForMemberRemoval,
 } from "../lib/megolmSession";
 import { getWsUrl } from "../lib/wsUrl";
@@ -1148,6 +1149,11 @@ export function ChatShell({
   // Session-Key schon via Olm-1:1 verschickt? Bei Rotation wird der Eintrag
   // gelöscht (membership-add/remove/leave) und neu verteilt.
   const megolmDistributedRef = useRef<Map<string, Set<string>>>(new Map());
+  // Selbstheilung (Matrix-Style): Drosseln für Megolm-Key-Requests.
+  // keyRequestSentRef: `${groupId}:${sessionId}` → ts der letzten Anfrage WIR→Absender.
+  // keyRequestServedRef: `${requesterId}:${groupId}` → ts der letzten Antwort WIR→Anfragender.
+  const keyRequestSentRef = useRef<Map<string, number>>(new Map());
+  const keyRequestServedRef = useRef<Map<string, number>>(new Map());
 
   // Purge expired messages continuously so they disappear "live".
   useEffect(() => {
@@ -1676,6 +1682,52 @@ export function ChatShell({
     [rebuildGroup, session.user.id, sendDmWire]
   );
 
+  /**
+   * Selbstheilung bei fehlendem Gruppen-Schlüssel (Matrix/Signal-Prinzip):
+   * Können wir einen Gruppen-Cipher nicht entschlüsseln, weil uns die
+   * Megolm-Inbound-Session des Absenders fehlt, fragen wir den Schlüssel
+   * GEZIELT beim Absender an (der VCG6-Header trägt senderUuid+sessionId im
+   * Klartext). Der Absender antwortet — nur wenn wir echtes Mitglied sind —
+   * mit einem megolm_session_key-Frame; die gepufferten Cipher werden dann
+   * automatisch erneut entschlüsselt. Gedrosselt (20s je Session), damit kein
+   * Request-Sturm entsteht.
+   */
+  const requestMissingGroupKey = useCallback(
+    async (groupId: string, cipherB64: string) => {
+      const env = parseMegolmEnvelope(cipherB64);
+      if (!env) return;
+      const { senderUuid, sessionId } = env;
+      if (!senderUuid || senderUuid === session.user.id) return;
+      if (blockedPeersRef.current.has(senderUuid)) return;
+      const throttleKey = `${groupId}:${sessionId}`;
+      const now = Date.now();
+      if (now - (keyRequestSentRef.current.get(throttleKey) ?? 0) < 20_000) {
+        return;
+      }
+      keyRequestSentRef.current.set(throttleKey, now);
+      let sender = usersRef.current.find((u) => u.id === senderUuid) ?? null;
+      if (!sender) {
+        try {
+          const { users } = await api.listUsers(session.token, [senderUuid]);
+          sender = users[0] ?? null;
+        } catch {
+          return;
+        }
+      }
+      if (!sender) return;
+      const reqPayload: PlainPayload = {
+        v: 2,
+        cid: newCid(),
+        kind: "megolm_key_request",
+        groupId,
+        megolmSessionId: sessionId,
+        senderUserId: session.user.id,
+      };
+      await sendDmWire(sender, reqPayload, true).catch(() => {});
+    },
+    [session.user.id, session.token, sendDmWire]
+  );
+
   /** Flush pending envelopes from outbox. Called on reconnect + periodically. */
   const flushOutbox = useCallback(async () => {
     const ws = wsRef.current;
@@ -2090,6 +2142,47 @@ export function ChatShell({
             if (plain.kind === "group_key") {
               return;
             }
+            // Selbstheilung (Antwort-Seite): ein Mitglied bittet um UNSEREN
+            // Megolm-Session-Key, weil es einen unserer Gruppen-Cipher nicht
+            // entschlüsseln konnte. SICHERHEIT: nur antworten, wenn der
+            // Anfragende ECHTES aktuelles Mitglied der Gruppe ist (sonst
+            // Key-Leak an Nicht-Mitglieder). Gedrosselt (10s je Anfragender).
+            if (
+              plain.kind === "megolm_key_request" &&
+              plain.groupId &&
+              plain.megolmSessionId
+            ) {
+              const requesterId = dec.senderUserId;
+              const grp = groupsRef.current.find((x) => x.id === plain.groupId);
+              if (!grp || !grp.memberIds.includes(requesterId)) return;
+              const sk = `${requesterId}:${plain.groupId}`;
+              const now = Date.now();
+              if (now - (keyRequestServedRef.current.get(sk) ?? 0) < 10_000) {
+                return;
+              }
+              keyRequestServedRef.current.set(sk, now);
+              try {
+                const dist = await buildSessionKeyDistribution(plain.groupId);
+                const keyPayload: PlainPayload = {
+                  v: 2,
+                  cid: newCid(),
+                  kind: "megolm_session_key",
+                  groupId: plain.groupId,
+                  megolmSessionId: dist.sessionId,
+                  megolmSessionKey: dist.sessionKey,
+                  senderUserId: session.user.id,
+                };
+                await sendDmWire(peerUser, keyPayload, true).catch(() => {});
+                const set =
+                  megolmDistributedRef.current.get(plain.groupId) ??
+                  new Set<string>();
+                set.add(requesterId);
+                megolmDistributedRef.current.set(plain.groupId, set);
+              } catch {
+                /* Olm/Megolm nicht verfügbar — best effort */
+              }
+              return;
+            }
 
             const ttl = plain.ttlMs ?? 0;
             await idbPutDm({
@@ -2214,6 +2307,9 @@ export function ChatShell({
                 buf.push({ id, ciphertext: ct, createdAt: Number(data.createdAt) || Date.now() });
                 pendingGroupCipherRef.current.set(gid, buf);
               }
+              // Selbstheilung: Schlüssel gezielt beim Absender anfragen, statt
+              // nur passiv zu puffern und auf den nächsten Send zu hoffen.
+              void requestMissingGroupKey(gid, ct);
               return;
             }
             if (

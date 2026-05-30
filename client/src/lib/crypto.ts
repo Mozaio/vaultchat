@@ -111,6 +111,7 @@ export type PlainPayload = {
     | "voice"
     | "group_key"
     | "megolm_session_key"
+    | "megolm_key_request"
     | "reaction"
     | "edit"
     | "delete"

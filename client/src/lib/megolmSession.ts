@@ -110,6 +110,36 @@ export async function megolmEncryptGroup(
   }
 }
 
+/**
+ * Liest NUR den unverschlüsselten VCG6-Header (senderUuid + sessionId) eines
+ * Group-Ciphers — OHNE eine Inbound-Session zu brauchen. Wird genutzt, um bei
+ * fehlendem Schlüssel gezielt einen Key-Request an den Absender zu schicken
+ * (Matrix/Signal-Style Selbstheilung). Gibt null zurück, wenn kein VCG6-Frame.
+ */
+export function parseMegolmEnvelope(
+  cipherB64: string
+): { senderUuid: string; sessionId: string } | null {
+  try {
+    const wire = uint8FromBase64(cipherB64);
+    for (let i = 0; i < VCG6_MAGIC.length; i++) {
+      if (wire[i] !== VCG6_MAGIC[i]) return null;
+    }
+    let p = VCG6_MAGIC.length;
+    const sessionIdLen = wire[p++];
+    if (sessionIdLen === undefined || p + sessionIdLen + 16 > wire.length) {
+      return null;
+    }
+    const sessionId = new TextDecoder().decode(
+      wire.subarray(p, p + sessionIdLen)
+    );
+    p += sessionIdLen;
+    const senderUuid = bytesToUuid(wire.subarray(p, p + 16));
+    return { senderUuid, sessionId };
+  } catch {
+    return null;
+  }
+}
+
 export async function megolmDecryptGroup(
   groupId: string,
   cipherB64: string
