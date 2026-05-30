@@ -155,9 +155,12 @@ body,
 
   --bubble-me: linear-gradient(165deg, #e8865f, #c75b39);
   --bubble-me-text: #ffffff;
-  --bubble-peer: #241a13;
+  /* Empfangene Bubble deutlich heller als --bg-chat (#1a130e), damit sie sich
+     klar abhebt (wie bei Signal/Element) statt im Hintergrund zu verschwimmen —
+     bleibt aber im warmen Braunton ("Warm Cozy"). */
+  --bubble-peer: #33271b;
   --bubble-peer-text: #f1e7dd;
-  --bubble-peer-border: #322519;
+  --bubble-peer-border: #473521;
   --bubble-peer-shadow: none;
 
   /* theme-aware redesign hooks (consumed by the v5 block) */
