@@ -2186,14 +2186,25 @@ export function ChatShell({
               const pending = pendingGroupCipherRef.current.get(plain.groupId);
               if (pending && pending.length > 0) {
                 pendingGroupCipherRef.current.delete(plain.groupId);
+                // Cipher, deren Key WEITERHIN fehlt (z.B. anderer Sender oder
+                // eine andere Session-Generation als der gerade eingelöste Key),
+                // dürfen NICHT verworfen werden — sie werden re-gepuffert und ihr
+                // passender Key gezielt nachgefordert. Sonst gehen genau die
+                // frühen Nachrichten verloren, deren Key zeitlich nach dem Cipher
+                // ankommt (Ursache des "erste Nachricht fehlt"-Bugs nach Rotation
+                // / bei mehreren parallelen Sendern).
+                const stillPending: Array<{
+                  id: string;
+                  ciphertext: string;
+                  createdAt: number;
+                }> = [];
                 for (const buf of pending) {
                   if (!isMegolmGroupCiphertext(buf.ciphertext)) {
                     // Nicht-Megolm bleiben dem alten Pfad überlassen.
-                    const re = pendingGroupCipherRef.current.get(plain.groupId) ?? [];
-                    re.push(buf);
-                    pendingGroupCipherRef.current.set(plain.groupId, re);
+                    stillPending.push(buf);
                     continue;
                   }
+                  if (seen.current.has(buf.id)) continue; // schon angezeigt
                   try {
                     const r = await megolmDecryptGroup(plain.groupId, buf.ciphertext);
                     const retried = JSON.parse(r.plaintext) as PlainPayload;
@@ -2228,6 +2239,7 @@ export function ChatShell({
                         : {}),
                     });
                     const arr = rawGroupRef.current.get(plain.groupId) ?? [];
+                    if (arr.some((x) => x.id === buf.id)) continue;
                     arr.push({
                       id: buf.id,
                       fromMe: false,
@@ -2244,7 +2256,29 @@ export function ChatShell({
                       rebuildGroup(plain.groupId);
                     }
                   } catch {
-                    /* Frame bleibt verworfen */
+                    // Key dieser sessionId fehlt noch → NICHT verwerfen.
+                    stillPending.push(buf);
+                  }
+                }
+                if (stillPending.length > 0) {
+                  // Re-puffern (Cap beibehalten) — ggf. mit Ciphern mischen, die
+                  // während der awaits oben frisch eingetroffen sind.
+                  const merged =
+                    pendingGroupCipherRef.current.get(plain.groupId) ?? [];
+                  for (const b of stillPending) {
+                    if (merged.length >= 256) break;
+                    if (!merged.some((x) => x.id === b.id)) merged.push(b);
+                  }
+                  pendingGroupCipherRef.current.set(plain.groupId, merged);
+                  // Für jede noch fehlende Session genau EINEN gezielten
+                  // Key-Request feuern (selbst gedrosselt, 20s je Session).
+                  const askedSessions = new Set<string>();
+                  for (const b of stillPending) {
+                    const env = parseMegolmEnvelope(b.ciphertext);
+                    if (env && !askedSessions.has(env.sessionId)) {
+                      askedSessions.add(env.sessionId);
+                      void requestMissingGroupKey(plain.groupId, b.ciphertext);
+                    }
                   }
                 }
               }
@@ -2553,6 +2587,23 @@ export function ChatShell({
     };
     const interval = setInterval(() => {
       void flushOutbox();
+      // Re-Heal: für Gruppen mit weiterhin unentschlüsselbaren Ciphern den
+      // fehlenden Megolm-Key erneut beim Absender anfragen. Deckt den Fall ab,
+      // dass sowohl die initiale Distribution als auch der erste Self-Heal-
+      // Request scheiterten (z.B. Absender war offline) und der Absender nicht
+      // erneut sendet — ohne diesen Tick bliebe die frühe Nachricht für immer
+      // im Puffer. `requestMissingGroupKey` ist intern auf 20s/Session
+      // gedrosselt, daher kein Request-Sturm.
+      for (const [gid, bufs] of pendingGroupCipherRef.current) {
+        const asked = new Set<string>();
+        for (const b of bufs) {
+          const env = parseMegolmEnvelope(b.ciphertext);
+          if (env && !asked.has(env.sessionId)) {
+            asked.add(env.sessionId);
+            void requestMissingGroupKey(gid, b.ciphertext);
+          }
+        }
+      }
     }, 15_000);
 
     // Fast-Reconnect: wenn der Tab wieder sichtbar wird oder das Netz
