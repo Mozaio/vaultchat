@@ -149,8 +149,16 @@ export function getPreKeyBundle(userId: string): {
   let otp: { keyId: number; publicKey: string } | null = null;
   for (const [keyId, publicKey] of b.oneTimePreKeys) {
     otp = { keyId, publicKey };
-    b.oneTimePreKeys.delete(keyId);
-    persistBundles();
+    // DoS-Schutz (#15): die LETZTE OTK NICHT löschen. Sonst kann ein Angreifer
+    // durch wiederholte /api/keys-Abrufe den Pool leeren und so neue Sessions
+    // mit dem Opfer blockieren (Olm braucht eine OTK fürs Outbound-Handshake).
+    // Die letzte OTK als wiederverwendbarer "Last-Resort"-Key zu behalten ist
+    // der übliche X3DH/Olm-Kompromiss (nur minimal reduzierte Forward Secrecy,
+    // und nur solange der Pool erschöpft ist — der Client füllt proaktiv nach).
+    if (b.oneTimePreKeys.size > 1) {
+      b.oneTimePreKeys.delete(keyId);
+      persistBundles();
+    }
     break;
   }
   // Olm-OTK separat verbrauchen — gleicher Pattern, eigene Map.
@@ -164,8 +172,11 @@ export function getPreKeyBundle(userId: string): {
     let olmOtk: { keyId: string; publicKey: string } | null = null;
     for (const [keyId, publicKey] of b.olm.oneTimeKeys) {
       olmOtk = { keyId, publicKey };
-      b.olm.oneTimeKeys.delete(keyId);
-      persistBundles();
+      // DoS-Schutz (#15): letzte Olm-OTK als Last-Resort behalten (s. oben).
+      if (b.olm.oneTimeKeys.size > 1) {
+        b.olm.oneTimeKeys.delete(keyId);
+        persistBundles();
+      }
       break;
     }
     olmOut = {
