@@ -97,10 +97,16 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
 - Security shipped since May: `#15` OTK-exhaustion mitigation, `#25` E2EE
   group names/descriptions/avatars, `#26` sealed-sender for groups (opt-in
   toggle in settings), sender-key rotation on every membership change,
-  mailbox per-user byte quota (OOM-DoS guard, June 2026). Still open:
-  `#22` versioned KDF for at-rest/backup, group **member list** is plaintext
-  on the server (metadata gap — zkgroup-style fix speced in `ZKGROUP_SPEC.md`),
-  JWT has no refresh/revocation. See `SECURITY_ROADMAP.md`, `THREAT_MODEL.md`.
+  mailbox per-user byte quota (OOM-DoS guard), login timing-leak fix
+  (dummy Argon2 verify against username enumeration), `#22` versioned KDF
+  params in identity wrap + backup (clamped, backwards-compatible),
+  JWT **sliding sessions** (`POST /api/token/refresh`, s0-claim caps absolute
+  age at 30d; client refreshes when token >6h old), safety-number-change
+  system notice in DMs (Signal pattern), WS pre-auth frame cap. Still open:
+  group **member list** is plaintext on the server (metadata gap —
+  zkgroup-style fix speced in `ZKGROUP_SPEC.md`, hard review gate), token
+  revocation (blacklist) — refresh exists, revoke does not. See
+  `SECURITY_ROADMAP.md`, `THREAT_MODEL.md`.
 - UX next (from June 2026 review): swipe actions / long-press context menu on
   chat rows (mobile), warm-dark pass over remaining legacy CSS blocks,
   unarchive-on-new-message option, contact QR.
