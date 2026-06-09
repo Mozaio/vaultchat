@@ -308,8 +308,12 @@ export function MessageBubble({
 
   // View-once countdown: once revealed, count down VIEW_ONCE_REVEAL_MS and
   // then trigger a local-only delete. Only runs for non-sender (recipient).
+  // msg.deleted-Guard: wird die Nachricht während des Countdowns über das
+  // Menü gelöscht, ändert sich `msg` → Effekt läuft neu an und würde ohne
+  // den Guard einen zweiten Countdown starten und onLocalDelete doppelt
+  // feuern.
   useEffect(() => {
-    if (!revealed || msg.fromMe || !msg.plain.viewOnce) return;
+    if (!revealed || msg.fromMe || !msg.plain.viewOnce || msg.deleted) return;
     const start = Date.now();
     setViewOnceLeftMs(VIEW_ONCE_REVEAL_MS);
     const tick = window.setInterval(() => {
