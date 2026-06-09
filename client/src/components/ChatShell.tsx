@@ -338,6 +338,68 @@ export function ChatShell({
       return next;
     });
   }, []);
+  // Kontextmenü auf Chat-Zeilen (Rechtsklick Desktop, Long-Press Android —
+  // beides feuert "contextmenu"): die wichtigsten Listen-Aktionen ohne den
+  // Chat öffnen zu müssen (Discord/Telegram-Pattern).
+  const [rowMenu, setRowMenu] = useState<{
+    kind: "dm" | "group";
+    id: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const openRowMenu = useCallback(
+    (
+      kind: "dm" | "group",
+      id: string,
+      e: { preventDefault(): void; clientX: number; clientY: number }
+    ) => {
+      e.preventDefault();
+      const menuW = 240;
+      const menuH = kind === "dm" ? 300 : 130;
+      setRowMenu({
+        kind,
+        id,
+        x: Math.max(8, Math.min(e.clientX, window.innerWidth - menuW - 8)),
+        y: Math.max(8, Math.min(e.clientY, window.innerHeight - menuH - 8)),
+      });
+    },
+    []
+  );
+  const toggleMutePeer = useCallback((id: string) => {
+    setMutedPeers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveStringSet("vaultchat.muted.peers", next);
+      return next;
+    });
+  }, []);
+  const toggleMuteGroup = useCallback((id: string) => {
+    setMutedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveStringSet("vaultchat.muted.groups", next);
+      return next;
+    });
+  }, []);
+  const toggleFavoritePeer = useCallback((id: string) => {
+    setFavoritePeers((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveStringSet("vaultchat.favorites.peers", next);
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    if (!rowMenu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setRowMenu(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [rowMenu]);
   // Message requests (Signal-style gate): a peer is "accepted" once the user
   // has engaged (added them, sent them a message, or explicitly accepted a
   // request). The first DM from a not-yet-accepted, not-blocked sender lands
@@ -4364,6 +4426,7 @@ export function ChatShell({
           isRequest={isReq}
           blurAvatar={isReq}
           onTogglePin={() => togglePinPeer(u.id)}
+          onContextMenu={(e) => openRowMenu("dm", u.id, e)}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
@@ -4388,6 +4451,7 @@ export function ChatShell({
     onlinePeers,
     requestPeerIds,
     togglePinPeer,
+    openRowMenu,
     fmtListTime,
     draftsVersion,
   ]);
@@ -4412,6 +4476,7 @@ export function ChatShell({
               setPeer(null);
               setInfoOpen(false);
             }}
+            onContextMenu={(e) => openRowMenu("group", g.id, e)}
             className={`contact-item w-full !mx-0 ${
               group?.id === g.id && tab === "group"
                 ? "active"
@@ -4479,6 +4544,7 @@ export function ChatShell({
       lastGroupPreviewByGroup,
       unreadByGroup,
       mutedGroups,
+      openRowMenu,
       fmtListTime,
       draftsVersion,
     ]
@@ -4516,6 +4582,158 @@ export function ChatShell({
       {shortcutsHelpOpen && (
         <ShortcutsHelpModal onClose={() => setShortcutsHelpOpen(false)} />
       )}
+      {rowMenu &&
+        (() => {
+          const menuUser =
+            rowMenu.kind === "dm"
+              ? users.find((x) => x.id === rowMenu.id)
+              : undefined;
+          const menuGroup =
+            rowMenu.kind === "group"
+              ? groups.find((x) => x.id === rowMenu.id)
+              : undefined;
+          const closeRowMenu = () => setRowMenu(null);
+          return (
+            <div
+              className="row-menu-overlay"
+              onClick={closeRowMenu}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                closeRowMenu();
+              }}
+            >
+              <div
+                className="chat-menu row-context-menu"
+                style={{ left: rowMenu.x, top: rowMenu.y }}
+                onClick={(e) => e.stopPropagation()}
+                role="menu"
+              >
+                {menuUser && (
+                  <>
+                    <button
+                      type="button"
+                      className="chat-menu-item"
+                      onClick={() => {
+                        togglePinPeer(menuUser.id);
+                        closeRowMenu();
+                      }}
+                    >
+                      <IconPin size={16} />{" "}
+                      {pinnedPeers.has(menuUser.id)
+                        ? t("chat.unpinChat")
+                        : t("chat.pinChat")}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-menu-item"
+                      onClick={() => {
+                        toggleMutePeer(menuUser.id);
+                        closeRowMenu();
+                      }}
+                    >
+                      <IconVolumeMute size={16} />{" "}
+                      {mutedPeers.has(menuUser.id)
+                        ? t("chat.unmuteContact")
+                        : t("chat.muteContact")}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-menu-item"
+                      onClick={() => {
+                        toggleFavoritePeer(menuUser.id);
+                        closeRowMenu();
+                      }}
+                    >
+                      <IconStar size={16} />{" "}
+                      {favoritePeers.has(menuUser.id)
+                        ? t("chat.unfavorite")
+                        : t("chat.favorite")}
+                    </button>
+                    {menuUser.id !== session.user.id && (
+                      <button
+                        type="button"
+                        className="chat-menu-item"
+                        onClick={() => {
+                          markChatUnread(menuUser);
+                          closeRowMenu();
+                        }}
+                      >
+                        <IconBell size={16} /> {t("chat.markUnread")}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="chat-menu-item"
+                      onClick={() => {
+                        toggleArchiveChat(`dm:${menuUser.id}`);
+                        closeRowMenu();
+                      }}
+                    >
+                      <IconArchive size={16} />{" "}
+                      {archivedChats.has(`dm:${menuUser.id}`)
+                        ? t("chat.unarchive")
+                        : t("chat.archive")}
+                    </button>
+                    {menuUser.id !== session.user.id && (
+                      <button
+                        type="button"
+                        className="chat-menu-item danger"
+                        onClick={() => {
+                          if (!blockedPeers.has(menuUser.id)) {
+                            rememberBlockedName(menuUser.id, menuUser.username);
+                          }
+                          setBlockedPeers((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(menuUser.id)) next.delete(menuUser.id);
+                            else next.add(menuUser.id);
+                            saveStringSet("vaultchat.blocked.peers", next);
+                            return next;
+                          });
+                          closeRowMenu();
+                        }}
+                      >
+                        <IconBan size={16} />{" "}
+                        {blockedPeers.has(menuUser.id)
+                          ? t("chat.unblock")
+                          : t("chat.block")}
+                      </button>
+                    )}
+                  </>
+                )}
+                {menuGroup && (
+                  <>
+                    <button
+                      type="button"
+                      className="chat-menu-item"
+                      onClick={() => {
+                        toggleMuteGroup(menuGroup.id);
+                        closeRowMenu();
+                      }}
+                    >
+                      <IconVolumeMute size={16} />{" "}
+                      {mutedGroups.has(menuGroup.id)
+                        ? t("chat.unmuteContact")
+                        : t("chat.muteContact")}
+                    </button>
+                    <button
+                      type="button"
+                      className="chat-menu-item"
+                      onClick={() => {
+                        toggleArchiveChat(`group:${menuGroup.id}`);
+                        closeRowMenu();
+                      }}
+                    >
+                      <IconArchive size={16} />{" "}
+                      {archivedChats.has(`group:${menuGroup.id}`)
+                        ? t("chat.unarchive")
+                        : t("chat.archive")}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       {foldersManageOpen && (
         <FoldersManageModal
           folders={folders}

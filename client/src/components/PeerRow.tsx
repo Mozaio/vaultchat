@@ -20,6 +20,7 @@ export function PeerRow({
   isRequest,
   blurAvatar,
   onTogglePin,
+  onContextMenu,
   selected,
   onSelect,
 }: {
@@ -40,6 +41,12 @@ export function PeerRow({
   /** Pixelate/blur the avatar (unknown, not-yet-accepted sender). */
   blurAvatar?: boolean;
   onTogglePin?: () => void;
+  /** Rechtsklick / Long-Press auf die Zeile (Kontextmenü). */
+  onContextMenu?: (e: {
+    preventDefault(): void;
+    clientX: number;
+    clientY: number;
+  }) => void;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -49,7 +56,7 @@ export function PeerRow({
     void getPin(u.id).then(setPin);
   }, [u.id, u.publicKey]);
   return (
-    <div className="peer-row-wrap">
+    <div className="peer-row-wrap" onContextMenu={onContextMenu}>
       <button
         type="button"
         onClick={onSelect}

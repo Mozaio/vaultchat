@@ -8155,4 +8155,25 @@ html.is-tauri #root > div:not(.titlebar) {
   font-weight: 640;
 }
 
+/* Kontextmenü auf Chat-Zeilen (Rechtsklick Desktop / Long-Press Android).
+   Überschreibt das header-verankerte .chat-menu (absolute, right:0) mit
+   fixer Cursor-Position; left/top kommen geclampt per Inline-Style. */
+.row-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+}
+.row-context-menu {
+  position: fixed;
+  right: auto;
+  top: auto;
+  width: 240px;
+  animation: reaction-pop-in 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-context-menu {
+    animation: none;
+  }
+}
+
 /* End VAULTCHAT v8 */
