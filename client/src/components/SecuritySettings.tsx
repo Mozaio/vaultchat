@@ -110,13 +110,26 @@ function readNotifyEnabled(): boolean {
   }
 }
 
-function readNotifyPreview(): boolean {
+/** Signal-Style: Was die System-Benachrichtigung preisgibt.
+ *  Legacy-Mapping: kein Wert = "full", "off" (alter Toggle) = "name". */
+export type NotifyPreviewMode = "full" | "name" | "none";
+
+function readNotifyPreviewMode(): NotifyPreviewMode {
   try {
-    return localStorage.getItem(NOTIFY_PREVIEW_STORAGE_KEY) !== "off";
+    const stored = localStorage.getItem(NOTIFY_PREVIEW_STORAGE_KEY);
+    if (stored === "off") return "name";
+    if (stored === "none") return "none";
   } catch {
-    return true;
+    /* ignore */
   }
+  return "full";
 }
+
+const NOTIFY_PREVIEW_OPTIONS: { mode: NotifyPreviewMode; labelKey: string }[] = [
+  { mode: "full", labelKey: "settings.notifyPreview.full" },
+  { mode: "name", labelKey: "settings.notifyPreview.name" },
+  { mode: "none", labelKey: "settings.notifyPreview.none" },
+];
 
 /** Sealed-Sender für Gruppen (#26): Absender vor dem Server verbergen.
  *  Default aus (Opt-in). */
@@ -186,7 +199,9 @@ export function SecuritySettings({
   const [defaultTtl, setDefaultTtl] = useState<number>(() => loadDefaultTtl());
   const [replayStats, setReplayStats] = useState(getReplayStats());
   const [desktopNotify, setDesktopNotify] = useState(readNotifyEnabled);
-  const [notifyPreview, setNotifyPreview] = useState(readNotifyPreview);
+  const [notifyPreviewMode, setNotifyPreviewMode] = useState<NotifyPreviewMode>(
+    readNotifyPreviewMode
+  );
   const [sealedGroup, setSealedGroup] = useState(readSealedGroup);
   const [notifyPermission, setNotifyPermission] = useState<
     NotificationPermission | "unsupported"
@@ -243,11 +258,13 @@ export function SecuritySettings({
     }
   };
 
-  const setNotifyPreviewStored = (enabled: boolean) => {
-    setNotifyPreview(enabled);
+  const setNotifyPreviewModeStored = (mode: NotifyPreviewMode) => {
+    setNotifyPreviewMode(mode);
     try {
-      if (enabled) localStorage.removeItem(NOTIFY_PREVIEW_STORAGE_KEY);
-      else localStorage.setItem(NOTIFY_PREVIEW_STORAGE_KEY, "off");
+      if (mode === "full") localStorage.removeItem(NOTIFY_PREVIEW_STORAGE_KEY);
+      else if (mode === "name")
+        localStorage.setItem(NOTIFY_PREVIEW_STORAGE_KEY, "off");
+      else localStorage.setItem(NOTIFY_PREVIEW_STORAGE_KEY, "none");
     } catch {
       /* ignore */
     }
@@ -917,29 +934,41 @@ export function SecuritySettings({
                         </span>
                       </span>
                     </label>
-                    <label
-                      className="mt-3 flex cursor-pointer items-start gap-3 text-sm"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={notifyPreview}
-                        onChange={(e) =>
-                          setNotifyPreviewStored(e.target.checked)
-                        }
-                        disabled={!desktopNotify}
-                        className="mt-1 disabled:opacity-40"
-                      />
-                      <span>
+                    <div className="mt-3">
+                      <p
+                        className="text-sm"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
                         {t("settings.notifyPreview")}
-                        <span
-                          className="mt-0.5 block text-xs"
-                          style={{ color: "var(--text-muted)" }}
-                        >
-                          {t("settings.notifyPreviewDesc")}
-                        </span>
-                      </span>
-                    </label>
+                      </p>
+                      <p
+                        className="mt-0.5 mb-2 text-xs"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {t("settings.notifyPreviewModeDesc")}
+                      </p>
+                      <div className="space-y-1.5">
+                        {NOTIFY_PREVIEW_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.mode}
+                            className="flex cursor-pointer items-center gap-3 text-sm"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            <input
+                              type="radio"
+                              name="notify-preview-mode"
+                              checked={notifyPreviewMode === opt.mode}
+                              onChange={() =>
+                                setNotifyPreviewModeStored(opt.mode)
+                              }
+                              disabled={!desktopNotify}
+                              className="disabled:opacity-40"
+                            />
+                            <span>{t(opt.labelKey)}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 )}
               </div>

@@ -678,25 +678,34 @@ export function ChatShell({
     } catch {
       /* ignore */
     }
-    let showPreview = true;
+    // Signal-Style 3 Stufen: "full" (Name+Text) / "name" (legacy "off",
+    // nur Absender) / "none" (weder Name noch Inhalt auf dem Lockscreen).
+    let previewMode: "full" | "name" | "none" = "full";
     try {
-      showPreview = localStorage.getItem(NOTIFY_PREVIEW_STORAGE_KEY) !== "off";
+      const stored = localStorage.getItem(NOTIFY_PREVIEW_STORAGE_KEY);
+      if (stored === "off") previewMode = "name";
+      else if (stored === "none") previewMode = "none";
     } catch {
       /* ignore */
     }
-    const displayBody = showPreview ? body : t("chat.newMessageNotif");
+    const displayTitle = previewMode === "none" ? "Umbra" : title;
+    const displayBody =
+      previewMode === "full" ? body : t("chat.newMessageNotif");
     // Only notify when the window isn't focused (minimized / in tray / bg tab).
     if (document.visibilityState === "visible") return;
     // Desktop app: WebView2 doesn't reliably expose Web Notifications, so go
     // through the native OS notification channel.
     if (isTauri()) {
-      void sendDesktopNotification(title, displayBody);
+      void sendDesktopNotification(displayTitle, displayBody);
       void flashDesktopWindow();
       return;
     }
     if (!("Notification" in window)) return;
     if (Notification.permission === "granted") {
-      new Notification(title, { body: displayBody, tag: "vaultchat-message" });
+      new Notification(displayTitle, {
+        body: displayBody,
+        tag: "vaultchat-message",
+      });
       return;
     }
     if (Notification.permission === "default") {
