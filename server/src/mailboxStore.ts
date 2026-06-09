@@ -25,6 +25,28 @@ const groupByRecipient = new Map<string, MailboxGroup[]>();
 const DEFAULT_TTL_MS = Number(process.env.VAULTCHAT_MAILBOX_TTL_MS ?? 7 * 24 * 60 * 60 * 1000);
 const MAX_PER_RECIPIENT = Number(process.env.VAULTCHAT_MAILBOX_MAX_PER_USER ?? 500);
 
+/**
+ * Byte-Budget pro Empfänger UND Liste (DM/Group getrennt). Ohne dieses Cap
+ * könnte ein Angreifer 500 × 16-MB-Frames an einen Offline-User queuen und
+ * den RAM-only-Store (Render Free: ~512 MB) per OOM abschießen. Base64-
+ * Stringlänge ≈ Payload-Bytes — als konservative Näherung ausreichend.
+ */
+const MAX_BYTES_PER_RECIPIENT = Number(
+  process.env.VAULTCHAT_MAILBOX_PER_USER_BYTES ?? 48 * 1024 * 1024
+);
+
+/** FIFO-Trim auf Count- und Byte-Budget; gibt die Liste zurück. */
+function trimToBudget<T extends { envelope?: string; ciphertext?: string }>(list: T[]): T[] {
+  const sizeOf = (x: T) => (x.envelope ?? x.ciphertext ?? "").length;
+  let bytes = 0;
+  for (const x of list) bytes += sizeOf(x);
+  while (list.length > 0 && (list.length > MAX_PER_RECIPIENT || bytes > MAX_BYTES_PER_RECIPIENT)) {
+    const dropped = list.shift();
+    if (dropped) bytes -= sizeOf(dropped);
+  }
+  return list;
+}
+
 export function enqueueMailboxDm(input: {
   toUserId: string;
   envelope: string;
@@ -48,7 +70,7 @@ export function enqueueMailboxDm(input: {
     expiresAt: createdAt + DEFAULT_TTL_MS,
   };
   list.push(item);
-  while (list.length > MAX_PER_RECIPIENT) list.shift();
+  trimToBudget(list);
   dmByRecipient.set(input.toUserId, list);
   return item;
 }
@@ -108,7 +130,7 @@ export function enqueueMailboxGroup(input: {
     (x) => x.expiresAt > Date.now()
   );
   list.push(item);
-  while (list.length > MAX_PER_RECIPIENT) list.shift();
+  trimToBudget(list);
   groupByRecipient.set(input.toUserId, list);
   return item;
 }
@@ -140,17 +162,30 @@ export function removeMailboxGroup(userId: string, id: string): void {
 export function getMailboxStats() {
   const now = Date.now();
   let queued = 0;
+  let queuedBytes = 0;
   for (const list of dmByRecipient.values()) {
-    queued += list.filter((item) => item.expiresAt > now).length;
+    for (const item of list) {
+      if (item.expiresAt > now) {
+        queued += 1;
+        queuedBytes += item.envelope.length;
+      }
+    }
   }
   for (const list of groupByRecipient.values()) {
-    queued += list.filter((item) => item.expiresAt > now).length;
+    for (const item of list) {
+      if (item.expiresAt > now) {
+        queued += 1;
+        queuedBytes += item.ciphertext.length;
+      }
+    }
   }
   return {
     recipients: new Set([...dmByRecipient.keys(), ...groupByRecipient.keys()]).size,
     queued,
+    queuedBytes,
     ttlMs: DEFAULT_TTL_MS,
     maxPerRecipient: MAX_PER_RECIPIENT,
+    maxBytesPerRecipient: MAX_BYTES_PER_RECIPIENT,
   };
 }
 
