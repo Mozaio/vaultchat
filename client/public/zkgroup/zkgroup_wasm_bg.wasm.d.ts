@@ -3,6 +3,7 @@
 export const memory: WebAssembly.Memory;
 export const derive_group_identifier: (a: number, b: number) => [number, number, number, number];
 export const derive_group_public_params: (a: number, b: number) => [number, number, number, number];
+export const roundtrip_self_test: () => [number, number, number];
 export const self_test: () => [number, number, number];
 export const version: () => [number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;

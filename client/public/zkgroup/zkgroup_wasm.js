@@ -37,7 +37,22 @@ export function derive_group_public_params(master_key) {
 }
 
 /**
- * Selbsttest für den Browser: Determinismus + Nicht-Trivialität.
+ * VOLLER Mitgliedschafts-Proof im Browser: Issue → Receive → Present →
+ * Verify (inkl. Negativprüfungen) gegen die echte auditierte Crate.
+ * Beweist, dass das gesamte zkgroup-Protokoll im App-Bundle läuft —
+ * nicht nur die Schlüsselableitung.
+ * @returns {boolean}
+ */
+export function roundtrip_self_test() {
+    const ret = wasm.roundtrip_self_test();
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return ret[0] !== 0;
+}
+
+/**
+ * Leichter Determinismus-Check (GMK → Params).
  * @returns {boolean}
  */
 export function self_test() {

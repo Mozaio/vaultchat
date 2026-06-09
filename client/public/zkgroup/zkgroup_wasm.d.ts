@@ -14,7 +14,15 @@ export function derive_group_identifier(master_key: Uint8Array): Uint8Array;
 export function derive_group_public_params(master_key: Uint8Array): Uint8Array;
 
 /**
- * Selbsttest für den Browser: Determinismus + Nicht-Trivialität.
+ * VOLLER Mitgliedschafts-Proof im Browser: Issue → Receive → Present →
+ * Verify (inkl. Negativprüfungen) gegen die echte auditierte Crate.
+ * Beweist, dass das gesamte zkgroup-Protokoll im App-Bundle läuft —
+ * nicht nur die Schlüsselableitung.
+ */
+export function roundtrip_self_test(): boolean;
+
+/**
+ * Leichter Determinismus-Check (GMK → Params).
  */
 export function self_test(): boolean;
 
@@ -29,6 +37,7 @@ export interface InitOutput {
     readonly memory: WebAssembly.Memory;
     readonly derive_group_identifier: (a: number, b: number) => [number, number, number, number];
     readonly derive_group_public_params: (a: number, b: number) => [number, number, number, number];
+    readonly roundtrip_self_test: () => [number, number, number];
     readonly self_test: () => [number, number, number];
     readonly version: () => [number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
