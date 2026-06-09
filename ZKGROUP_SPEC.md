@@ -85,15 +85,38 @@ vectors.)
   cryptographer review** before going live.
 
 ## 8. Phased plan
+
+> **Decision 2026-06-10 ("Weg A"):** instead of re-implementing the KVAC
+> protocol in TypeScript (original P1 below), we **use Signal's audited
+> implementation directly**: `@signalapp/libsignal-client` (native, server)
+> + the `zkgroup` Rust crate compiled to WASM (browser client). This removes
+> the entire class of "wrong proof equation" risks — we never hand-write a
+> single proof. The external-review gate then applies to our *integration*
+> (params handling, redemption windows, replay) instead of the crypto core.
+
 - **P0 (done):** GMK foundation (`groupSecret.ts`), sealed-sender (#26, opt-in),
   this spec.
-- **P1:** add `@noble/curves`; implement KVAC issue/verify + presentation in
-  `zkgroup.ts`/`zkgroupVerify.ts` as pure modules with **known-answer tests vs
-  libsignal vectors** (CI must run them). NOT wired to any live path.
-- **P2:** external cryptographer review of P1 + this spec. Freeze.
-- **P3:** wire the membership proof into the sealed endpoint behind the
+- **A1 (done, 2026-06-10):** server foundation behind `VAULTCHAT_ZKGROUP=1`
+  (default OFF): `server/src/zkgroup.ts` — optional dependency
+  `@signalapp/libsignal-client@0.95.0`, ServerSecretParams bootstrap
+  (pin via `VAULTCHAT_ZKGROUP_SECRET_PARAMS`, else per-boot), auth-credential
+  issuance (`issueAuthCredentialWithPniZkc`, ACI=PNI=user UUID, day-aligned
+  redemption time), `GET /api/zkgroup/status` as load probe. **Not** a live
+  security boundary.
+- **A2 (started, 2026-06-10):** `wasm/zkgroup-wasm` + CI workflow
+  `zkgroup-wasm.yml` — builds the audited `zkgroup` crate (libsignal
+  v0.95.0, signal's curve25519-dalek fork patch replicated, toolchain
+  nightly-2026-03-23) to wasm32 with deterministic derivations only;
+  measures raw/gzip size. Iterates via CI, zero product impact.
+- **A3 (next):** client lib loads the WASM artifact (lazy, experimental
+  flag): derive GroupSecretParams from GMK, fetch credential, create
+  `AuthCredentialPresentation`; sealed endpoint verifies presentations
+  **in shadow mode** (log-only) before any enforcement.
+- **P2 (unchanged, before enforcement):** external review of the
+  *integration* + this spec. Freeze.
+- **P3:** enforce the membership proof on the sealed endpoint behind the
   experimental flag; dogfood.
-- **P4:** encrypted member storage; flip flag on by default after audit sign-off.
+- **P4:** encrypted member storage; flip flag on by default after sign-off.
 
 ## 9. Honest status line for users
 Until P2 sign-off: "Group **content** is Signal-level E2EE; the **sender** can be
