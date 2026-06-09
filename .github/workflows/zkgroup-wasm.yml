@@ -35,6 +35,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Schreibrecht NUR für den Vendor-Commit-back (client/public/zkgroup/).
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -56,7 +59,7 @@ jobs:
           RUSTFLAGS: --cfg getrandom_backend="wasm_js"
         run: wasm-pack build --release --target web
 
-      - name: Size report (entscheidet über A3)
+      - name: Size report
         run: |
           ls -la wasm/zkgroup-wasm/pkg/
           echo "---- WASM-Groesse (roh) ----"
@@ -71,3 +74,27 @@ jobs:
           name: zkgroup-wasm-pkg
           path: wasm/zkgroup-wasm/pkg/
           retention-days: 30
+
+      # A3-Teil-2: das vorgebaute WASM in den Client vendoren, damit Renders
+      # reiner Vite-Build (kein Rust) es einbinden kann. Commit-back berührt
+      # NUR client/public/zkgroup/** — das ist NICHT in den Trigger-paths
+      # oben, daher kein Re-Trigger; [skip ci] sichert zusätzlich ab.
+      - name: Vendor prebuilt WASM into client (commit back)
+        if: github.event_name != 'pull_request'
+        run: |
+          DEST=client/public/zkgroup
+          mkdir -p "$DEST"
+          cp wasm/zkgroup-wasm/pkg/zkgroup_wasm.js "$DEST/"
+          cp wasm/zkgroup-wasm/pkg/zkgroup_wasm_bg.wasm "$DEST/"
+          cp wasm/zkgroup-wasm/pkg/zkgroup_wasm.d.ts "$DEST/" 2>/dev/null || true
+          cp wasm/zkgroup-wasm/pkg/zkgroup_wasm_bg.wasm.d.ts "$DEST/" 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # -f: pkg/ trägt eine .gitignore, die diese Dateien sonst blockt.
+          git add -f "$DEST"
+          if git diff --cached --quiet; then
+            echo "Kein WASM-Update — nichts zu vendoren."
+          else
+            git commit -m "chore(zkgroup): vendor prebuilt WASM into client [skip ci]"
+            git push origin HEAD:main
+          fi
