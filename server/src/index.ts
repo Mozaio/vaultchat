@@ -27,6 +27,12 @@ import {
   verifyPasswordOrDummy,
   verifyToken,
 } from "./auth.js";
+import {
+  currentRedemptionTime,
+  getZkgroupStatus,
+  initZkgroup,
+  issueAuthCredential,
+} from "./zkgroup.js";
 import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
 import {
   enqueueMailboxDm,
@@ -535,6 +541,49 @@ app.post("/api/token/refresh", apiLimiter, (req, res) => {
     ),
   });
 });
+
+// ---------------------------------------------------------------------------
+// zkgroup (Weg A, Phase A1 — experimentell, Flag VAULTCHAT_ZKGROUP=1).
+// Auditiertes libsignal-zkgroup: Status/Probe + Credential-Issuance.
+// Keine aktive Security-Boundary — das Sealed-Endpoint-Gate kommt erst,
+// wenn die Client-Seite (WASM) steht und das Review-Gate passiert ist.
+// ---------------------------------------------------------------------------
+app.get("/api/zkgroup/status", apiLimiter, (req, res) => {
+  const t = bearer(req);
+  if (!t || !verifyToken(t)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  res.json(getZkgroupStatus());
+});
+
+app.post("/api/zkgroup/credential", apiLimiter, (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const zk = getZkgroupStatus();
+  if (!zk.enabled || !zk.available) {
+    res.status(503).json({ error: "zkgroup_unavailable" });
+    return;
+  }
+  try {
+    const redemptionTime = currentRedemptionTime();
+    const credential = Buffer.from(
+      issueAuthCredential(jwtUser.userId, redemptionTime)
+    ).toString("base64");
+    res.json({ credential, redemptionTime, publicParams: zk.publicParams });
+  } catch (e) {
+    log.warn("zkgroup_issue_failed", {
+      reason: e instanceof Error ? e.message.slice(0, 120) : "unknown",
+    });
+    res.status(500).json({ error: "zkgroup_issue_failed" });
+  }
+});
+
+void initZkgroup();
 
 // ---------------------------------------------------------------------------
 // Blob-Store für Chunked-File-Upload (Foundation, kein Client-Adopter yet).
