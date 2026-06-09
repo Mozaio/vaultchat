@@ -4291,6 +4291,18 @@ const DICT: Record<string, Dict> = {
     pt: "⚠ Chave alterada", ru: "⚠ Ключ изменён", ar: "⚠ تغيّر المفتاح",
     zh: "⚠ 密钥已更改", hi: "⚠ कुंजी बदली",
   },
+  "trust.keyChangedNotice": {
+    en: "Your safety number with {name} has changed. Verify it before sending sensitive messages.",
+    de: "Deine Sicherheitsnummer mit {name} hat sich geändert. Überprüfe sie, bevor du sensible Nachrichten sendest.",
+    tr: "{name} ile güvenlik numaran değişti. Hassas mesajlar göndermeden önce doğrula.",
+    es: "Tu número de seguridad con {name} ha cambiado. Verifícalo antes de enviar mensajes sensibles.",
+    fr: "Votre numéro de sécurité avec {name} a changé. Vérifiez-le avant d'envoyer des messages sensibles.",
+    pt: "Seu número de segurança com {name} mudou. Verifique antes de enviar mensagens sensíveis.",
+    ru: "Ваш код безопасности с {name} изменился. Проверьте его, прежде чем отправлять конфиденциальные сообщения.",
+    ar: "تغيّر رقم الأمان الخاص بك مع {name}. تحقق منه قبل إرسال رسائل حساسة.",
+    zh: "你与 {name} 的安全码已更改。发送敏感消息前请先核验。",
+    hi: "{name} के साथ आपका सुरक्षा नंबर बदल गया है। संवेदनशील संदेश भेजने से पहले इसे सत्यापित करें।",
+  },
   "trust.new": {
     en: "New", de: "Neu", tr: "Yeni", es: "Nuevo", fr: "Nouveau",
     pt: "Novo", ru: "Новый", ar: "جديد", zh: "新", hi: "नया",

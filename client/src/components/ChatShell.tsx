@@ -863,7 +863,7 @@ export function ChatShell({
         (u) => u.username.toLowerCase() === username.toLowerCase() && u.id !== session.user.id
       );
       if (found) {
-        await observePeerKey(found.id, found.publicKey);
+        await observePeerKeyNoticed(found.id, found.publicKey, found.username);
         return found;
       }
       return null;
@@ -917,7 +917,7 @@ export function ChatShell({
     // Also observe peer keys for contacts
     for (const u of contacts) {
       try {
-        await observePeerKey(u.id, u.publicKey);
+        await observePeerKeyNoticed(u.id, u.publicKey, u.username);
       } catch {
         /* ignore */
       }
@@ -3402,6 +3402,52 @@ export function ChatShell({
     });
     rawDmRef.current.set(selfId, arr);
     if (peerRef.current?.id === selfId) rebuildDm(selfId);
+  }
+
+  /** Lokale System-Notiz in einen DM-Verlauf schreiben — geht NIE über die
+   *  Leitung. Verwendet für Sicherheits-Hinweise wie den Key-Wechsel. */
+  async function appendDmSystemNotice(peerId: string, body: string) {
+    const payload: PlainPayload = {
+      v: 2,
+      cid: newCid(),
+      kind: "system",
+      body,
+    };
+    const id = `sys:${newCid()}`;
+    const at = Date.now();
+    const stored = {
+      id,
+      peerId,
+      fromMe: false,
+      plainJson: JSON.stringify(payload),
+      at,
+    };
+    await idbPutDm(stored);
+    const arr = rawDmRef.current.get(peerId) ?? [];
+    arr.push({ id, fromMe: false, plainJson: stored.plainJson, at });
+    rawDmRef.current.set(peerId, arr);
+    if (peerRef.current?.id === peerId) rebuildDm(peerId);
+  }
+
+  /** observePeerKey + Signal-Pattern: beim Übergang zu "mismatch" landet
+   *  eine System-Notiz im Chat-Verlauf ("Sicherheitsnummer hat sich
+   *  geändert") — das Warn-Badge allein ist leicht zu übersehen. Die Notiz
+   *  feuert nur auf der Flanke (vorher != mismatch), nicht bei jedem
+   *  erneuten Beobachten desselben abweichenden Keys. */
+  async function observePeerKeyNoticed(
+    userId: string,
+    publicKey: string,
+    username: string
+  ) {
+    const before = await getPin(userId).catch(() => null);
+    const after = await observePeerKey(userId, publicKey);
+    if (after.state === "mismatch" && before?.state !== "mismatch") {
+      await appendDmSystemNotice(
+        userId,
+        t("trust.keyChangedNotice", { name: username })
+      ).catch(() => {});
+    }
+    return after;
   }
 
   function buildInviteUrl(token: string): string {
@@ -7885,7 +7931,7 @@ export function ChatShell({
           });
           // Adding a contact deliberately = accepting them.
           markAccepted(user.id);
-          void observePeerKey(user.id, user.publicKey);
+          void observePeerKeyNoticed(user.id, user.publicKey, user.username);
           setTab("dm");
           setPeer(user);
         }}
