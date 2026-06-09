@@ -82,6 +82,51 @@ fn run_membership_roundtrip() -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Client-Hälfte des Flows aus Byte-I/O: aus einem SERVER-ausgestellten
+/// Credential-Response + ServerPublicParams + GMK eine serialisierte
+/// Mitgliedschafts-Presentation erzeugen (receive → present). Die
+/// `randomness` kommt vom Aufrufer (JS: crypto.getRandomValues), damit
+/// dieser Pfad ohne getrandom-Syscall auskommt und deterministisch testbar
+/// ist. Geteilt zwischen wasm-Export und nativem Test.
+#[cfg(any(test, target_arch = "wasm32"))]
+fn build_presentation(
+    master_key: &[u8],
+    server_public_params: &[u8],
+    credential_response: &[u8],
+    uuid16: &[u8],
+    redemption_time: u64,
+    randomness: &[u8],
+) -> Result<Vec<u8>, &'static str> {
+    use libsignal_core::{Aci, Pni};
+    use zkgroup::auth::AuthCredentialWithPniZkcResponse;
+    use zkgroup::groups::{GroupMasterKey, GroupSecretParams};
+    use zkgroup::{ServerPublicParams, Timestamp};
+
+    let mk: [u8; GROUP_MASTER_KEY_LEN] = master_key
+        .try_into()
+        .map_err(|_| "master_key must be 32 bytes")?;
+    let uuid: [u8; 16] = uuid16.try_into().map_err(|_| "uuid must be 16 bytes")?;
+    let rand: [u8; 32] = randomness
+        .try_into()
+        .map_err(|_| "randomness must be 32 bytes")?;
+
+    let gsp = GroupSecretParams::derive_from_master_key(GroupMasterKey::new(mk));
+    let spp: ServerPublicParams =
+        zkgroup::deserialize(server_public_params).map_err(|_| "bad server public params")?;
+    let response: AuthCredentialWithPniZkcResponse =
+        zkgroup::deserialize(credential_response).map_err(|_| "bad credential response")?;
+
+    let aci = Aci::from_uuid_bytes(uuid);
+    let pni = Pni::from_uuid_bytes(uuid);
+    let ts = Timestamp::from_epoch_seconds(redemption_time);
+
+    let credential = response
+        .receive(aci, pni, ts, &spp)
+        .map_err(|_| "credential receive failed")?;
+    let presentation = credential.present(&spp, &gsp, rand);
+    Ok(zkgroup::serialize(&presentation))
+}
+
 #[cfg(target_arch = "wasm32")]
 mod wasm_api {
     use super::GROUP_MASTER_KEY_LEN;
@@ -100,7 +145,30 @@ mod wasm_api {
     /// Build-Identität für den Status-/Debug-Pfad im Client.
     #[wasm_bindgen]
     pub fn version() -> String {
-        "zkgroup-wasm 0.1.2 (libsignal v0.95.0)".to_string()
+        "zkgroup-wasm 0.1.3 (libsignal v0.95.0)".to_string()
+    }
+
+    /// Erzeugt eine echte Mitgliedschafts-Presentation aus einem
+    /// SERVER-ausgestellten Credential. Das ist die Client-Hälfte des
+    /// realen Flows (A3-2d): das Ergebnis geht an den Server-Verify.
+    #[wasm_bindgen]
+    pub fn create_membership_presentation(
+        master_key: &[u8],
+        server_public_params: &[u8],
+        credential_response: &[u8],
+        uuid16: &[u8],
+        redemption_time: u64,
+        randomness: &[u8],
+    ) -> Result<Vec<u8>, JsError> {
+        super::build_presentation(
+            master_key,
+            server_public_params,
+            credential_response,
+            uuid16,
+            redemption_time,
+            randomness,
+        )
+        .map_err(JsError::new)
     }
 
     /// GMK (32 Bytes, aus groupSecret.ts) → serialisierte GroupPublicParams.
@@ -154,6 +222,54 @@ mod tests {
     #[test]
     fn full_membership_flow_roundtrips() {
         super::run_membership_roundtrip().expect("full membership flow must pass");
+    }
+
+    /// Byte-Pfad von build_presentation: SERVER stellt aus → serialisiert →
+    /// build_presentation (Client) → SERVER verifiziert. Beweist genau die
+    /// Aufrufkette, die der wasm-Export create_membership_presentation +
+    /// der Server-Verify (Node) fahren.
+    #[test]
+    fn presentation_from_bytes_verifies() {
+        use libsignal_core::{Aci, Pni};
+        use zkgroup::auth::{
+            AuthCredentialWithPniZkcPresentation, AuthCredentialWithPniZkcResponse,
+        };
+        use zkgroup::groups::{GroupMasterKey, GroupSecretParams};
+        use zkgroup::{ServerSecretParams, Timestamp};
+
+        const SECONDS_PER_DAY: u64 = 86_400;
+        let server_secret = ServerSecretParams::generate([5u8; 32]);
+        let server_public_bytes = zkgroup::serialize(&server_secret.get_public_params());
+        let gpp = GroupSecretParams::derive_from_master_key(GroupMasterKey::new([9u8; 32]))
+            .get_public_params();
+        let uuid = [2u8; 16];
+        let redemption_secs = 100_000u64 * SECONDS_PER_DAY;
+        let redemption = Timestamp::from_epoch_seconds(redemption_secs);
+
+        let response = AuthCredentialWithPniZkcResponse::issue_credential(
+            Aci::from_uuid_bytes(uuid),
+            Pni::from_uuid_bytes(uuid),
+            redemption,
+            &server_secret,
+            [3u8; 32],
+        );
+        let response_bytes = zkgroup::serialize(&response);
+
+        let pres_bytes = super::build_presentation(
+            &[9u8; 32],
+            &server_public_bytes,
+            &response_bytes,
+            &uuid,
+            redemption_secs,
+            &[4u8; 32],
+        )
+        .expect("build_presentation");
+
+        let presentation: AuthCredentialWithPniZkcPresentation =
+            zkgroup::deserialize(&pres_bytes).expect("deserialize presentation");
+        presentation
+            .verify(&server_secret, &gpp, redemption)
+            .expect("server verifies the bytes-built presentation");
     }
 
     /// GMK → GroupPublicParams ist deterministisch und kollisionsfrei.

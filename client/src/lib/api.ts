@@ -212,6 +212,26 @@ export async function refreshToken(token: string) {
   });
 }
 
+/** zkgroup (experimentell): holt ein Mitgliedschafts-Credential vom Server. */
+export async function zkgroupCredential(token: string) {
+  return req<{ credential: string; redemptionTime: number; publicParams: string }>(
+    "/api/zkgroup/credential",
+    { method: "POST", token }
+  );
+}
+
+/** zkgroup (experimentell): lässt eine Presentation server-seitig verifizieren. */
+export async function zkgroupVerifyPresentation(
+  token: string,
+  body: { presentation: string; groupPublicParams: string }
+) {
+  return req<{ valid: boolean }>("/api/zkgroup/verify-presentation", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+}
+
 export async function me(token: string) {
   return req<ApiUser>("/api/me", { headers: {}, token });
 }

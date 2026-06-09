@@ -65,7 +65,9 @@ import {
   isZkgroupExperimentalEnabled,
   setZkgroupExperimentalEnabled,
   probeZkgroup,
+  zkgroupServerRoundtrip,
   type ZkgroupProbe,
+  type ZkgroupServerProbe,
 } from "../lib/zkgroupClient";
 
 export type SecurityLevel = "normal" | "extreme";
@@ -1273,12 +1275,25 @@ function ZkgroupExperimentalSection() {
   const [enabled, setEnabled] = useState(() => isZkgroupExperimentalEnabled());
   const [busy, setBusy] = useState(false);
   const [probe, setProbe] = useState<ZkgroupProbe | null>(null);
+  const [serverProbe, setServerProbe] = useState<ZkgroupServerProbe | null>(
+    null
+  );
 
   const runProbe = async (full: boolean) => {
     setBusy(true);
     setProbe(null);
+    setServerProbe(null);
     const result = await probeZkgroup(full);
     setProbe(result);
+    setBusy(false);
+  };
+
+  const runServerRoundtrip = async () => {
+    setBusy(true);
+    setProbe(null);
+    setServerProbe(null);
+    const result = await zkgroupServerRoundtrip();
+    setServerProbe(result);
     setBusy(false);
   };
 
@@ -1337,6 +1352,37 @@ function ZkgroupExperimentalSection() {
               ? t("settings.zkgroupTesting")
               : t("settings.zkgroupRoundtrip")}
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runServerRoundtrip()}
+            className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {busy
+              ? t("settings.zkgroupTesting")
+              : t("settings.zkgroupServerTest")}
+          </button>
+          {serverProbe && (
+            <p
+              className="text-xs"
+              style={{
+                color:
+                  serverProbe.ran && serverProbe.valid
+                    ? "var(--accent)"
+                    : "var(--danger)",
+              }}
+            >
+              {serverProbe.ran && serverProbe.valid
+                ? t("settings.zkgroupServerOk")
+                : t("settings.zkgroupServerFail", {
+                    reason: serverProbe.reason ?? "unknown",
+                  })}
+            </p>
+          )}
           {probe && (
             <p
               className="text-xs"

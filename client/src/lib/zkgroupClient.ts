@@ -23,6 +23,15 @@ type ZkgroupWasm = {
   roundtrip_self_test(): boolean;
   derive_group_public_params(masterKey: Uint8Array): Uint8Array;
   derive_group_identifier(masterKey: Uint8Array): Uint8Array;
+  /** Client-Hälfte: echte Presentation aus einem Server-Credential. */
+  create_membership_presentation(
+    masterKey: Uint8Array,
+    serverPublicParams: Uint8Array,
+    credentialResponse: Uint8Array,
+    uuid16: Uint8Array,
+    redemptionTime: number,
+    randomness: Uint8Array
+  ): Uint8Array;
 };
 
 type ZkgroupGlue = ZkgroupWasm & {
@@ -126,4 +135,78 @@ export async function deriveGroupPublicParams(
 ): Promise<Uint8Array> {
   const m = await loadZkgroup();
   return m.derive_group_public_params(masterKey);
+}
+
+/** UUID-String ("xxxxxxxx-xxxx-…") → 16 Bytes (für Aci/Pni). */
+function uuidToBytes(uuid: string): Uint8Array {
+  const hex = uuid.replace(/-/g, "");
+  if (hex.length !== 32 || /[^0-9a-fA-F]/.test(hex)) {
+    throw new Error("user id is not a uuid");
+  }
+  const out = new Uint8Array(16);
+  for (let i = 0; i < 16; i++) {
+    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
+}
+
+export type ZkgroupServerProbe = {
+  ran: boolean;
+  valid: boolean | null;
+  reason: string | null;
+};
+
+/**
+ * Echter A3-2d-Roundtrip: holt ein Credential vom Server, erzeugt eine echte
+ * Mitgliedschafts-Presentation im WASM und lässt sie server-seitig
+ * verifizieren. Reine Diagnose — nicht im Nachrichtenpfad, kein Enforcement.
+ * Nutzt eine feste Test-GMK; der Server kennt sie nicht, prüft nur die
+ * mitgelieferten GroupPublicParams gegen die Presentation.
+ */
+export async function zkgroupServerRoundtrip(): Promise<ZkgroupServerProbe> {
+  if (!isZkgroupExperimentalEnabled()) {
+    return { ran: false, valid: null, reason: "flag_off" };
+  }
+  try {
+    const { base64FromUint8, uint8FromBase64 } = await import("./b64");
+    const { loadToken } = await import("./localIdentity");
+    const { loadLocalIdentity } = await import("./localIdentity");
+    const api = await import("./api");
+
+    const token = loadToken();
+    const identity = loadLocalIdentity();
+    if (!token || !identity) {
+      return { ran: false, valid: null, reason: "not_logged_in" };
+    }
+
+    const m = await loadZkgroup();
+    const cred = await api.zkgroupCredential(token);
+
+    const testGmk = new Uint8Array(32).fill(9);
+    const gpp = m.derive_group_public_params(testGmk);
+    const uuid16 = uuidToBytes(identity.userId);
+    const randomness = crypto.getRandomValues(new Uint8Array(32));
+
+    const presentation = m.create_membership_presentation(
+      testGmk,
+      uint8FromBase64(cred.publicParams),
+      uint8FromBase64(cred.credential),
+      uuid16,
+      cred.redemptionTime,
+      randomness
+    );
+
+    const { valid } = await api.zkgroupVerifyPresentation(token, {
+      presentation: base64FromUint8(presentation),
+      groupPublicParams: base64FromUint8(gpp),
+    });
+    return { ran: true, valid, reason: valid ? null : "server_rejected" };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "roundtrip_failed";
+    // 503 vom Server = zkgroup dort nicht aktiviert (VAULTCHAT_ZKGROUP=1).
+    const reason = /zkgroup_unavailable|503/.test(msg)
+      ? "server_disabled"
+      : msg.slice(0, 160);
+    return { ran: false, valid: null, reason };
+  }
 }

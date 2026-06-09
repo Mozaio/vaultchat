@@ -38,10 +38,19 @@ type ZkAuthOps = {
     pni: unknown,
     redemptionTime: number
   ): ZkByteArray;
+  /** Wirft bei ungültiger/abgelaufener Presentation, sonst void. */
+  verifyAuthCredentialPresentation(
+    groupPublicParams: unknown,
+    presentation: unknown,
+    now?: Date
+  ): void;
 };
+type ZkByteArrayCtor = new (contents: Uint8Array) => unknown;
 type ZkgroupModule = {
   ServerSecretParams: ZkServerSecretParamsCtor;
   ServerZkAuthOperations: new (params: ZkServerSecretParams) => ZkAuthOps;
+  GroupPublicParams: ZkByteArrayCtor;
+  AuthCredentialPresentation: ZkByteArrayCtor;
 };
 type MainModule = {
   Aci: { fromUuid(uuid: string): unknown };
@@ -74,6 +83,9 @@ let status: ZkgroupStatus = {
 let issueFn:
   | ((userUuid: string, redemptionTime: number) => Uint8Array)
   | null = null;
+let verifyFn:
+  | ((groupPublicParams: Uint8Array, presentation: Uint8Array) => boolean)
+  | null = null;
 
 export function getZkgroupStatus(): ZkgroupStatus {
   return status;
@@ -90,6 +102,20 @@ export function issueAuthCredential(
 ): Uint8Array {
   if (!issueFn) throw new Error("zkgroup_unavailable");
   return issueFn(userUuid, redemptionTime);
+}
+
+/**
+ * Verifiziert eine Mitgliedschafts-Presentation gegen GroupPublicParams mit
+ * der server-eigenen ServerSecretParams. Gibt true/false zurück (kein Wurf
+ * bei ungültiger Presentation — das ist ein erwartetes Ergebnis, kein
+ * Fehler). Wirft nur, wenn zkgroup nicht verfügbar ist.
+ */
+export function verifyPresentation(
+  groupPublicParams: Uint8Array,
+  presentation: Uint8Array
+): boolean {
+  if (!verifyFn) throw new Error("zkgroup_unavailable");
+  return verifyFn(groupPublicParams, presentation);
 }
 
 export async function initZkgroup(): Promise<void> {
@@ -129,6 +155,18 @@ export async function initZkgroup(): Promise<void> {
         .issueAuthCredentialWithPniZkc(aci, pni, redemptionTime)
         .serialize();
     };
+    verifyFn = (groupPublicParams: Uint8Array, presentation: Uint8Array) => {
+      const gpp = new zk.GroupPublicParams(groupPublicParams);
+      const pres = new zk.AuthCredentialPresentation(presentation);
+      try {
+        // now-Default = jetzt; das Credential wird tagesalign ausgestellt,
+        // liegt also im gültigen Fenster.
+        authOps.verifyAuthCredentialPresentation(gpp, pres);
+        return true;
+      } catch {
+        return false;
+      }
+    };
 
     status = {
       enabled: true,
@@ -150,6 +188,7 @@ export async function initZkgroup(): Promise<void> {
       e instanceof Error ? e.message.slice(0, 200) : "load_failed";
     status = { ...status, available: false, reason };
     issueFn = null;
+    verifyFn = null;
     log.warn("zkgroup_init_failed", { reason });
   }
 }
