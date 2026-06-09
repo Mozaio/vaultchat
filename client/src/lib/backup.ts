@@ -1,4 +1,5 @@
 import { base64FromUint8, uint8FromBase64 } from "./b64";
+import { clampKdfParams } from "./crypto";
 import type { LocalIdentity } from "./localIdentity";
 import { getSodium, sodiumReady } from "./sodium";
 
@@ -40,6 +41,12 @@ export type EncryptedIdentityBackup = {
   nonce: string;
   cipher: string;
   createdAt: string;
+  /** KDF-Versionierung (#22): optionale Argon2-Parameter. Neue Backups
+   *  schreiben sie; der Reader bevorzugt sie vor den Konstanten. Alte
+   *  Backups ohne diese Felder bleiben lesbar (INTERACTIVE-Fallback),
+   *  alte Clients ignorieren die Zusatzfelder. */
+  ops?: number;
+  mem?: number;
 };
 
 function pwhashAlg(sodium: {
@@ -67,15 +74,23 @@ function isEncryptedIdentityBackup(value: unknown): value is EncryptedIdentityBa
   );
 }
 
-async function deriveBackupKey(passphrase: string, salt: Uint8Array) {
+async function deriveBackupKey(
+  passphrase: string,
+  salt: Uint8Array,
+  params?: { ops?: number; mem?: number }
+) {
   await sodiumReady();
   const sodium = getSodium();
+  const { ops, mem } = clampKdfParams(params?.ops, params?.mem, {
+    ops: sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
+    mem: sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+  });
   return sodium.crypto_pwhash(
     sodium.crypto_secretbox_KEYBYTES,
     passphrase,
     salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+    ops,
+    mem,
     pwhashAlg(sodium)
   );
 }
@@ -88,7 +103,9 @@ export async function encryptIdentityBackup(
   const sodium = getSodium();
   const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
-  const key = await deriveBackupKey(passphrase, salt);
+  const ops = sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE;
+  const mem = sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE;
+  const key = await deriveBackupKey(passphrase, salt, { ops, mem });
   try {
     const plain = enc.encode(JSON.stringify(identity));
     const cipher = sodium.crypto_secretbox_easy(plain, nonce, key);
@@ -100,6 +117,8 @@ export async function encryptIdentityBackup(
       nonce: base64FromUint8(nonce),
       cipher: base64FromUint8(cipher),
       createdAt: new Date().toISOString(),
+      ops,
+      mem,
     };
   } finally {
     sodium.memzero(key);
@@ -122,7 +141,10 @@ export async function parseIdentityBackup(
   const salt = uint8FromBase64(parsed.salt);
   const nonce = uint8FromBase64(parsed.nonce);
   const cipher = uint8FromBase64(parsed.cipher);
-  const key = await deriveBackupKey(passphrase, salt);
+  const key = await deriveBackupKey(passphrase, salt, {
+    ops: parsed.ops,
+    mem: parsed.mem,
+  });
   try {
     let plain: Uint8Array;
     try {

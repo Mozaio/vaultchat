@@ -10,7 +10,35 @@ export type WrappedSecret = {
   salt: string;
   nonce: string;
   cipher: string;
+  /** KDF-Versionierung (#22): Parameter werden mitgespeichert, damit ein
+   *  späteres Anheben der Argon2-Kosten alte Wraps weiter entschlüsselt.
+   *  Fehlende Felder = Legacy-Wrap → INTERACTIVE-Konstanten. */
+  kdf?: "argon2id";
+  ops?: number;
+  mem?: number;
 };
+
+/** Sanity-Clamp für gespeicherte KDF-Parameter: schützt vor manipulierten
+ *  Werten (z. B. mem=4 GB als DoS oder ops=0 als Downgrade). Außerhalb des
+ *  Korridors fallen wir auf die Default-Konstanten zurück — schlägt die
+ *  MAC-Prüfung dann fehl, gibt es einen sauberen Fehler statt Browser-OOM. */
+export function clampKdfParams(
+  ops: unknown,
+  mem: unknown,
+  defaults: { ops: number; mem: number }
+): { ops: number; mem: number } {
+  const okOps =
+    typeof ops === "number" && Number.isInteger(ops) && ops >= 1 && ops <= 16;
+  const okMem =
+    typeof mem === "number" &&
+    Number.isInteger(mem) &&
+    mem >= 8 * 1024 * 1024 &&
+    mem <= 1024 * 1024 * 1024;
+  return {
+    ops: okOps ? (ops as number) : defaults.ops,
+    mem: okMem ? (mem as number) : defaults.mem,
+  };
+}
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -53,12 +81,16 @@ export async function wrapSecretKey(
   await sodiumReady();
   const sodium = getSodium();
   const salt = sodium.randombytes_buf(sodium.crypto_pwhash_SALTBYTES);
+  // #22: Parameter explizit festhalten statt implizit über die Konstanten —
+  // der Unwrap nutzt die GESPEICHERTEN Werte, nicht die dann aktuellen.
+  const ops = sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE;
+  const mem = sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE;
   const key = sodium.crypto_pwhash(
     sodium.crypto_secretbox_KEYBYTES,
     password,
     salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+    ops,
+    mem,
     pwhashAlg(sodium)
   );
   const nonce = sodium.randombytes_buf(sodium.crypto_secretbox_NONCEBYTES);
@@ -68,6 +100,9 @@ export async function wrapSecretKey(
     salt: base64FromUint8(salt),
     nonce: base64FromUint8(nonce),
     cipher: base64FromUint8(cipher),
+    kdf: "argon2id",
+    ops,
+    mem,
   };
 }
 
@@ -80,12 +115,17 @@ export async function unwrapSecretKey(
   const salt = uint8FromBase64(w.salt);
   const nonce = uint8FromBase64(w.nonce);
   const cipher = uint8FromBase64(w.cipher);
+  // Legacy-Wraps ohne Params → INTERACTIVE; gespeicherte Werte geclampt.
+  const { ops, mem } = clampKdfParams(w.ops, w.mem, {
+    ops: sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
+    mem: sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+  });
   const key = sodium.crypto_pwhash(
     sodium.crypto_secretbox_KEYBYTES,
     password,
     salt,
-    sodium.crypto_pwhash_OPSLIMIT_INTERACTIVE,
-    sodium.crypto_pwhash_MEMLIMIT_INTERACTIVE,
+    ops,
+    mem,
     pwhashAlg(sodium)
   );
   const sk = sodium.crypto_secretbox_open_easy(cipher, nonce, key);
