@@ -1574,22 +1574,29 @@ export function ChatShell({
   // Write-through: hält die Map live (Senden leert sie via setText("")) und
   // persistiert debounced. Vor dem Boot-Load kein Persist, sonst würde ein
   // früher Tastendruck den gespeicherten Blob mit nur einem Chat überschreiben.
+  // Der Versions-Bump (→ Sidebar-Rebuild) feuert NUR beim Übergang
+  // leer↔nicht-leer, nicht pro Tastendruck: der aktive Chat zeigt ohnehin
+  // keine eigene Entwurf-Vorschau, und beim Chat-Wechsel baut peerList
+  // bereits über die `peer`-Dependency neu. Sonst würde jedes Zeichen die
+  // ganze Chatliste neu rendern.
   useEffect(() => {
     if (!draftsLoadedRef.current) return;
     const id = lastDraftPeerIdRef.current;
     if (!id) return;
+    const had = draftsRef.current.has(id);
     if (text.trim()) draftsRef.current.set(id, text);
     else draftsRef.current.delete(id);
-    setDraftsVersion((v) => v + 1);
+    if (had !== draftsRef.current.has(id)) setDraftsVersion((v) => v + 1);
     persistDraftsSoon();
   }, [text, persistDraftsSoon]);
   useEffect(() => {
     if (!draftsLoadedRef.current) return;
     const id = lastDraftGroupIdRef.current;
     if (!id) return;
+    const had = groupDraftsRef.current.has(id);
     if (groupText.trim()) groupDraftsRef.current.set(id, groupText);
     else groupDraftsRef.current.delete(id);
-    setDraftsVersion((v) => v + 1);
+    if (had !== groupDraftsRef.current.has(id)) setDraftsVersion((v) => v + 1);
     persistDraftsSoon();
   }, [groupText, persistDraftsSoon]);
 
@@ -5413,6 +5420,49 @@ export function ChatShell({
                     </div>
                   </button>
                 )}
+              {sidebarFilter === "all" && archivedChats.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarFilter("archived")}
+                  className="contact-item w-full !mx-0"
+                >
+                  <div
+                    className="contact-avatar !h-9 !w-9"
+                    style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}
+                  >
+                    <IconArchive size={16} />
+                  </div>
+                  <div className="contact-info min-w-0">
+                    <span className="contact-name">{t("chat.archived")}</span>
+                    <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
+                      {t("chat.archivedCount", { n: archivedChats.size })}
+                    </p>
+                  </div>
+                  <div className="contact-meta">
+                    {(() => {
+                      // WhatsApp-Pattern: Badge zeigt, wie viele archivierte
+                      // Chats ungelesene Nachrichten haben.
+                      let n = 0;
+                      for (const key of archivedChats) {
+                        if (
+                          key.startsWith("dm:") &&
+                          (unreadByPeer[key.slice(3)] ?? 0) > 0
+                        ) {
+                          n += 1;
+                        } else if (
+                          key.startsWith("group:") &&
+                          (unreadByGroup[key.slice(6)] ?? 0) > 0
+                        ) {
+                          n += 1;
+                        }
+                      }
+                      return n > 0 ? (
+                        <span className="unread-badge">{n > 99 ? "99+" : n}</span>
+                      ) : null;
+                    })()}
+                  </div>
+                </button>
+              )}
               {sidebarFilter === "requests" && requestUsers.length === 0 && (
                 <p
                   className="px-3 py-6 text-center text-sm"
@@ -5422,6 +5472,16 @@ export function ChatShell({
                 </p>
               )}
               {peerList}
+              {sidebarFilter === "archived" &&
+                visibleUsers.length === 0 &&
+                visibleGroups.length === 0 && (
+                  <p
+                    className="px-6 py-10 text-center text-sm"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {t("chat.archivedEmpty")}
+                  </p>
+                )}
               {query.trim().length > 0 &&
                 visibleUsers.length === 0 &&
                 visibleGroups.length === 0 &&
@@ -5471,65 +5531,15 @@ export function ChatShell({
 
         {sidebarFilter === "fav" && (
           <div className="flex-1 overflow-y-auto p-2">
-            {sidebarFilter === "all" && archivedChats.size > 0 && (
-              <button
-                type="button"
-                onClick={() => setSidebarFilter("archived")}
-                className="contact-item w-full !mx-0"
-              >
-                <div
-                  className="contact-avatar !h-9 !w-9"
-                  style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}
-                >
-                  <IconArchive size={16} />
-                </div>
-                <div className="contact-info min-w-0">
-                  <span className="contact-name">{t("chat.archived")}</span>
-                  <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
-                    {t("chat.archivedCount", { n: archivedChats.size })}
-                  </p>
-                </div>
-                <div className="contact-meta">
-                  {(() => {
-                    // WhatsApp-Pattern: Badge zeigt, wie viele archivierte
-                    // Chats ungelesene Nachrichten haben.
-                    let n = 0;
-                    for (const key of archivedChats) {
-                      if (
-                        key.startsWith("dm:") &&
-                        (unreadByPeer[key.slice(3)] ?? 0) > 0
-                      ) {
-                        n += 1;
-                      } else if (
-                        key.startsWith("group:") &&
-                        (unreadByGroup[key.slice(6)] ?? 0) > 0
-                      ) {
-                        n += 1;
-                      }
-                    }
-                    return n > 0 ? (
-                      <span className="unread-badge">{n > 99 ? "99+" : n}</span>
-                    ) : null;
-                  })()}
-                </div>
-              </button>
-            )}
             {peerList.length > 0 ? (
               peerList
-            ) : sidebarFilter !== "archived" ? (
+            ) : (
               <div className="flex h-full items-center justify-center px-6 text-center">
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                   {t("chat.favEmptyHint")}
                 </p>
               </div>
-            ) : visibleGroups.length === 0 ? (
-              <p
-                className="px-6 py-10 text-center text-sm"
-                style={{ color: "var(--text-muted)" }}
-              >
-                {t("chat.archivedEmpty")}
-              </p>
-            ) : null}
+            )}
           </div>
         )}
 
