@@ -80,7 +80,11 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
 
 - ✅ Full product: DMs, groups, voice + group calls, screenshare, threads,
   reactions, custom emojis, polls, folders, view-once, disappearing messages,
-  encrypted backups, read receipts, pinned/starred, mentions, unread divider.
+  encrypted backups, read receipts, pinned/starred, mentions, unread divider,
+  message requests (gate unknown senders + blurred avatars), block list,
+  chat archive (WhatsApp-style), per-chat drafts (encrypted-at-rest, survive
+  reload, "Draft:" preview in list), 3-level notification privacy
+  (name+message / name only / nothing — Signal-style).
 - ✅ **Fully localized** (10 languages) — verified: every used `t()` key exists.
 - ✅ PWA installable (manifest, icons, themed address bar, install prompt).
 - ✅ Tauri desktop app: tray, close-to-tray, single-instance, persisted window
@@ -90,12 +94,16 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
 
 ## Roadmap / open items
 
-- Security (need co-testing, don't ship blind): `#15` OTK-exhaustion DoS,
-  `#22` versioned KDF for at-rest/backup, `#25` E2EE group names/avatars,
-  `#26` unauthenticated sealed-sender (hide sender from server). See
-  `SECURITY_ROADMAP.md`, `THREAT_MODEL.md`.
-- Signal-inspired next: **message requests** (gate unknown senders), blur
-  unknown-sender avatars, contact QR.
+- Security shipped since May: `#15` OTK-exhaustion mitigation, `#25` E2EE
+  group names/descriptions/avatars, `#26` sealed-sender for groups (opt-in
+  toggle in settings), sender-key rotation on every membership change,
+  mailbox per-user byte quota (OOM-DoS guard, June 2026). Still open:
+  `#22` versioned KDF for at-rest/backup, group **member list** is plaintext
+  on the server (metadata gap — zkgroup-style fix speced in `ZKGROUP_SPEC.md`),
+  JWT has no refresh/revocation. See `SECURITY_ROADMAP.md`, `THREAT_MODEL.md`.
+- UX next (from June 2026 review): swipe actions / long-press context menu on
+  chat rows (mobile), warm-dark pass over remaining legacy CSS blocks,
+  unarchive-on-new-message option, contact QR.
 - Desktop: deep links for invite URLs, close-to-tray toggle, signed
   auto-updates (needs a signing keypair from the user).
 
