@@ -5,3 +5,8 @@ data
 .env.local
 *.log
 .DS_Store
+
+# Rust/WASM-Spike (Build-Output bleibt draussen, Artefakte kommen aus CI)
+wasm/zkgroup-wasm/target
+wasm/zkgroup-wasm/pkg
+wasm/zkgroup-wasm/Cargo.lock

@@ -1,0 +1,56 @@
+name: zkgroup-wasm-spike
+
+# Weg A, Phase A2: baut Signals auditierte zkgroup-Crate (libsignal,
+# Tag v0.95.0) als WASM für den Browser-Client. Reiner Spike — das
+# Artefakt wird NICHT automatisch ins Produkt verdrahtet. Erwartung:
+# die ersten Läufe können an Dependency-Details scheitern (getrandom-
+# Backend, dalek-Patch); Iteration läuft bewusst über CI-Logs, nicht
+# über lokale Builds.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "wasm/zkgroup-wasm/**"
+      - ".github/workflows/zkgroup-wasm.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Gleiche Toolchain wie libsignal v0.95.0 (rust-toolchain im Repo).
+      - name: Rust toolchain (libsignal pin)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-03-23
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --locked
+
+      - name: Build (release, target web)
+        working-directory: wasm/zkgroup-wasm
+        env:
+          # getrandom 0.3 verlangt das Backend zusätzlich als cfg-Flag;
+          # bei getrandom 0.2 im Graph ist das Flag wirkungslos.
+          RUSTFLAGS: --cfg getrandom_backend="wasm_js"
+        run: wasm-pack build --release --target web
+
+      - name: Size report (entscheidet über A3)
+        run: |
+          ls -la wasm/zkgroup-wasm/pkg/
+          echo "---- WASM-Groesse (roh) ----"
+          du -h wasm/zkgroup-wasm/pkg/*.wasm
+          echo "---- gzip (realistische Transfer-Groesse) ----"
+          gzip -k -9 wasm/zkgroup-wasm/pkg/*.wasm
+          du -h wasm/zkgroup-wasm/pkg/*.wasm.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zkgroup-wasm-pkg
+          path: wasm/zkgroup-wasm/pkg/
+          retention-days: 30
