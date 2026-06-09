@@ -21,7 +21,12 @@ import {
   removeGroupMember,
   updateGroupProfile,
 } from "./memoryStore.js";
-import { hashPassword, signToken, verifyPassword, verifyToken } from "./auth.js";
+import {
+  hashPassword,
+  signToken,
+  verifyPasswordOrDummy,
+  verifyToken,
+} from "./auth.js";
 import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
 import {
   enqueueMailboxDm,
@@ -460,7 +465,10 @@ app.post("/api/login", authLimiter, async (req, res) => {
   }
   const { username, password } = parsed.data;
   const user = findUserByUsername(username);
-  if (!user || !(await verifyPassword(user.passwordHash, password))) {
+  // Dummy-Verify bei unbekanntem User — Antwortzeit darf die Existenz
+  // des Accounts nicht verraten (siehe auth.ts).
+  const passwordOk = await verifyPasswordOrDummy(user?.passwordHash, password);
+  if (!user || !passwordOk) {
     log.info("auth_login_fail", {
       reqId: req.id,
       username: username.slice(0, 32),

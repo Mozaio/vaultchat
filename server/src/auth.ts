@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
@@ -51,6 +52,27 @@ export async function verifyPassword(hash: string, password: string) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Timing-Schutz gegen Username-Enumeration: Argon2id dominiert die
+ * Login-Antwortzeit (~100-300 ms). Ohne Dummy-Verify antwortet der Server
+ * bei unbekanntem Username in <5 ms — die Dauer verrät die Existenz des
+ * Accounts trotz einheitlicher invalid_credentials-Meldung. Existiert der
+ * User nicht, verifizieren wir deshalb gegen diesen Wegwerf-Hash mit
+ * identischen Parametern und geben immer false zurück.
+ */
+const dummyHashPromise: Promise<string> = hashPassword(
+  randomBytes(32).toString("hex")
+);
+
+export async function verifyPasswordOrDummy(
+  hash: string | null | undefined,
+  password: string
+): Promise<boolean> {
+  if (hash) return verifyPassword(hash, password);
+  await verifyPassword(await dummyHashPromise, password);
+  return false;
 }
 
 export function signToken(user: JwtUser, ttlSec = 60 * 60 * 12) {
