@@ -2033,6 +2033,27 @@ const DICT: Record<string, Dict> = {
     fr: "Brouillon :", pt: "Rascunho:", ru: "Черновик:", ar: "مسودة:",
     zh: "草稿：", hi: "ड्राफ़्ट:",
   },
+  "chat.archive": {
+    en: "Archive", de: "Archivieren", tr: "Arşivle", es: "Archivar",
+    fr: "Archiver", pt: "Arquivar", ru: "В архив", ar: "أرشفة",
+    zh: "归档", hi: "संग्रहित करें",
+  },
+  "chat.unarchive": {
+    en: "Unarchive", de: "Dearchivieren", tr: "Arşivden çıkar",
+    es: "Desarchivar", fr: "Désarchiver", pt: "Desarquivar",
+    ru: "Из архива", ar: "إلغاء الأرشفة", zh: "取消归档",
+    hi: "असंग्रहित करें",
+  },
+  "chat.archived": {
+    en: "Archived", de: "Archiviert", tr: "Arşivlenmiş", es: "Archivados",
+    fr: "Archivés", pt: "Arquivados", ru: "Архив", ar: "المؤرشفة",
+    zh: "已归档", hi: "संग्रहीत",
+  },
+  "chat.archivedCount": {
+    en: "{n} chats", de: "{n} Chats", tr: "{n} sohbet", es: "{n} chats",
+    fr: "{n} discussions", pt: "{n} conversas", ru: "Чатов: {n}",
+    ar: "{n} محادثة", zh: "{n} 个聊天", hi: "{n} चैट",
+  },
   "chat.notesForYou": {
     en: "Notes for yourself", de: "Notizen für dich", tr: "Kendine notlar",
     es: "Notas para ti", fr: "Notes pour vous", pt: "Notas para si",

@@ -127,6 +127,7 @@ import {
   flashDesktopWindow,
 } from "../lib/desktopNotify";
 import {
+  IconArchive,
   IconArrowDown,
   IconBan,
   IconBell,
@@ -168,6 +169,7 @@ type SidebarFilter =
   | "unread"
   | "star"
   | "requests"
+  | "archived"
   | `folder:${string}`;
 type CallStatus = "idle" | "ringing" | "connecting" | "connected" | "failed" | "ended";
 
@@ -322,6 +324,20 @@ export function ChatShell({
   const [blockedPeers, setBlockedPeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.blocked.peers")
   );
+  // Archivierte Chats (WhatsApp-Pattern): raus aus der Hauptliste, erreichbar
+  // über die "Archiviert"-Zeile. Keys: "dm:<userId>" / "group:<groupId>".
+  const [archivedChats, setArchivedChats] = useState<Set<string>>(() =>
+    loadStringSet("vaultchat.archived.chats")
+  );
+  const toggleArchiveChat = useCallback((key: string) => {
+    setArchivedChats((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveStringSet("vaultchat.archived.chats", next);
+      return next;
+    });
+  }, []);
   // Message requests (Signal-style gate): a peer is "accepted" once the user
   // has engaged (added them, sent them a message, or explicitly accepted a
   // request). The first DM from a not-yet-accepted, not-blocked sender lands
@@ -4188,6 +4204,8 @@ export function ChatShell({
     if (sidebarFilter === "group") return [];
     if (sidebarFilter === "requests") {
       arr = filteredUsers.filter((u) => requestPeerIds.has(u.id));
+    } else if (sidebarFilter === "archived") {
+      arr = filteredUsers.filter((u) => archivedChats.has(`dm:${u.id}`));
     } else if (sidebarFilter === "fav") {
       arr = filteredUsers.filter((u) => favoritePeers.has(u.id));
     } else if (sidebarFilter === "unread") {
@@ -4204,6 +4222,10 @@ export function ChatShell({
     if (sidebarFilter !== "requests") {
       arr = arr.filter((u) => !requestPeerIds.has(u.id));
     }
+    // Archivierte Chats erscheinen nur in der Archiv-Ansicht.
+    if (sidebarFilter !== "archived") {
+      arr = arr.filter((u) => !archivedChats.has(`dm:${u.id}`));
+    }
     // sort: pinned first, then by recency
     return [...arr].sort((a, b) => {
       const pa = pinnedPeers.has(a.id) ? 1 : 0;
@@ -4219,6 +4241,7 @@ export function ChatShell({
     unreadByPeer,
     favoritePeers,
     pinnedPeers,
+    archivedChats,
     lastDmPreviewByPeer,
     peersWithStars,
     activeFolder,
@@ -4233,7 +4256,9 @@ export function ChatShell({
     )
       return [];
     let arr: api.ApiGroup[];
-    if (sidebarFilter === "unread") {
+    if (sidebarFilter === "archived") {
+      arr = filteredGroups.filter((g) => archivedChats.has(`group:${g.id}`));
+    } else if (sidebarFilter === "unread") {
       arr = filteredGroups.filter((g) => (unreadByGroup[g.id] ?? 0) > 0);
     } else if (sidebarFilter === "star") {
       arr = filteredGroups.filter((g) => groupsWithStars.has(g.id));
@@ -4242,6 +4267,10 @@ export function ChatShell({
       arr = filteredGroups.filter((g) => keys.has(`group:${g.id}`));
     } else {
       arr = filteredGroups;
+    }
+    // Archivierte Gruppen erscheinen nur in der Archiv-Ansicht.
+    if (sidebarFilter !== "archived") {
+      arr = arr.filter((g) => !archivedChats.has(`group:${g.id}`));
     }
     return [...arr].sort((a, b) => {
       const ta = lastGroupPreviewByGroup.get(a.id)?.at ?? a.createdAt ?? 0;
@@ -4254,6 +4283,7 @@ export function ChatShell({
     groupsWithStars,
     activeFolder,
     unreadByGroup,
+    archivedChats,
     lastGroupPreviewByGroup,
   ]);
 
@@ -4911,11 +4941,14 @@ export function ChatShell({
           sidebarFilter === "unread" ||
           sidebarFilter === "star" ||
           sidebarFilter === "requests" ||
+          sidebarFilter === "archived" ||
           activeFolder !== null) && (
           <>
             <div
               className={`overflow-y-auto p-2 ${
-                sidebarFilter === "all" || sidebarFilter === "star"
+                sidebarFilter === "all" ||
+                sidebarFilter === "star" ||
+                sidebarFilter === "archived"
                   ? "max-h-[42%]"
                   : "flex-1"
               }`}
@@ -4934,6 +4967,26 @@ export function ChatShell({
                   </div>
                   <div className="contact-info min-w-0">
                     <span className="contact-name">{t("requests.title")}</span>
+                    <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
+                      {t("common.back")}
+                    </p>
+                  </div>
+                </button>
+              )}
+              {sidebarFilter === "archived" && (
+                <button
+                  type="button"
+                  onClick={() => setSidebarFilter("all")}
+                  className="contact-item w-full !mx-0"
+                >
+                  <div
+                    className="contact-avatar !h-9 !w-9"
+                    style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}
+                  >
+                    ←
+                  </div>
+                  <div className="contact-info min-w-0">
+                    <span className="contact-name">{t("chat.archived")}</span>
                     <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
                       {t("common.back")}
                     </p>
@@ -5060,15 +5113,35 @@ export function ChatShell({
 
         {sidebarFilter === "fav" && (
           <div className="flex-1 overflow-y-auto p-2">
+            {sidebarFilter === "all" && archivedChats.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setSidebarFilter("archived")}
+                className="contact-item w-full !mx-0"
+              >
+                <div
+                  className="contact-avatar !h-9 !w-9"
+                  style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}
+                >
+                  <IconArchive size={16} />
+                </div>
+                <div className="contact-info min-w-0">
+                  <span className="contact-name">{t("chat.archived")}</span>
+                  <p className="contact-preview" style={{ color: "var(--text-muted)" }}>
+                    {t("chat.archivedCount", { n: archivedChats.size })}
+                  </p>
+                </div>
+              </button>
+            )}
             {peerList.length > 0 ? (
               peerList
-            ) : (
+            ) : sidebarFilter !== "archived" ? (
               <div className="flex h-full items-center justify-center px-6 text-center">
                 <p className="text-sm" style={{ color: "var(--text-muted)" }}>
                   {t("chat.favEmptyHint")}
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
@@ -5202,11 +5275,13 @@ export function ChatShell({
           sidebarFilter === "group" ||
           sidebarFilter === "star" ||
           sidebarFilter === "unread" ||
+          sidebarFilter === "archived" ||
           activeFolder !== null) && (
           <div className="flex-1 overflow-y-auto p-2">
             {(sidebarFilter === "all" ||
               sidebarFilter === "star" ||
               sidebarFilter === "unread" ||
+              sidebarFilter === "archived" ||
               activeFolder !== null) &&
               visibleGroups.length > 0 && (
               <p className="px-2 pb-1 pt-2 text-[11px] font-semibold" style={{ color: "var(--text-muted)" }}>
@@ -5634,6 +5709,19 @@ export function ChatShell({
                               : t("chat.muteContact")}
                           </button>
                         )}
+                        <button
+                          type="button"
+                          className="chat-menu-item"
+                          onClick={() => {
+                            toggleArchiveChat(`dm:${peer.id}`);
+                            setDmMenuOpen(false);
+                          }}
+                        >
+                          <IconArchive size={16} />
+                          {archivedChats.has(`dm:${peer.id}`)
+                            ? t("chat.unarchive")
+                            : t("chat.archive")}
+                        </button>
                         <button
                           type="button"
                           className="chat-menu-item"
@@ -6358,6 +6446,19 @@ export function ChatShell({
                         </button>
                         <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setGroupPanelOpen(true); }}>
                           <IconUsers size={16} /> {t("group.showMembers")}
+                        </button>
+                        <button
+                          type="button"
+                          className="chat-menu-item"
+                          onClick={() => {
+                            toggleArchiveChat(`group:${group.id}`);
+                            setGroupMenuOpen(false);
+                          }}
+                        >
+                          <IconArchive size={16} />
+                          {archivedChats.has(`group:${group.id}`)
+                            ? t("chat.unarchive")
+                            : t("chat.archive")}
                         </button>
                       </div>
                     )}
