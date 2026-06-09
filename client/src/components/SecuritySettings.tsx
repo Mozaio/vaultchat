@@ -1274,10 +1274,10 @@ function ZkgroupExperimentalSection() {
   const [busy, setBusy] = useState(false);
   const [probe, setProbe] = useState<ZkgroupProbe | null>(null);
 
-  const runProbe = async () => {
+  const runProbe = async (full: boolean) => {
     setBusy(true);
     setProbe(null);
-    const result = await probeZkgroup();
+    const result = await probeZkgroup(full);
     setProbe(result);
     setBusy(false);
   };
@@ -1310,11 +1310,11 @@ function ZkgroupExperimentalSection() {
         <span>{t("settings.zkgroupToggle")}</span>
       </label>
       {enabled && (
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
           <button
             type="button"
             disabled={busy}
-            onClick={() => void runProbe()}
+            onClick={() => void runProbe(false)}
             className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
             style={{
               background: "var(--bg-elevated)",
@@ -1323,15 +1323,36 @@ function ZkgroupExperimentalSection() {
           >
             {busy ? t("settings.zkgroupTesting") : t("settings.zkgroupSelfTest")}
           </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runProbe(true)}
+            className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {busy
+              ? t("settings.zkgroupTesting")
+              : t("settings.zkgroupRoundtrip")}
+          </button>
           {probe && (
             <p
-              className="mt-2 text-xs"
+              className="text-xs"
               style={{
-                color: probe.selfTest ? "var(--accent)" : "var(--danger)",
+                color:
+                  probe.available && probe.selfTest && probe.roundtrip !== false
+                    ? "var(--accent)"
+                    : "var(--danger)",
               }}
             >
-              {probe.selfTest
-                ? t("settings.zkgroupOk", { version: probe.version ?? "?" })
+              {probe.available && probe.selfTest && probe.roundtrip !== false
+                ? probe.roundtrip
+                  ? t("settings.zkgroupRoundtripOk", {
+                      version: probe.version ?? "?",
+                    })
+                  : t("settings.zkgroupOk", { version: probe.version ?? "?" })
                 : t("settings.zkgroupFail", {
                     reason: probe.reason ?? "unknown",
                   })}

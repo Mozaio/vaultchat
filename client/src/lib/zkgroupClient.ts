@@ -19,6 +19,8 @@ const WASM_MODULE_URL = "/zkgroup/zkgroup_wasm.js";
 type ZkgroupWasm = {
   version(): string;
   self_test(): boolean;
+  /** Voller Mitgliedschafts-Proof (Issue→Receive→Present→Verify) in-WASM. */
+  roundtrip_self_test(): boolean;
   derive_group_public_params(masterKey: Uint8Array): Uint8Array;
   derive_group_identifier(masterKey: Uint8Array): Uint8Array;
 };
@@ -71,21 +73,36 @@ export type ZkgroupProbe = {
   available: boolean;
   version: string | null;
   selfTest: boolean | null;
+  /** Ergebnis des vollen Mitgliedschafts-Proof-Roundtrips (null = nicht gelaufen). */
+  roundtrip: boolean | null;
   reason: string | null;
 };
 
-/** Diagnose für die Einstellungen: lädt das WASM und führt self_test aus. */
-export async function probeZkgroup(): Promise<ZkgroupProbe> {
+/**
+ * Diagnose für die Einstellungen: lädt das WASM, führt den leichten
+ * Determinismus-Check (`self_test`) und — wenn `full` — den vollen
+ * Mitgliedschafts-Proof-Roundtrip (`roundtrip_self_test`) aus.
+ */
+export async function probeZkgroup(full = false): Promise<ZkgroupProbe> {
   if (!isZkgroupExperimentalEnabled()) {
-    return { available: false, version: null, selfTest: null, reason: "flag_off" };
+    return {
+      available: false,
+      version: null,
+      selfTest: null,
+      roundtrip: null,
+      reason: "flag_off",
+    };
   }
   try {
     const m = await loadZkgroup();
-    const ok = m.self_test();
+    const selfOk = m.self_test();
+    const roundtripOk = full ? m.roundtrip_self_test() : null;
+    const ok = selfOk && (roundtripOk ?? true);
     return {
       available: true,
       version: m.version(),
-      selfTest: ok,
+      selfTest: selfOk,
+      roundtrip: roundtripOk,
       reason: ok ? null : "self_test_failed",
     };
   } catch (e) {
@@ -93,6 +110,7 @@ export async function probeZkgroup(): Promise<ZkgroupProbe> {
       available: false,
       version: null,
       selfTest: null,
+      roundtrip: null,
       reason: e instanceof Error ? e.message.slice(0, 160) : "load_failed",
     };
   }

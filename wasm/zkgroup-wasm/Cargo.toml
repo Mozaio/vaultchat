@@ -1,7 +1,8 @@
 [package]
 name = "zkgroup-wasm"
-# 0.1.1: A3 — voller E2E-Credential-Test + Auto-Vendoring in den Client.
-version = "0.1.1"
+# 0.1.2: A3-2c — voller Mitgliedschafts-Roundtrip als WASM-Export
+# (Issue→Receive→Present→Verify), geteilt mit dem nativen cargo-Test.
+version = "0.1.2"
 edition = "2021"
 publish = false
 description = "Spike: Signals auditiertes zkgroup (libsignal) als WASM für den Umbra-Browser-Client"
