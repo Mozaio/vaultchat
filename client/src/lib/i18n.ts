@@ -2059,6 +2059,13 @@ const DICT: Record<string, Dict> = {
     es: "Silenciado", fr: "Mis en sourdine", pt: "Silenciado",
     ru: "Без звука", ar: "مكتوم", zh: "已静音", hi: "म्यूट किया गया",
   },
+  "chat.archivedEmpty": {
+    en: "No archived chats.", de: "Keine archivierten Chats.",
+    tr: "Arşivlenmiş sohbet yok.", es: "No hay chats archivados.",
+    fr: "Aucune discussion archivée.", pt: "Nenhuma conversa arquivada.",
+    ru: "Нет архивированных чатов.", ar: "لا توجد محادثات مؤرشفة.",
+    zh: "没有已归档的聊天。", hi: "कोई संग्रहीत चैट नहीं।",
+  },
   "chat.notesForYou": {
     en: "Notes for yourself", de: "Notizen für dich", tr: "Kendine notlar",
     es: "Notas para ti", fr: "Notes pour vous", pt: "Notas para si",

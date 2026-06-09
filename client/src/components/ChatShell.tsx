@@ -5359,6 +5359,29 @@ export function ChatShell({
                     {t("chat.archivedCount", { n: archivedChats.size })}
                   </p>
                 </div>
+                <div className="contact-meta">
+                  {(() => {
+                    // WhatsApp-Pattern: Badge zeigt, wie viele archivierte
+                    // Chats ungelesene Nachrichten haben.
+                    let n = 0;
+                    for (const key of archivedChats) {
+                      if (
+                        key.startsWith("dm:") &&
+                        (unreadByPeer[key.slice(3)] ?? 0) > 0
+                      ) {
+                        n += 1;
+                      } else if (
+                        key.startsWith("group:") &&
+                        (unreadByGroup[key.slice(6)] ?? 0) > 0
+                      ) {
+                        n += 1;
+                      }
+                    }
+                    return n > 0 ? (
+                      <span className="unread-badge">{n > 99 ? "99+" : n}</span>
+                    ) : null;
+                  })()}
+                </div>
               </button>
             )}
             {peerList.length > 0 ? (
@@ -5369,6 +5392,13 @@ export function ChatShell({
                   {t("chat.favEmptyHint")}
                 </p>
               </div>
+            ) : visibleGroups.length === 0 ? (
+              <p
+                className="px-6 py-10 text-center text-sm"
+                style={{ color: "var(--text-muted)" }}
+              >
+                {t("chat.archivedEmpty")}
+              </p>
             ) : null}
           </div>
         )}
