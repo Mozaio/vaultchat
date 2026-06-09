@@ -15,6 +15,23 @@ on:
       - ".github/workflows/zkgroup-wasm.yml"
 
 jobs:
+  # A3: nativer End-to-End-Test der vollen Credential-Sequenz (Issue →
+  # Receive → Present → Verify, inkl. Wire-Roundtrips) gegen die echte
+  # auditierte Crate. Läuft nativ (kein wasm-Target, KEIN getrandom-wasm-
+  # cfg) und schnell — der Korrektheits-Beweis für das ganze Protokoll.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain (libsignal pin)
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-03-23
+      - name: cargo test (native, full membership flow)
+        working-directory: wasm/zkgroup-wasm
+        run: cargo test --release -- --nocapture
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
