@@ -164,7 +164,32 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: process.env.VAULTCHAT_JSON_LIMIT ?? "12mb" }));
+/** Cap für Base64-Ciphertext-Strings (WS-Frames + Sealed-Group-Bodies). */
+const MAX_B64_CIPHERTEXT = Number(
+  process.env.VAULTCHAT_MAX_B64_CIPHERTEXT_BYTES ?? 16 * 1024 * 1024
+);
+
+/**
+ * Body-Parser zweistufig: Standard-Routen brauchen nur kleine JSON-Bodies.
+ * Der Sealed-Group-Endpoint (#26) transportiert dagegen komplette
+ * Megolm-Ciphertexte als JSON — mit dem globalen 12-MB-Limit starben
+ * große Sealed-Sends mit 413, obwohl Zod bis MAX_B64_CIPHERTEXT erlaubt
+ * und der parallele WS-Pfad dieselben Frames akzeptiert.
+ */
+const SEALED_GROUP_PATH = /^\/api\/groups\/[^/]+\/sealed$/;
+const sealedGroupJson = express.json({
+  limit: MAX_B64_CIPHERTEXT + 4 * 1024 * 1024,
+});
+const standardJson = express.json({
+  limit: process.env.VAULTCHAT_JSON_LIMIT ?? "12mb",
+});
+app.use((req, res, next) => {
+  if (req.method === "POST" && SEALED_GROUP_PATH.test(req.path)) {
+    sealedGroupJson(req, res, next);
+    return;
+  }
+  standardJson(req, res, next);
+});
 app.use(requestLogger);
 
 const authLimiter = rateLimit({
@@ -1186,10 +1211,17 @@ const server = createServer(app);
  * E2E-DM: base64(Envelope) / Gruppen-ciphertext. Zod-Maxlänge = erlaubter Umschlag.
  * WebSocket-Frame etwas größer (JSON-Metadaten um `envelope` herum).
  */
-const MAX_B64_CIPHERTEXT = Number(
-  process.env.VAULTCHAT_MAX_B64_CIPHERTEXT_BYTES ?? 16 * 1024 * 1024
-);
+// MAX_B64_CIPHERTEXT ist oben beim Body-Parser definiert (Sealed-Route
+// braucht denselben Wert fürs JSON-Limit).
 const WS_MAX_FRAME_BYTES = MAX_B64_CIPHERTEXT + 4 * 1024 * 1024;
+
+/**
+ * Vor der Auth ist der einzige legitime Frame ein kleiner auth-Frame
+ * (JWT, < 2 KB). Ohne dieses Cap könnte ein unauthentifizierter Client
+ * bis zum auth_timeout 20-MB-Frames schicken, die der Server alle
+ * JSON.parsen müsste — CPU-Burn ganz ohne Account.
+ */
+const MAX_PREAUTH_FRAME_BYTES = 8 * 1024;
 
 // Sealed-Sender-Body (#26): hier definiert, weil es MAX_B64_CIPHERTEXT braucht
 // (das erst hier deklariert ist). Der Route-Handler oben nutzt es lazy.
@@ -1485,10 +1517,18 @@ wss.on("connection", (ws, req) => {
       return;
     }
     if (!jwtUser) {
+      // Pre-Auth: erster Frame MUSS ein valider auth-Frame sein. Oversize
+      // oder kaputtes JSON ist kein Client-Bug, sondern Noise/Angriff —
+      // sofort schließen statt bis zum auth_timeout weiterzuparsen.
+      if ((data as Buffer).length > MAX_PREAUTH_FRAME_BYTES) {
+        ws.close(4401, "auth_required");
+        return;
+      }
       let first: { type?: string; token?: string };
       try {
         first = JSON.parse(data.toString()) as { type?: string; token?: string };
       } catch {
+        ws.close(4401, "auth_required");
         return;
       }
       if (first.type !== "auth" || typeof first.token !== "string") {
