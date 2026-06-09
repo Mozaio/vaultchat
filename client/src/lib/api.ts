@@ -203,6 +203,15 @@ export async function login(body: { username: string; password: string }) {
   });
 }
 
+/** Sliding-Session: tauscht ein noch gültiges Token gegen ein frisches.
+ *  Serverseitig durch die absolute Session-Obergrenze (s0-Claim) gedeckelt. */
+export async function refreshToken(token: string) {
+  return req<{ token: string }>("/api/token/refresh", {
+    method: "POST",
+    token,
+  });
+}
+
 export async function me(token: string) {
   return req<ApiUser>("/api/me", { headers: {}, token });
 }

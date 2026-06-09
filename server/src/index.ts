@@ -497,6 +497,45 @@ app.post("/api/login", authLimiter, async (req, res) => {
   });
 });
 
+/**
+ * Sliding-Session-Refresh: ein noch gültiges Token wird gegen ein frisches
+ * getauscht (kein Passwort nötig). Der s0-Claim (Session-Start) wandert
+ * dabei UNVERÄNDERT mit und deckelt die absolute Session-Lebensdauer —
+ * ein gestohlenes Token lässt sich also nicht endlos verlängern.
+ * Bisher starb jede Session hart nach 12 h (Re-Login mit Passwort).
+ */
+const MAX_SESSION_AGE_MS = Number(
+  process.env.VAULTCHAT_MAX_SESSION_AGE_MS ?? 30 * 24 * 60 * 60 * 1000
+);
+app.post("/api/token/refresh", apiLimiter, (req, res) => {
+  const t = bearer(req);
+  const u = t ? verifyToken(t) : null;
+  if (!u) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  // Account muss noch existieren (gelöschte Accounts bekommen kein
+  // frisches Token, auch wenn das alte formal noch gültig ist).
+  const user = findUserById(u.userId);
+  if (!user) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const s0 = u.sessionStart ?? Math.floor(Date.now() / 1000);
+  if (Date.now() - s0 * 1000 > MAX_SESSION_AGE_MS) {
+    res.status(401).json({ error: "session_expired" });
+    return;
+  }
+  log.debug("auth_token_refresh", { userId: user.id });
+  res.json({
+    token: signToken(
+      { userId: user.id, username: user.username },
+      undefined,
+      s0
+    ),
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Blob-Store für Chunked-File-Upload (Foundation, kein Client-Adopter yet).
 // Verschlüsselte Ciphertext-Bytes vom Client; Server speichert lediglich

@@ -7,9 +7,16 @@ import { log } from "./logger.js";
 const JwtPayload = z.object({
   sub: z.string(),
   u: z.string(),
+  /** Session-Start (Unix-Sekunden) — wandert beim Refresh unverändert mit
+   *  und begrenzt die absolute Lebensdauer einer Sliding-Session. */
+  s0: z.number().optional(),
 });
 
-export type JwtUser = { userId: string; username: string };
+export type JwtUser = {
+  userId: string;
+  username: string;
+  sessionStart?: number;
+};
 
 const JWT_SECRET = process.env.VAULTCHAT_JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
@@ -75,8 +82,13 @@ export async function verifyPasswordOrDummy(
   return false;
 }
 
-export function signToken(user: JwtUser, ttlSec = 60 * 60 * 12) {
-  return jwt.sign({ sub: user.userId, u: user.username }, secret(), {
+export function signToken(
+  user: JwtUser,
+  ttlSec = 60 * 60 * 12,
+  sessionStartSec?: number
+) {
+  const s0 = sessionStartSec ?? Math.floor(Date.now() / 1000);
+  return jwt.sign({ sub: user.userId, u: user.username, s0 }, secret(), {
     expiresIn: ttlSec,
     issuer: "vaultchat",
   });
@@ -86,7 +98,11 @@ export function verifyToken(token: string): JwtUser | null {
   try {
     const raw = jwt.verify(token, secret(), { issuer: "vaultchat" });
     const p = JwtPayload.parse(raw);
-    return { userId: p.sub, username: p.u };
+    return {
+      userId: p.sub,
+      username: p.u,
+      ...(typeof p.s0 === "number" ? { sessionStart: p.s0 } : {}),
+    };
   } catch {
     return null;
   }

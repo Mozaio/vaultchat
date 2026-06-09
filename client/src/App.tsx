@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { sodiumReady, getSodium } from "./lib/sodium";
@@ -242,6 +243,57 @@ export function App() {
   }, [session]);
 
   useAutoLock(unlocked, autoLockMinutes * 60 * 1000, lock);
+
+  // Sliding-Session: Token läuft nach 12 h hart ab — vorher gegen ein
+  // frisches tauschen, sonst stirbt jede längere Session mit Re-Login.
+  // Details:
+  // - Token lebt im Ref, damit der Effekt NICHT auf session.token hängt
+  //   (sonst: Refresh → neues Token → Effekt-Neustart → Endlosschleife).
+  // - Refresh nur wenn das Token älter als 6 h ist: das neue session-Objekt
+  //   triggert den WS-Effekt in ChatShell (kurzer Reconnect) — das soll
+  //   selten passieren, nicht bei jedem Entsperren.
+  const sessionTokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    sessionTokenRef.current = session?.token ?? null;
+  }, [session]);
+  useEffect(() => {
+    if (!unlocked) return;
+    let disposed = false;
+    const tokenIssuedAtSec = (tok: string): number | null => {
+      try {
+        const part = tok.split(".")[1] ?? "";
+        const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+        const payload = JSON.parse(atob(padded)) as { iat?: number };
+        return typeof payload.iat === "number" ? payload.iat : null;
+      } catch {
+        return null;
+      }
+    };
+    const REFRESH_AFTER_SEC = 6 * 60 * 60;
+    const refresh = async () => {
+      const tok = sessionTokenRef.current;
+      if (!tok) return;
+      const iat = tokenIssuedAtSec(tok);
+      if (iat !== null && Date.now() / 1000 - iat < REFRESH_AFTER_SEC) return;
+      try {
+        const api = await import("./lib/api");
+        const { token } = await api.refreshToken(tok);
+        if (disposed || !token) return;
+        saveToken(token);
+        setSession((s) => (s ? { ...s, token } : s));
+      } catch {
+        // Offline, Server schläft oder session_expired — die bestehenden
+        // 401-Pfade greifen beim nächsten API-Call; hier nichts erzwingen.
+      }
+    };
+    void refresh();
+    const id = window.setInterval(refresh, 30 * 60 * 1000);
+    return () => {
+      disposed = true;
+      window.clearInterval(id);
+    };
+  }, [unlocked]);
 
   // Surface unexpected runtime errors instead of a blank screen.
   useEffect(() => {
