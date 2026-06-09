@@ -61,6 +61,12 @@ import {
   PLAN_LIMITS,
   type PlanId,
 } from "../lib/plan";
+import {
+  isZkgroupExperimentalEnabled,
+  setZkgroupExperimentalEnabled,
+  probeZkgroup,
+  type ZkgroupProbe,
+} from "../lib/zkgroupClient";
 
 export type SecurityLevel = "normal" | "extreme";
 
@@ -1208,6 +1214,7 @@ export function SecuritySettings({
                   </p>
                 </div>
               )}
+              <ZkgroupExperimentalSection />
               <AccountDangerZone />
             </div>
           )}
@@ -1257,6 +1264,81 @@ export function SecuritySettings({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ZkgroupExperimentalSection() {
+  useLocale();
+  const [enabled, setEnabled] = useState(() => isZkgroupExperimentalEnabled());
+  const [busy, setBusy] = useState(false);
+  const [probe, setProbe] = useState<ZkgroupProbe | null>(null);
+
+  const runProbe = async () => {
+    setBusy(true);
+    setProbe(null);
+    const result = await probeZkgroup();
+    setProbe(result);
+    setBusy(false);
+  };
+
+  return (
+    <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
+      <h3
+        className="mb-1 text-sm font-medium"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {t("settings.zkgroupHeading")}
+      </h3>
+      <p className="mb-2 text-xs" style={{ color: "var(--text-muted)" }}>
+        {t("settings.zkgroupDesc")}
+      </p>
+      <label
+        className="flex cursor-pointer items-start gap-3 text-sm"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => {
+            setZkgroupExperimentalEnabled(e.target.checked);
+            setEnabled(e.target.checked);
+            setProbe(null);
+          }}
+          className="mt-1"
+        />
+        <span>{t("settings.zkgroupToggle")}</span>
+      </label>
+      {enabled && (
+        <div className="mt-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runProbe()}
+            className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {busy ? t("settings.zkgroupTesting") : t("settings.zkgroupSelfTest")}
+          </button>
+          {probe && (
+            <p
+              className="mt-2 text-xs"
+              style={{
+                color: probe.selfTest ? "var(--accent)" : "var(--danger)",
+              }}
+            >
+              {probe.selfTest
+                ? t("settings.zkgroupOk", { version: probe.version ?? "?" })
+                : t("settings.zkgroupFail", {
+                    reason: probe.reason ?? "unknown",
+                  })}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
