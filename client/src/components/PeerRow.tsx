@@ -21,6 +21,9 @@ export function PeerRow({
   blurAvatar,
   onTogglePin,
   onContextMenu,
+  onRowTouchStart,
+  onRowTouchMove,
+  onRowTouchEnd,
   selected,
   onSelect,
 }: {
@@ -47,6 +50,14 @@ export function PeerRow({
     clientX: number;
     clientY: number;
   }) => void;
+  /** iOS-Long-Press-Fallback: Touch-Timer im Parent (kein contextmenu auf iOS). */
+  onRowTouchStart?: (e: {
+    touches: ArrayLike<{ clientX: number; clientY: number }>;
+  }) => void;
+  onRowTouchMove?: (e: {
+    touches: ArrayLike<{ clientX: number; clientY: number }>;
+  }) => void;
+  onRowTouchEnd?: () => void;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -56,7 +67,14 @@ export function PeerRow({
     void getPin(u.id).then(setPin);
   }, [u.id, u.publicKey]);
   return (
-    <div className="peer-row-wrap" onContextMenu={onContextMenu}>
+    <div
+      className="peer-row-wrap"
+      onContextMenu={onContextMenu}
+      onTouchStart={onRowTouchStart}
+      onTouchMove={onRowTouchMove}
+      onTouchEnd={onRowTouchEnd}
+      onTouchCancel={onRowTouchEnd}
+    >
       <button
         type="button"
         onClick={onSelect}

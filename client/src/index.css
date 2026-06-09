@@ -8170,6 +8170,17 @@ html.is-tauri #root > div:not(.titlebar) {
   width: 240px;
   animation: reaction-pop-in 0.14s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
+/* Long-Press auf Chat-Zeilen: iOS-Callout + Textauswahl unterdrücken,
+   damit der Touch-Timer das Kontextmenü öffnen kann statt der
+   System-Lupe/-Auswahl. */
+.peer-row-wrap,
+.peer-row-wrap .contact-item,
+.contact-item {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .row-context-menu {
     animation: none;

@@ -400,6 +400,66 @@ export function ChatShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [rowMenu]);
+  // iOS feuert KEIN contextmenu bei Long-Press — eigener Touch-Timer
+  // (500 ms, bricht bei >10 px Bewegung oder Fingerheben ab). Der
+  // Click-Guard unterdrückt den Ghost-Click, den der Browser nach dem
+  // Long-Press beim Fingerheben synthetisiert — sonst würde er sofort
+  // das frisch geöffnete Menü treffen oder schließen.
+  const longPressRef = useRef<{
+    timer: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const rowMenuGuardUntilRef = useRef(0);
+  const cancelRowLongPress = useCallback(() => {
+    if (longPressRef.current) {
+      window.clearTimeout(longPressRef.current.timer);
+      longPressRef.current = null;
+    }
+  }, []);
+  const startRowLongPress = useCallback(
+    (
+      kind: "dm" | "group",
+      id: string,
+      e: { touches: ArrayLike<{ clientX: number; clientY: number }> }
+    ) => {
+      const t0 = e.touches[0];
+      if (!t0) return;
+      cancelRowLongPress();
+      const startX = t0.clientX;
+      const startY = t0.clientY;
+      const timer = window.setTimeout(() => {
+        longPressRef.current = null;
+        rowMenuGuardUntilRef.current = Date.now() + 350;
+        try {
+          navigator.vibrate?.(15);
+        } catch {
+          /* kein Vibration-Support */
+        }
+        openRowMenu(kind, id, {
+          preventDefault: () => {},
+          clientX: startX,
+          clientY: startY,
+        });
+      }, 500);
+      longPressRef.current = { timer, startX, startY };
+    },
+    [cancelRowLongPress, openRowMenu]
+  );
+  const moveRowLongPress = useCallback(
+    (e: { touches: ArrayLike<{ clientX: number; clientY: number }> }) => {
+      const lp = longPressRef.current;
+      const t0 = e.touches[0];
+      if (!lp || !t0) return;
+      if (
+        Math.abs(t0.clientX - lp.startX) > 10 ||
+        Math.abs(t0.clientY - lp.startY) > 10
+      ) {
+        cancelRowLongPress();
+      }
+    },
+    [cancelRowLongPress]
+  );
   // Message requests (Signal-style gate): a peer is "accepted" once the user
   // has engaged (added them, sent them a message, or explicitly accepted a
   // request). The first DM from a not-yet-accepted, not-blocked sender lands
@@ -4473,6 +4533,9 @@ export function ChatShell({
           blurAvatar={isReq}
           onTogglePin={() => togglePinPeer(u.id)}
           onContextMenu={(e) => openRowMenu("dm", u.id, e)}
+          onRowTouchStart={(e) => startRowLongPress("dm", u.id, e)}
+          onRowTouchMove={moveRowLongPress}
+          onRowTouchEnd={cancelRowLongPress}
           selected={peer?.id === u.id && tab === "dm"}
           onSelect={() => {
             setTab("dm");
@@ -4498,6 +4561,9 @@ export function ChatShell({
     requestPeerIds,
     togglePinPeer,
     openRowMenu,
+    startRowLongPress,
+    moveRowLongPress,
+    cancelRowLongPress,
     fmtListTime,
     draftsVersion,
   ]);
@@ -4523,6 +4589,10 @@ export function ChatShell({
               setInfoOpen(false);
             }}
             onContextMenu={(e) => openRowMenu("group", g.id, e)}
+            onTouchStart={(e) => startRowLongPress("group", g.id, e)}
+            onTouchMove={moveRowLongPress}
+            onTouchEnd={cancelRowLongPress}
+            onTouchCancel={cancelRowLongPress}
             className={`contact-item w-full !mx-0 ${
               group?.id === g.id && tab === "group"
                 ? "active"
@@ -4591,6 +4661,9 @@ export function ChatShell({
       unreadByGroup,
       mutedGroups,
       openRowMenu,
+      startRowLongPress,
+      moveRowLongPress,
+      cancelRowLongPress,
       fmtListTime,
       draftsVersion,
     ]
@@ -4642,7 +4715,11 @@ export function ChatShell({
           return (
             <div
               className="row-menu-overlay"
-              onClick={closeRowMenu}
+              onClick={() => {
+                // Ghost-Click nach Touch-Long-Press ignorieren.
+                if (Date.now() < rowMenuGuardUntilRef.current) return;
+                closeRowMenu();
+              }}
               onContextMenu={(e) => {
                 e.preventDefault();
                 closeRowMenu();
@@ -4652,6 +4729,13 @@ export function ChatShell({
                 className="chat-menu row-context-menu"
                 style={{ left: rowMenu.x, top: rowMenu.y }}
                 onClick={(e) => e.stopPropagation()}
+                onClickCapture={(e) => {
+                  // Ghost-Click darf keinen Menüpunkt auslösen.
+                  if (Date.now() < rowMenuGuardUntilRef.current) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
                 role="menu"
               >
                 {menuUser && (
