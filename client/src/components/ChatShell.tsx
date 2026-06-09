@@ -1301,8 +1301,9 @@ export function ChatShell({
 
   // Per-chat composer drafts (Discord/Signal-style): switching conversations
   // preserves each chat's unsent text instead of bleeding it across chats.
-  // Kept in-memory only — drafts must not survive a lock/logout (no at-rest
-  // plaintext draft leak).
+  // Drafts überleben Reload/Sperre: verschlüsselt in der IDB-Meta-Storage
+  // (Local-Key) — gleiches Schutzniveau wie der Nachrichtenverlauf, weiterhin
+  // kein Plaintext at rest.
   const draftsRef = useRef<Map<string, string>>(new Map());
   const lastDraftPeerIdRef = useRef<string | null>(null);
   const textRef = useRef(text);
@@ -1349,7 +1350,7 @@ export function ChatShell({
 
   // Per-group composer drafts + reply hygiene, mirroring the DM behaviour:
   // switching groups preserves each group's unsent text and never carries a
-  // reply target into the next group. In-memory only (no at-rest draft leak).
+  // reply target into the next group.
   const groupDraftsRef = useRef<Map<string, string>>(new Map());
   const lastDraftGroupIdRef = useRef<string | null>(null);
   const groupTextRef = useRef(groupText);
@@ -1363,6 +1364,96 @@ export function ChatShell({
     if (prevId) setReplyGroup(null);
     lastDraftGroupIdRef.current = nextId;
   }, [group?.id]);
+
+  // Draft-Persistenz: alle Entwürfe als EINE verschlüsselte Meta-Row
+  // ("drafts:v1"), damit der Boot-Load ohne Meta-Enumeration auskommt.
+  // draftsVersion triggert die Sidebar-Previews ("Entwurf: …") — Refs allein
+  // lösen keinen Re-Render aus.
+  const [draftsVersion, setDraftsVersion] = useState(0);
+  const draftsLoadedRef = useRef(false);
+  const draftsPersistTimerRef = useRef<number | null>(null);
+  const persistDraftsSoon = useCallback(() => {
+    if (draftsPersistTimerRef.current !== null) {
+      window.clearTimeout(draftsPersistTimerRef.current);
+    }
+    draftsPersistTimerRef.current = window.setTimeout(() => {
+      draftsPersistTimerRef.current = null;
+      const dm: Record<string, string> = {};
+      for (const [k, v] of draftsRef.current) if (v.trim()) dm[k] = v;
+      const grp: Record<string, string> = {};
+      for (const [k, v] of groupDraftsRef.current) if (v.trim()) grp[k] = v;
+      void metaSet("drafts:v1", JSON.stringify({ dm, group: grp })).catch(
+        () => {}
+      );
+    }, 600);
+  }, []);
+  useEffect(
+    () => () => {
+      // Kein Persist-Write mehr nach Unmount (z. B. nach Sperren).
+      if (draftsPersistTimerRef.current !== null) {
+        window.clearTimeout(draftsPersistTimerRef.current);
+      }
+    },
+    []
+  );
+  // Boot: persistierte Drafts einmalig laden; In-Memory-Stände gewinnen.
+  useEffect(() => {
+    if (draftsLoadedRef.current) return;
+    draftsLoadedRef.current = true;
+    void (async () => {
+      const raw = await metaGet("drafts:v1").catch(() => null);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw) as {
+          dm?: Record<string, string>;
+          group?: Record<string, string>;
+        };
+        for (const [k, v] of Object.entries(parsed.dm ?? {})) {
+          if (typeof v === "string" && v && !draftsRef.current.has(k)) {
+            draftsRef.current.set(k, v);
+          }
+        }
+        for (const [k, v] of Object.entries(parsed.group ?? {})) {
+          if (typeof v === "string" && v && !groupDraftsRef.current.has(k)) {
+            groupDraftsRef.current.set(k, v);
+          }
+        }
+        // Falls schon ein Chat offen ist: Draft in den Composer heben.
+        const curPeer = lastDraftPeerIdRef.current;
+        if (curPeer && !textRef.current) {
+          setText(draftsRef.current.get(curPeer) ?? "");
+        }
+        const curGroup = lastDraftGroupIdRef.current;
+        if (curGroup && !groupTextRef.current) {
+          setGroupText(groupDraftsRef.current.get(curGroup) ?? "");
+        }
+        setDraftsVersion((v) => v + 1);
+      } catch {
+        /* korrupter Draft-Blob — ignorieren */
+      }
+    })();
+  }, []);
+  // Write-through: hält die Map live (Senden leert sie via setText("")) und
+  // persistiert debounced. Vor dem Boot-Load kein Persist, sonst würde ein
+  // früher Tastendruck den gespeicherten Blob mit nur einem Chat überschreiben.
+  useEffect(() => {
+    if (!draftsLoadedRef.current) return;
+    const id = lastDraftPeerIdRef.current;
+    if (!id) return;
+    if (text.trim()) draftsRef.current.set(id, text);
+    else draftsRef.current.delete(id);
+    setDraftsVersion((v) => v + 1);
+    persistDraftsSoon();
+  }, [text, persistDraftsSoon]);
+  useEffect(() => {
+    if (!draftsLoadedRef.current) return;
+    const id = lastDraftGroupIdRef.current;
+    if (!id) return;
+    if (groupText.trim()) groupDraftsRef.current.set(id, groupText);
+    else groupDraftsRef.current.delete(id);
+    setDraftsVersion((v) => v + 1);
+    persistDraftsSoon();
+  }, [groupText, persistDraftsSoon]);
 
   // Auto-scroll: nur wenn der User bereits unten war ODER neue Nachricht reinkommt
   // Mit smooth scrolling und verbesserter Bottom-Erkennung
@@ -4211,6 +4302,10 @@ export function ChatShell({
     return visibleUsers.map((u) => {
       const prev = lastDmPreviewByPeer.get(u.id);
       const isReq = requestPeerIds.has(u.id);
+      // WhatsApp-Pattern: nicht-aktive Chats mit ungesendetem Text zeigen
+      // "Entwurf: …" statt der letzten Nachricht.
+      const isActive = peer?.id === u.id && tab === "dm";
+      const draft = !isReq && !isActive ? draftsRef.current.get(u.id) : undefined;
       // Privacy: never surface a not-yet-accepted sender's message text in the
       // list — it could be abusive/unsolicited. Show a neutral prompt instead.
       const subtitle = isReq
@@ -4227,6 +4322,7 @@ export function ChatShell({
           key={u.id}
           u={u}
           subtitle={subtitle}
+          draftText={draft && draft.trim() ? draft : undefined}
           isTyping={peer?.id === u.id && typing}
           metaRight={fmtListTime(prev?.at)}
           unread={unreadByPeer[u.id] ?? 0}
@@ -4261,6 +4357,7 @@ export function ChatShell({
     requestPeerIds,
     togglePinPeer,
     fmtListTime,
+    draftsVersion,
   ]);
 
   const groupList = useMemo(
@@ -4270,6 +4367,9 @@ export function ChatShell({
         const showGTyping = Boolean(gTyping && gTyping.size > 0);
         const gPrev = lastGroupPreviewByGroup.get(g.id);
         const gUnread = unreadByGroup[g.id] ?? 0;
+        const gActive = group?.id === g.id && tab === "group";
+        const gDraftRaw = gActive ? undefined : groupDraftsRef.current.get(g.id);
+        const gDraft = gDraftRaw && gDraftRaw.trim() ? gDraftRaw : undefined;
         return (
           <button
             key={g.id}
@@ -4309,6 +4409,11 @@ export function ChatShell({
                     <span></span>
                     {t("chat.typing")}
                   </span>
+                ) : gDraft ? (
+                  <>
+                    <span className="draft-prefix">{t("chat.draftLabel")}</span>{" "}
+                    {gDraft}
+                  </>
                 ) : gPrev ? (
                   `${gPrev.author}: ${gPrev.text}`
                 ) : (
@@ -4335,6 +4440,7 @@ export function ChatShell({
       lastGroupPreviewByGroup,
       unreadByGroup,
       fmtListTime,
+      draftsVersion,
     ]
   );
 

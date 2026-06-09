@@ -2028,6 +2028,11 @@ const DICT: Record<string, Dict> = {
     fr: "écrit…", pt: "digitando…", ru: "печатает…", ar: "يكتب…",
     zh: "正在输入…", hi: "लिख रहे हैं…",
   },
+  "chat.draftLabel": {
+    en: "Draft:", de: "Entwurf:", tr: "Taslak:", es: "Borrador:",
+    fr: "Brouillon :", pt: "Rascunho:", ru: "Черновик:", ar: "مسودة:",
+    zh: "草稿：", hi: "ड्राफ़्ट:",
+  },
   "chat.notesForYou": {
     en: "Notes for yourself", de: "Notizen für dich", tr: "Kendine notlar",
     es: "Notas para ti", fr: "Notes pour vous", pt: "Notas para si",

@@ -8125,3 +8125,16 @@ html.is-tauri #root > div:not(.titlebar) {
 }
 
 /* End VAULTCHAT v7 */
+
+/* ============================================================
+   VAULTCHAT v8 — Draft-Preview in der Chatliste (WhatsApp-Pattern)
+   ============================================================ */
+
+/* "Entwurf:"-Prefix im Listen-Preview: Akzentfarbe hebt ungesendeten
+   Text von normalen Nachrichten-Previews ab. */
+.draft-prefix {
+  color: var(--accent);
+  font-weight: 640;
+}
+
+/* End VAULTCHAT v8 */

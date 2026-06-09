@@ -8,6 +8,7 @@ import { t, useLocale } from "../lib/i18n";
 export function PeerRow({
   u,
   subtitle,
+  draftText,
   metaRight,
   unread,
   isFavorite,
@@ -23,6 +24,8 @@ export function PeerRow({
 }: {
   u: api.ApiUser;
   subtitle?: string;
+  /** Ungesendeter Composer-Text — zeigt "Entwurf: …" statt der letzten Nachricht. */
+  draftText?: string;
   metaRight?: string;
   unread?: number;
   isFavorite?: boolean;
@@ -108,8 +111,13 @@ export function PeerRow({
                 <span></span>
                 <span></span>
                 <span></span>
-                schreibt
+                {t("chat.typing")}
               </span>
+            ) : draftText ? (
+              <>
+                <span className="draft-prefix">{t("chat.draftLabel")}</span>{" "}
+                {draftText}
+              </>
             ) : (
               subtitle ?? ""
             )}
