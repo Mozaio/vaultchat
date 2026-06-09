@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import * as api from "../lib/api";
 import { userGradient } from "../lib/chatHelpers";
 import { getPin, type PeerPin } from "../lib/trust";
-import { IconPin } from "./Icons";
+import { IconPin, IconVolumeMute } from "./Icons";
 import { t, useLocale } from "../lib/i18n";
 
 export function PeerRow({
@@ -14,6 +14,7 @@ export function PeerRow({
   isFavorite,
   isBlocked,
   isPinned,
+  isMuted,
   isOnline,
   isTyping,
   isRequest,
@@ -31,6 +32,7 @@ export function PeerRow({
   isFavorite?: boolean;
   isBlocked?: boolean;
   isPinned?: boolean;
+  isMuted?: boolean;
   isOnline?: boolean;
   isTyping?: boolean;
   /** Pending message request from a not-yet-accepted sender. */
@@ -85,6 +87,11 @@ export function PeerRow({
             {isFavorite && (
               <span className="row-badge row-badge-fav" title={t("chat.favoriteShort")}>
                 ★
+              </span>
+            )}
+            {isMuted && (
+              <span className="row-badge row-badge-muted" title={t("chat.muted")}>
+                <IconVolumeMute size={11} />
               </span>
             )}
             {isBlocked && (

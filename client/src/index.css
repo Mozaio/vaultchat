@@ -3249,6 +3249,15 @@ select:focus-visible {
   pointer-events: auto;
 }
 
+/* Touch-Geräte haben kein Hover — Pin-Toggle dezent immer anbieten,
+   sonst ist Anpinnen auf Mobile unmöglich. */
+@media (hover: none) {
+  .peer-pin-toggle {
+    opacity: 0.45;
+    pointer-events: auto;
+  }
+}
+
 .peer-pin-toggle:hover,
 .peer-pin-toggle.active {
   color: var(--accent);
@@ -3309,6 +3318,15 @@ select:focus-visible {
   color: var(--accent);
   background: var(--accent-soft);
   text-transform: none;
+}
+
+/* Stumm-Indikator in der Chatliste (WhatsApp/Telegram-Pattern):
+   dezent, nur Icon, kein lauter Chip. */
+.row-badge-muted {
+  border-color: transparent;
+  background: transparent;
+  padding: 0.1rem;
+  color: var(--text-muted);
 }
 
 /*
@@ -7409,10 +7427,10 @@ button:focus-visible,
   box-shadow: 0 2px 8px -3px var(--accent-glow);
 }
 .message-bubble.sent.tail {
-  border-bottom-right-radius: 7px;
+  border-bottom-right-radius: 6px;
 }
 .message-bubble.received.tail {
-  border-bottom-left-radius: 7px;
+  border-bottom-left-radius: 6px;
 }
 .message-wrapper:hover
   .message-bubble:not(.is-deleted):not(.system-message) {

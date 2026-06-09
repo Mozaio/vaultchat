@@ -4359,6 +4359,7 @@ export function ChatShell({
           isFavorite={favoritePeers.has(u.id)}
           isBlocked={blockedPeers.has(u.id)}
           isPinned={pinnedPeers.has(u.id)}
+          isMuted={mutedPeers.has(u.id)}
           isOnline={onlinePeers.has(u.id)}
           isRequest={isReq}
           blurAvatar={isReq}
@@ -4383,6 +4384,7 @@ export function ChatShell({
     favoritePeers,
     blockedPeers,
     pinnedPeers,
+    mutedPeers,
     onlinePeers,
     requestPeerIds,
     togglePinPeer,
@@ -4428,7 +4430,14 @@ export function ChatShell({
               </div>
             )}
             <div className="contact-info min-w-0">
-              <span className="contact-name">{g.name}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="contact-name">{g.name}</span>
+                {mutedGroups.has(g.id) && (
+                  <span className="row-badge row-badge-muted" title={t("chat.muted")}>
+                    <IconVolumeMute size={11} />
+                  </span>
+                )}
+              </div>
               <p
                 className={`contact-preview${showGTyping ? " typing" : ""}`}
               >
@@ -4469,6 +4478,7 @@ export function ChatShell({
       groupTypingMap,
       lastGroupPreviewByGroup,
       unreadByGroup,
+      mutedGroups,
       fmtListTime,
       draftsVersion,
     ]

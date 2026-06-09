@@ -2054,6 +2054,11 @@ const DICT: Record<string, Dict> = {
     fr: "{n} discussions", pt: "{n} conversas", ru: "Чатов: {n}",
     ar: "{n} محادثة", zh: "{n} 个聊天", hi: "{n} चैट",
   },
+  "chat.muted": {
+    en: "Muted", de: "Stummgeschaltet", tr: "Sessize alındı",
+    es: "Silenciado", fr: "Mis en sourdine", pt: "Silenciado",
+    ru: "Без звука", ar: "مكتوم", zh: "已静音", hi: "म्यूट किया गया",
+  },
   "chat.notesForYou": {
     en: "Notes for yourself", de: "Notizen für dich", tr: "Kendine notlar",
     es: "Notas para ti", fr: "Notes pour vous", pt: "Notas para si",
