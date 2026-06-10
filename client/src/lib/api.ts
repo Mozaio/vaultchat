@@ -220,15 +220,31 @@ export async function zkgroupCredential(token: string) {
   );
 }
 
-/** zkgroup (experimentell): lässt eine Presentation server-seitig verifizieren. */
+/** zkgroup (experimentell): lässt eine Presentation server-seitig verifizieren.
+ *  Entweder gegen client-attestierte Params (groupPublicParams) oder
+ *  gruppen-gebunden gegen die server-gespeicherten Params (groupId). */
 export async function zkgroupVerifyPresentation(
   token: string,
-  body: { presentation: string; groupPublicParams: string }
+  body:
+    | { presentation: string; groupPublicParams: string }
+    | { presentation: string; groupId: string }
 ) {
-  return req<{ valid: boolean }>("/api/zkgroup/verify-presentation", {
+  return req<{ valid: boolean; groupBound?: boolean }>(
+    "/api/zkgroup/verify-presentation",
+    { method: "POST", token, body: JSON.stringify(body) }
+  );
+}
+
+/** zkgroup (experimentell): lädt die GroupPublicParams einer Gruppe hoch. */
+export async function zkgroupSetGroupParams(
+  token: string,
+  groupId: string,
+  groupPublicParams: string
+) {
+  return req<{ ok: boolean }>(`/api/groups/${groupId}/zkgroup-params`, {
     method: "POST",
     token,
-    body: JSON.stringify(body),
+    body: JSON.stringify({ groupPublicParams }),
   });
 }
 

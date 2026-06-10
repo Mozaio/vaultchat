@@ -210,3 +210,76 @@ export async function zkgroupServerRoundtrip(): Promise<ZkgroupServerProbe> {
     return { ran: false, valid: null, reason };
   }
 }
+
+/**
+ * Gruppen-gebundener Roundtrip (A3-2e): leitet die GroupPublicParams aus dem
+ * GMK einer ECHTEN Gruppe ab, lädt sie auf den Server, erzeugt eine
+ * Presentation mit demselben GMK und lässt sie gegen die SERVER-gespeicherten
+ * Params verifizieren. Beweist: „Absender hält ein gültiges Credential UND
+ * kennt das Geheimnis dieser Gruppe" — also Mitgliedschaft, ohne dass der
+ * Server die Identität lernt. Reine Diagnose, NICHT im Nachrichtenpfad.
+ */
+export async function zkgroupGroupBoundRoundtrip(): Promise<ZkgroupServerProbe> {
+  if (!isZkgroupExperimentalEnabled()) {
+    return { ran: false, valid: null, reason: "flag_off" };
+  }
+  try {
+    const { base64FromUint8, uint8FromBase64 } = await import("./b64");
+    const { loadToken, loadLocalIdentity } = await import("./localIdentity");
+    const { getGroupSecret } = await import("./groupSecret");
+    const api = await import("./api");
+
+    const token = loadToken();
+    const identity = loadLocalIdentity();
+    if (!token || !identity) {
+      return { ran: false, valid: null, reason: "not_logged_in" };
+    }
+
+    const { groups } = await api.listGroups(token);
+    if (!groups || groups.length === 0) {
+      return { ran: false, valid: null, reason: "no_group" };
+    }
+    // Erste Gruppe, für die wir lokal das GMK haben (= echtes Mitglied).
+    let groupId: string | null = null;
+    let gmk: Uint8Array | null = null;
+    for (const g of groups) {
+      const gs = await getGroupSecret(g.id);
+      if (gs) {
+        groupId = g.id;
+        gmk = uint8FromBase64(gs.keyB64);
+        break;
+      }
+    }
+    if (!groupId || !gmk) {
+      return { ran: false, valid: null, reason: "no_group_secret" };
+    }
+
+    const m = await loadZkgroup();
+    const gpp = m.derive_group_public_params(gmk);
+    await api.zkgroupSetGroupParams(token, groupId, base64FromUint8(gpp));
+
+    const cred = await api.zkgroupCredential(token);
+    const uuid16 = uuidToBytes(identity.userId);
+    const randomness = crypto.getRandomValues(new Uint8Array(32));
+    const presentation = m.create_membership_presentation(
+      gmk,
+      uint8FromBase64(cred.publicParams),
+      uint8FromBase64(cred.credential),
+      uuid16,
+      cred.redemptionTime,
+      randomness
+    );
+
+    const { valid } = await api.zkgroupVerifyPresentation(token, {
+      presentation: base64FromUint8(presentation),
+      groupId,
+    });
+    return { ran: true, valid, reason: valid ? null : "server_rejected" };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "roundtrip_failed";
+    const reason = /zkgroup_unavailable|503/.test(msg)
+      ? "server_disabled"
+      : msg.slice(0, 160);
+    return { ran: false, valid: null, reason };
+  }
+}

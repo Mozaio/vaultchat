@@ -32,6 +32,14 @@ export type StoredGroup = {
   avatar?: string;
   /** Wann zuletzt Name/Beschreibung/Avatar geändert (für UI-Cache). */
   updatedAt?: number;
+  /**
+   * zkgroup (experimentell, A3-2e): base64-serialisierte GroupPublicParams,
+   * von einem Mitglied aus dem GMK abgeleitet hochgeladen. ÖFFENTLICHER Wert
+   * (leakt den GMK nicht). Nur in-memory, nicht persistiert — Clients laden
+   * sie bei Bedarf neu. Dient heute NUR der gruppen-gebundenen
+   * Presentation-Verifikation (Diagnose), nicht dem Nachrichtenpfad.
+   */
+  zkgPublicParams?: string;
 };
 
 const users = new Map<string, StoredUser>(
@@ -201,6 +209,22 @@ export function updateGroupProfile(
 
 export function getGroup(id: string) {
   return groups.get(id);
+}
+
+/**
+ * Setzt die zkgroup-GroupPublicParams einer Gruppe (nur ein Mitglied darf
+ * das). Additiv und in-memory — verändert keinen anderen Gruppen-Zustand.
+ */
+export function setGroupZkgParams(
+  groupId: string,
+  actorId: string,
+  zkgPublicParams: string
+): boolean {
+  const g = groups.get(groupId);
+  if (!g) return false;
+  if (!g.memberIds.includes(actorId)) return false;
+  g.zkgPublicParams = zkgPublicParams;
+  return true;
 }
 
 export function listGroupsForUser(userId: string) {

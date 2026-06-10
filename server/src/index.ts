@@ -19,6 +19,7 @@ import {
   listGroupsForUser,
   listUsersSafe,
   removeGroupMember,
+  setGroupZkgParams,
   updateGroupProfile,
 } from "./memoryStore.js";
 import {
@@ -591,9 +592,13 @@ app.post("/api/zkgroup/credential", apiLimiter, (req, res) => {
  * client-erzeugte Presentations server-seitig durchgehen. base64-Felder
  * sind klein (Presentation/Params je ein paar hundert Byte); 64 KB Cap.
  */
+// groupPublicParams (direkt, Test-GMK) ODER groupId (gegen die server-
+// gespeicherten Params der Gruppe → gruppen-gebundener Beweis). Eines von
+// beiden muss da sein.
 const ZkVerifyBody = z.object({
   presentation: z.string().min(1).max(64 * 1024),
-  groupPublicParams: z.string().min(1).max(64 * 1024),
+  groupPublicParams: z.string().min(1).max(64 * 1024).optional(),
+  groupId: z.string().uuid().optional(),
 });
 app.post("/api/zkgroup/verify-presentation", apiLimiter, (req, res) => {
   const t = bearer(req);
@@ -612,19 +617,72 @@ app.post("/api/zkgroup/verify-presentation", apiLimiter, (req, res) => {
     res.status(400).json({ error: "invalid_body" });
     return;
   }
+  let gppB64 = parsed.data.groupPublicParams;
+  let groupBound = false;
+  if (parsed.data.groupId) {
+    const g = getGroup(parsed.data.groupId);
+    // Nur Mitglieder dürfen gegen die Params ihrer Gruppe prüfen.
+    if (!g || !g.memberIds.includes(jwtUser.userId)) {
+      res.status(404).json({ error: "group_not_found" });
+      return;
+    }
+    if (!g.zkgPublicParams) {
+      res.status(409).json({ error: "group_params_missing" });
+      return;
+    }
+    gppB64 = g.zkgPublicParams;
+    groupBound = true;
+  }
+  if (!gppB64) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
   try {
     const valid = verifyPresentation(
-      new Uint8Array(Buffer.from(parsed.data.groupPublicParams, "base64")),
+      new Uint8Array(Buffer.from(gppB64, "base64")),
       new Uint8Array(Buffer.from(parsed.data.presentation, "base64"))
     );
-    log.debug("zkgroup_verify", { valid });
-    res.json({ valid });
+    log.debug("zkgroup_verify", { valid, groupBound });
+    res.json({ valid, groupBound });
   } catch (e) {
     log.warn("zkgroup_verify_failed", {
       reason: e instanceof Error ? e.message.slice(0, 120) : "unknown",
     });
     res.status(500).json({ error: "zkgroup_verify_failed" });
   }
+});
+
+/** Lädt die zkgroup-GroupPublicParams einer Gruppe hoch (Mitglied, flag). */
+const ZkParamsBody = z.object({
+  groupPublicParams: z.string().min(1).max(64 * 1024),
+});
+app.post("/api/groups/:id/zkgroup-params", groupLimiter, (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const zk = getZkgroupStatus();
+  if (!zk.enabled || !zk.available) {
+    res.status(503).json({ error: "zkgroup_unavailable" });
+    return;
+  }
+  const parsed = ZkParamsBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const ok = setGroupZkgParams(
+    req.params.id,
+    jwtUser.userId,
+    parsed.data.groupPublicParams
+  );
+  if (!ok) {
+    res.status(404).json({ error: "group_not_found" });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 void initZkgroup();

@@ -66,6 +66,7 @@ import {
   setZkgroupExperimentalEnabled,
   probeZkgroup,
   zkgroupServerRoundtrip,
+  zkgroupGroupBoundRoundtrip,
   type ZkgroupProbe,
   type ZkgroupServerProbe,
 } from "../lib/zkgroupClient";
@@ -1297,6 +1298,15 @@ function ZkgroupExperimentalSection() {
     setBusy(false);
   };
 
+  const runGroupBound = async () => {
+    setBusy(true);
+    setProbe(null);
+    setServerProbe(null);
+    const result = await zkgroupGroupBoundRoundtrip();
+    setServerProbe(result);
+    setBusy(false);
+  };
+
   return (
     <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
       <h3
@@ -1365,6 +1375,20 @@ function ZkgroupExperimentalSection() {
             {busy
               ? t("settings.zkgroupTesting")
               : t("settings.zkgroupServerTest")}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runGroupBound()}
+            className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            style={{
+              background: "var(--bg-elevated)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {busy
+              ? t("settings.zkgroupTesting")
+              : t("settings.zkgroupGroupBound")}
           </button>
           {serverProbe && (
             <p

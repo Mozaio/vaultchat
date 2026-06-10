@@ -2122,6 +2122,18 @@ const DICT: Record<string, Dict> = {
     ru: "Запустить реальный обход через сервер", ar: "تشغيل جولة الخادم الحقيقية",
     zh: "运行真实服务器往返", hi: "वास्तविक सर्वर राउंड-ट्रिप चलाएँ",
   },
+  "settings.zkgroupGroupBound": {
+    en: "Prove membership in a real group",
+    de: "Mitgliedschaft in einer echten Gruppe beweisen",
+    tr: "Gerçek bir grupta üyeliği kanıtla",
+    es: "Demostrar pertenencia a un grupo real",
+    fr: "Prouver l'appartenance à un vrai groupe",
+    pt: "Provar associação a um grupo real",
+    ru: "Доказать членство в реальной группе",
+    ar: "إثبات العضوية في مجموعة حقيقية",
+    zh: "证明在真实群组中的成员资格",
+    hi: "वास्तविक समूह में सदस्यता साबित करें",
+  },
   "settings.zkgroupServerOk": {
     en: "✓ Server issued a credential, accepted your membership proof — without learning your identity",
     de: "✓ Server hat ein Credential ausgestellt und deinen Mitgliedschaftsbeweis akzeptiert — ohne deine Identität zu erfahren",
