@@ -104,8 +104,10 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
   age at 30d; client refreshes when token >6h old), safety-number-change
   system notice in DMs (Signal pattern), WS pre-auth frame cap. Still open:
   group **member list** is plaintext on the server (metadata gap —
-  zkgroup-style fix speced in `ZKGROUP_SPEC.md`, hard review gate), token
-  revocation (blacklist) — refresh exists, revoke does not. See
+  zkgroup-style fix speced in `ZKGROUP_SPEC.md`, hard review gate). Token
+  **revocation** now exists: per-user `tokenEpoch` baked into JWTs (`te`
+  claim), `POST /api/account/logout-all` bumps it + drops live WS;
+  "Sign out of all devices" in Settings → Security. See
   `SECURITY_ROADMAP.md`, `THREAT_MODEL.md`.
 - UX next (from June 2026 review): swipe actions / long-press context menu on
   chat rows (mobile), warm-dark pass over remaining legacy CSS blocks,
