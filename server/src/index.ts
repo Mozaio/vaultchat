@@ -674,7 +674,7 @@ app.post("/api/groups/:id/zkgroup-params", groupLimiter, (req, res) => {
     return;
   }
   const ok = setGroupZkgParams(
-    req.params.id,
+    String(req.params.id),
     jwtUser.userId,
     parsed.data.groupPublicParams
   );
