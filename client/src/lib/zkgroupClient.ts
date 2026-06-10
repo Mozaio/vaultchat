@@ -169,8 +169,7 @@ export async function zkgroupServerRoundtrip(): Promise<ZkgroupServerProbe> {
   }
   try {
     const { base64FromUint8, uint8FromBase64 } = await import("./b64");
-    const { loadToken } = await import("./localIdentity");
-    const { loadLocalIdentity } = await import("./localIdentity");
+    const { loadToken, loadLocalIdentity } = await import("./localIdentity");
     const api = await import("./api");
 
     const token = loadToken();
