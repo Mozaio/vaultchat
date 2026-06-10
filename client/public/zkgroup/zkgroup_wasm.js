@@ -1,6 +1,38 @@
 /* @ts-self-types="./zkgroup_wasm.d.ts" */
 
 /**
+ * Erzeugt eine echte Mitgliedschafts-Presentation aus einem
+ * SERVER-ausgestellten Credential. Das ist die Client-Hälfte des
+ * realen Flows (A3-2d): das Ergebnis geht an den Server-Verify.
+ * @param {Uint8Array} master_key
+ * @param {Uint8Array} server_public_params
+ * @param {Uint8Array} credential_response
+ * @param {Uint8Array} uuid16
+ * @param {bigint} redemption_time
+ * @param {Uint8Array} randomness
+ * @returns {Uint8Array}
+ */
+export function create_membership_presentation(master_key, server_public_params, credential_response, uuid16, redemption_time, randomness) {
+    const ptr0 = passArray8ToWasm0(master_key, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArray8ToWasm0(server_public_params, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArray8ToWasm0(credential_response, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArray8ToWasm0(uuid16, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArray8ToWasm0(randomness, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ret = wasm.create_membership_presentation(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, redemption_time, ptr4, len4);
+    if (ret[3]) {
+        throw takeFromExternrefTable0(ret[2]);
+    }
+    var v6 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
+    return v6;
+}
+
+/**
  * GMK → GroupIdentifier (öffentliche, unverlinkbare Gruppen-Kennung).
  * @param {Uint8Array} master_key
  * @returns {Uint8Array}

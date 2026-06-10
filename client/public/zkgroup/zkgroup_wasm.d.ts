@@ -2,6 +2,13 @@
 /* eslint-disable */
 
 /**
+ * Erzeugt eine echte Mitgliedschafts-Presentation aus einem
+ * SERVER-ausgestellten Credential. Das ist die Client-Hälfte des
+ * realen Flows (A3-2d): das Ergebnis geht an den Server-Verify.
+ */
+export function create_membership_presentation(master_key: Uint8Array, server_public_params: Uint8Array, credential_response: Uint8Array, uuid16: Uint8Array, redemption_time: bigint, randomness: Uint8Array): Uint8Array;
+
+/**
  * GMK → GroupIdentifier (öffentliche, unverlinkbare Gruppen-Kennung).
  */
 export function derive_group_identifier(master_key: Uint8Array): Uint8Array;
@@ -35,6 +42,7 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
     readonly memory: WebAssembly.Memory;
+    readonly create_membership_presentation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: bigint, j: number, k: number) => [number, number, number, number];
     readonly derive_group_identifier: (a: number, b: number) => [number, number, number, number];
     readonly derive_group_public_params: (a: number, b: number) => [number, number, number, number];
     readonly roundtrip_self_test: () => [number, number, number];
