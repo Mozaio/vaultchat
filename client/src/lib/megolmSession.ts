@@ -38,7 +38,11 @@ const VCG6_MAGIC = new Uint8Array([0x56, 0x43, 0x47, 0x36]); // "VCG6"
 
 function uuidToBytes(uuid: string): Uint8Array {
   const hex = uuid.replace(/-/g, "");
-  if (hex.length !== 32) throw new Error("bad_uuid");
+  // Hex-Check: parseInt("XX",16)=NaN würde sonst still zu 0x00 koercen —
+  // zwei verschiedene Mülleingaben ergäben identische Sender-Bytes.
+  if (hex.length !== 32 || /[^0-9a-fA-F]/.test(hex)) {
+    throw new Error("bad_uuid");
+  }
   const out = new Uint8Array(16);
   for (let i = 0; i < 16; i++) {
     out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
