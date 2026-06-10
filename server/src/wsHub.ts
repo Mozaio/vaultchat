@@ -51,6 +51,31 @@ export function sendToUser(userId: string, payload: unknown) {
   return n;
 }
 
+/**
+ * Trennt alle offenen WebSockets eines Users sofort (z.B. nach Token-
+ * Revocation / "auf allen Geräten abmelden"). Ohne dies blieben bereits
+ * offene Verbindungen bis zum nächsten Reconnect bestehen. Iteriert über
+ * eine Kopie, weil close() den "close"-Handler triggert, der das Set mutiert.
+ */
+export function disconnectUser(
+  userId: string,
+  code = 4401,
+  reason = "revoked"
+): number {
+  const set = byUser.get(userId);
+  if (!set) return 0;
+  let n = 0;
+  for (const c of [...set]) {
+    try {
+      c.ws.close(code, reason);
+      n++;
+    } catch {
+      /* socket bereits am Schließen */
+    }
+  }
+  return n;
+}
+
 export function getWsStats() {
   let sockets = 0;
   for (const set of byUser.values()) sockets += set.size;

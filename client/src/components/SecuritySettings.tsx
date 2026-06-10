@@ -1217,6 +1217,7 @@ export function SecuritySettings({
                   </p>
                 </div>
               )}
+              <LogoutAllSection />
               <ZkgroupExperimentalSection />
               <AccountDangerZone />
             </div>
@@ -1267,6 +1268,87 @@ export function SecuritySettings({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function LogoutAllSection() {
+  useLocale();
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleLogoutAll() {
+    setError(null);
+    setBusy(true);
+    try {
+      const li = await import("../lib/localIdentity");
+      const token = li.loadToken();
+      if (!token) throw new Error("no_token");
+      const { logoutAllDevices } = await import("../lib/api");
+      await logoutAllDevices(token);
+      // Eigenes Token ist jetzt entwertet → Token verwerfen, Identität +
+      // lokale Daten BEHALTEN (Re-Login per Passwort). Reload zeigt Login.
+      li.clearToken();
+      location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
+      <h3
+        className="mb-1 text-sm font-medium"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        {t("settings.logoutAllTitle")}
+      </h3>
+      <p className="mb-2 text-xs" style={{ color: "var(--text-muted)" }}>
+        {t("settings.logoutAllDesc")}
+      </p>
+      {error && (
+        <p className="mb-2 text-xs" style={{ color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
+      {!confirming ? (
+        <button
+          type="button"
+          className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+          style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+          onClick={() => setConfirming(true)}
+        >
+          {t("settings.logoutAll")}
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <p className="text-xs" style={{ color: "var(--text)" }}>
+            {t("settings.logoutAllConfirm")}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="flex-1 rounded-lg px-3 py-2 text-sm transition-colors disabled:opacity-50"
+              style={{ background: "var(--bg-elevated)", color: "var(--text-secondary)" }}
+              onClick={() => setConfirming(false)}
+            >
+              {t("common.cancel")}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              style={{ background: "var(--danger)", color: "#fff" }}
+              onClick={() => void handleLogoutAll()}
+            >
+              {busy ? t("settings.loggingOut") : t("settings.logoutAll")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

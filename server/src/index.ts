@@ -8,6 +8,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
 import {
   addGroupMember,
+  bumpTokenEpoch,
   createGroup,
   createUser,
   deleteUserCompletely,
@@ -15,6 +16,7 @@ import {
   findUserByUsername,
   getDirectoryStats,
   getGroup,
+  getTokenEpoch,
   leaveGroup,
   listGroupsForUser,
   listUsersSafe,
@@ -24,10 +26,15 @@ import {
 } from "./memoryStore.js";
 import {
   hashPassword,
+  setTokenEpochResolver,
   signToken,
   verifyPasswordOrDummy,
   verifyToken,
 } from "./auth.js";
+
+// Token-Revocation: verifyToken prüft die Token-Epoch gegen den User-Store.
+// Muss vor dem ersten Request gesetzt sein (Modul-Load genügt).
+setTokenEpochResolver((userId) => getTokenEpoch(userId));
 import {
   currentRedemptionTime,
   getZkgroupStatus,
@@ -35,7 +42,12 @@ import {
   issueAuthCredential,
   verifyPresentation,
 } from "./zkgroup.js";
-import { getWsStats, registerClient, sendToUser } from "./wsHub.js";
+import {
+  disconnectUser,
+  getWsStats,
+  registerClient,
+  sendToUser,
+} from "./wsHub.js";
 import {
   enqueueMailboxDm,
   clearMailboxForUser,
@@ -452,7 +464,11 @@ app.post("/api/register", authLimiter, async (req, res) => {
     requestedPlan: parsed.data.requestedPlan ?? null,
     ipTag: clientIpTag(req.ip),
   });
-  const token = signToken({ userId: user.id, username: user.username });
+  const token = signToken({
+    userId: user.id,
+    username: user.username,
+    tokenEpoch: getTokenEpoch(user.id),
+  });
   res.json({
     token,
     user: {
@@ -486,7 +502,11 @@ app.post("/api/login", authLimiter, async (req, res) => {
     res.status(401).json({ error: "invalid_credentials" });
     return;
   }
-  const token = signToken({ userId: user.id, username: user.username });
+  const token = signToken({
+    userId: user.id,
+    username: user.username,
+    tokenEpoch: getTokenEpoch(user.id),
+  });
   log.info("auth_login_ok", {
     reqId: req.id,
     userId: user.id,
@@ -537,11 +557,40 @@ app.post("/api/token/refresh", apiLimiter, (req, res) => {
   log.debug("auth_token_refresh", { userId: user.id });
   res.json({
     token: signToken(
-      { userId: user.id, username: user.username },
+      {
+        userId: user.id,
+        username: user.username,
+        tokenEpoch: getTokenEpoch(user.id),
+      },
       undefined,
       s0
     ),
   });
+});
+
+/**
+ * "Auf allen Geräten abmelden": erhöht die Token-Epoch des Users → ALLE
+ * bisher ausgestellten Tokens (inkl. des gerade benutzten) werden ab sofort
+ * abgelehnt. Schließt die Refresh-Lücke (ein gestohlenes/altes Token ließ
+ * sich bisher endlos erneuern). Der Client muss sich danach neu anmelden.
+ */
+app.post("/api/account/logout-all", apiLimiter, (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const epoch = bumpTokenEpoch(jwtUser.userId);
+  if (epoch === null) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  // Token-Revocation greift beim nächsten verifyToken; bereits offene WS
+  // zusätzlich SOFORT trennen, damit keine Verbindung überlebt.
+  const dropped = disconnectUser(jwtUser.userId);
+  log.info("auth_logout_all", { userId: jwtUser.userId, droppedSockets: dropped });
+  res.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------

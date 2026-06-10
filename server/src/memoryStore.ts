@@ -17,6 +17,9 @@ export type StoredUser = {
   plan: "personal" | "pro" | "team";
   requestedPlan?: "personal" | "pro" | "team";
   createdAt: number;
+  /** Token-Revocation: in jedes ausgestellte JWT eingebacken (te). Ein Bump
+   *  entwertet alle bisherigen Tokens dieses Users. */
+  tokenEpoch?: number;
 };
 
 export type StoredGroup = {
@@ -108,6 +111,25 @@ export function createUser(input: {
   usersByName.set(user.username.toLowerCase(), user.id);
   persistDirectory();
   return user;
+}
+
+/** Aktuelle Token-Epoch eines Users (0 wenn unbekannt/nie entwertet). */
+export function getTokenEpoch(userId: string): number {
+  return users.get(userId)?.tokenEpoch ?? 0;
+}
+
+/**
+ * Erhöht die Token-Epoch ("auf allen Geräten abmelden") → alle bisher
+ * ausgestellten Tokens dieses Users (inkl. des gerade benutzten) werden
+ * beim nächsten verifyToken abgelehnt. Gibt den neuen Wert zurück (oder
+ * null, wenn der User nicht existiert).
+ */
+export function bumpTokenEpoch(userId: string): number | null {
+  const u = users.get(userId);
+  if (!u) return null;
+  u.tokenEpoch = (u.tokenEpoch ?? 0) + 1;
+  persistDirectory();
+  return u.tokenEpoch;
 }
 
 export function listUsersSafe() {

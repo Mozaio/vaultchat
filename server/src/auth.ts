@@ -10,13 +10,29 @@ const JwtPayload = z.object({
   /** Session-Start (Unix-Sekunden) — wandert beim Refresh unverändert mit
    *  und begrenzt die absolute Lebensdauer einer Sliding-Session. */
   s0: z.number().optional(),
+  /** Token-Epoch zur Revocation: liegt sie unter dem aktuellen Wert des
+   *  Users (via Resolver), gilt das Token als entwertet ("auf allen
+   *  Geräten abmelden"). Fehlt bei Alt-Tokens → wie 0 behandelt. */
+  te: z.number().optional(),
 });
 
 export type JwtUser = {
   userId: string;
   username: string;
   sessionStart?: number;
+  tokenEpoch?: number;
 };
+
+/**
+ * Resolver für die aktuelle Token-Epoch eines Users (per DI gesetzt, damit
+ * auth.ts nicht den memoryStore importieren muss → kein Zyklus). Ist er
+ * nicht gesetzt, findet KEINE Revocation-Prüfung statt (Tokens gelten wie
+ * bisher) — fail-open by design.
+ */
+let tokenEpochResolver: ((userId: string) => number) | null = null;
+export function setTokenEpochResolver(fn: (userId: string) => number): void {
+  tokenEpochResolver = fn;
+}
 
 const JWT_SECRET = process.env.VAULTCHAT_JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32) {
@@ -88,20 +104,34 @@ export function signToken(
   sessionStartSec?: number
 ) {
   const s0 = sessionStartSec ?? Math.floor(Date.now() / 1000);
-  return jwt.sign({ sub: user.userId, u: user.username, s0 }, secret(), {
-    expiresIn: ttlSec,
-    issuer: "vaultchat",
-  });
+  return jwt.sign(
+    { sub: user.userId, u: user.username, s0, te: user.tokenEpoch ?? 0 },
+    secret(),
+    { expiresIn: ttlSec, issuer: "vaultchat" }
+  );
 }
 
 export function verifyToken(token: string): JwtUser | null {
   try {
     const raw = jwt.verify(token, secret(), { issuer: "vaultchat" });
     const p = JwtPayload.parse(raw);
+    const te = typeof p.te === "number" ? p.te : 0;
+    if (tokenEpochResolver) {
+      let current: number;
+      try {
+        current = tokenEpochResolver(p.sub);
+      } catch {
+        // Resolver-Fehler darf NICHT alle aussperren — Verfügbarkeit geht
+        // hier vor einem Edge-Case-Revoke.
+        current = te;
+      }
+      if (te < current) return null; // via logout-all entwertet
+    }
     return {
       userId: p.sub,
       username: p.u,
       ...(typeof p.s0 === "number" ? { sessionStart: p.s0 } : {}),
+      tokenEpoch: te,
     };
   } catch {
     return null;

@@ -10,6 +10,9 @@ export type PersistedUser = {
   plan?: "personal" | "pro" | "team";
   requestedPlan?: "personal" | "pro" | "team";
   createdAt: number;
+  /** Token-Revocation-Zähler ("auf allen Geräten abmelden"). Persistiert,
+   *  damit eine Entwertung einen Restart im persistenten Modus überlebt. */
+  tokenEpoch?: number;
 };
 
 export type PersistedGroup = {

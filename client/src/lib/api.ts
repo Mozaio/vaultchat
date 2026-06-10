@@ -212,6 +212,15 @@ export async function refreshToken(token: string) {
   });
 }
 
+/** Auf allen Geräten abmelden: entwertet serverseitig ALLE Tokens des Users
+ *  (Token-Revocation). Danach ist Re-Login nötig. */
+export async function logoutAllDevices(token: string) {
+  return req<{ ok: boolean }>("/api/account/logout-all", {
+    method: "POST",
+    token,
+  });
+}
+
 /** zkgroup (experimentell): holt ein Mitgliedschafts-Credential vom Server. */
 export async function zkgroupCredential(token: string) {
   return req<{ credential: string; redemptionTime: number; publicParams: string }>(
