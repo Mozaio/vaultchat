@@ -308,12 +308,19 @@ export function MessageBubble({
 
   // View-once countdown: once revealed, count down VIEW_ONCE_REVEAL_MS and
   // then trigger a local-only delete. Only runs for non-sender (recipient).
-  // msg.deleted-Guard: wird die Nachricht während des Countdowns über das
-  // Menü gelöscht, ändert sich `msg` → Effekt läuft neu an und würde ohne
-  // den Guard einen zweiten Countdown starten und onLocalDelete doppelt
-  // feuern.
+  // msg/onLocalDelete laufen über Refs statt über die Dependencies: die
+  // Callback-Props sind Inline-Arrows aus ChatShell (neue Identität bei
+  // jedem Parent-Render) — stünden sie in den Deps, würde jeder Render
+  // (Tippen, Typing-Indicator, …) den 10s-Timer auf Anfang zurücksetzen
+  // und die Nachricht löschte sich nie. msg.deleted bleibt in den Deps:
+  // Menü-Löschung während des Countdowns → Effekt-Neustart → Guard greift.
+  const onLocalDeleteRef = useRef(onLocalDelete);
+  onLocalDeleteRef.current = onLocalDelete;
+  const msgRef = useRef(msg);
+  msgRef.current = msg;
   useEffect(() => {
-    if (!revealed || msg.fromMe || !msg.plain.viewOnce || msg.deleted) return;
+    const m = msgRef.current;
+    if (!revealed || m.fromMe || !m.plain.viewOnce || m.deleted) return;
     const start = Date.now();
     setViewOnceLeftMs(VIEW_ONCE_REVEAL_MS);
     const tick = window.setInterval(() => {
@@ -321,13 +328,13 @@ export function MessageBubble({
       if (left <= 0) {
         window.clearInterval(tick);
         setViewOnceLeftMs(0);
-        onLocalDelete?.(msg);
+        onLocalDeleteRef.current?.(msgRef.current);
       } else {
         setViewOnceLeftMs(left);
       }
     }, 250);
     return () => window.clearInterval(tick);
-  }, [revealed, msg, onLocalDelete]);
+  }, [revealed, msg.id, msg.deleted]);
 
   useEffect(() => {
     if (!menuOpen && !reactOpen) return;
