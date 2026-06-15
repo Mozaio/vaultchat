@@ -299,10 +299,13 @@ export function MessageBubble({
 
   useEffect(() => {
     if (!msg.expiresAt) return;
-    const h = setInterval(
-      () => setTtlLeft(computeTtlLeft(msg.expiresAt)),
-      1000
-    );
+    const h = setInterval(() => {
+      const next = computeTtlLeft(msg.expiresAt);
+      setTtlLeft(next);
+      // Nach Ablauf liefert computeTtlLeft dauerhaft "0s" — Interval stoppen,
+      // sonst re-rendert jede abgelaufene Bubble bis zum Parent-Unmount sekündlich.
+      if (next === null || next === "0s") clearInterval(h);
+    }, 1000);
     return () => clearInterval(h);
   }, [msg.expiresAt]);
 
