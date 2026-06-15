@@ -87,6 +87,7 @@ import {
   clearReplayState,
   markIfNew as markEnvelopeIfNew,
   replayStats,
+  sweepReplayState,
 } from "./replayStore.js";
 import {
   blobStats,
@@ -1533,6 +1534,16 @@ const blobSweep = setInterval(() => {
   if (r.removed > 0) log.info("blob_sweep", r);
 }, BLOB_SWEEP_MS);
 blobSweep.unref?.();
+
+// Replay-Sweep alle 10 min: entfernt Sender-Einträge, deren Hashes komplett
+// aus dem Fenster gefallen sind. Verhindert monotones Wachstum der recent-Map
+// über die (über die Zeit) gesamte Nutzerbasis.
+const REPLAY_SWEEP_MS = 10 * 60_000;
+const replaySweep = setInterval(() => {
+  const r = sweepReplayState();
+  if (r.sendersRemoved > 0) log.info("replay_sweep", r);
+}, REPLAY_SWEEP_MS);
+replaySweep.unref?.();
 
 // ---------------------------------------------------------------------------
 // WebSocket-Frame-Schemas (modul-level für Performance — vorher wurden sie

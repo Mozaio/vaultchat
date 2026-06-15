@@ -79,6 +79,34 @@ export function clearReplayState(senderUserId: string): void {
   recent.delete(senderUserId);
 }
 
+/**
+ * Periodischer Sweep: entfernt Sender-Einträge, deren neuester Hash älter als
+ * das Replay-Fenster ist. Ohne ihn wuchs `recent` monoton — die äußere Map
+ * behielt für jeden je aktiven Sender einen Eintrag (inkl. bis zu 256 längst
+ * abgelaufener Hashes), da pruneOnInsert nur beim nächsten Insert DESSELBEN
+ * Senders greift und clearReplayState nur bei Account-Löschung läuft.
+ * Slow-Leak-Fix für Render-Free (knapper RAM).
+ */
+export function sweepReplayState(): { sendersRemoved: number; entriesRemoved: number } {
+  const now = Date.now();
+  const cutoff = now - RECENT_WINDOW_MS;
+  let sendersRemoved = 0;
+  let entriesRemoved = 0;
+  for (const [sender, map] of recent) {
+    for (const [k, ts] of map) {
+      if (ts <= cutoff) {
+        map.delete(k);
+        entriesRemoved++;
+      }
+    }
+    if (map.size === 0) {
+      recent.delete(sender);
+      sendersRemoved++;
+    }
+  }
+  return { sendersRemoved, entriesRemoved };
+}
+
 export function replayStats(): { senders: number; entries: number } {
   let entries = 0;
   for (const m of recent.values()) entries += m.size;
