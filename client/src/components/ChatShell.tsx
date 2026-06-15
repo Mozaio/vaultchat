@@ -2742,7 +2742,10 @@ export function ChatShell({
             }
             seen.current.add(id);
             const fromUserId = plain.senderUserId ?? "";
-            const at = Number(data.createdAt);
+            // Fallback wie im DM-Pfad (Z. 2728): fehlt/ist createdAt nicht
+            // numerisch, würde NaN die IDB-Sortierung (at), expiresAt und den
+            // Unread-Vergleich (at > seenAt ist mit NaN immer false) zerstören.
+            const at = Number(data.createdAt) || Date.now();
             // Voice-room coordination is ephemeral: hand it to the group-call
             // layer and never persist or render it as a message.
             if (plain.kind === "voice_announce" && plain.voiceKind) {
@@ -2816,7 +2819,7 @@ export function ChatShell({
             ) {
               const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? t("chat.groupFallback");
               maybeNotify(
-                mentioned ? `${groupName} · Erwähnung` : groupName,
+                mentioned ? t("chat.mentionNotif", { group: groupName }) : groupName,
                 previewForPayload(plain)
               );
             }

@@ -2488,6 +2488,12 @@ const DICT: Record<string, Dict> = {
     en: "Group", de: "Gruppe", tr: "Grup", es: "Grupo", fr: "Groupe",
     pt: "Grupo", ru: "Группа", ar: "مجموعة", zh: "群组", hi: "समूह",
   },
+  "chat.mentionNotif": {
+    en: "{group} · Mention", de: "{group} · Erwähnung", tr: "{group} · Bahsetme",
+    es: "{group} · Mención", fr: "{group} · Mention", pt: "{group} · Menção",
+    ru: "{group} · Упоминание", ar: "{group} · إشارة", zh: "{group} · 提及",
+    hi: "{group} · उल्लेख",
+  },
   "common.clearSearch": {
     en: "Clear search", de: "Suche löschen", tr: "Aramayı temizle",
     es: "Borrar búsqueda", fr: "Effacer la recherche", pt: "Limpar busca",
