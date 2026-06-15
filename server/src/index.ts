@@ -1269,7 +1269,8 @@ app.post("/api/groups/:id/leave", async (req, res) => {
     res.status(401).json({ error: "unauthorized" });
     return;
   }
-  const g = leaveGroup(req.params.id, jwtUser.userId);
+  const groupId = String(req.params.id);
+  const g = leaveGroup(groupId, jwtUser.userId);
   if (!g) {
     res.status(400).json({ error: "cannot_leave" });
     return;
@@ -1280,13 +1281,13 @@ app.post("/api/groups/:id/leave", async (req, res) => {
   for (const remaining of g.memberIds) {
     sendToUser(remaining, {
       type: "group_member_removed",
-      groupId: req.params.id,
+      groupId,
       memberId: jwtUser.userId,
     });
   }
   log.info("group_left", {
     reqId: req.id,
-    groupId: req.params.id,
+    groupId,
     userId: jwtUser.userId,
     remainingMembers: g.memberIds.length,
   });
