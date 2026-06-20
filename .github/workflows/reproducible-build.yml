@@ -1,0 +1,72 @@
+name: Reproducible client build + bundle hashes
+
+# Phase 0.5: build the web client on a pinned toolchain and PUBLISH the
+# SHA-384 of every emitted asset (SRI format). Users can compare the hash the
+# app pins/shows in its code-integrity banner against this independently
+# produced value -> mitigates the #1 residual threat (compromised web host)
+# from THREAT_MODEL.md. CI-only: this never touches the running service.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "client/**"
+      - ".github/workflows/reproducible-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node (pinned to the Render runtime)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.20.2"
+
+      - name: Install web deps
+        working-directory: client
+        # No lockfile is committed yet, so we cannot use `npm ci`. We upload
+        # the resolved package-lock.json below so it can be committed to make
+        # the build fully reproducible (follow-up 0.5b).
+        run: npm install --no-audit --no-fund
+
+      - name: Build client
+        working-directory: client
+        # SOURCE_DATE_EPOCH nudges deterministic timestamps in the toolchain.
+        env:
+          SOURCE_DATE_EPOCH: "1700000000"
+        run: npm run build
+
+      - name: Publish bundle SHA-384 (SRI format)
+        working-directory: client
+        run: |
+          set -euo pipefail
+          : > bundle-hashes.txt
+          {
+            echo "## Client bundle SHA-384 (SRI format)"
+            echo ""
+            echo "Commit: \`${GITHUB_SHA}\`  •  Node: \`$(node --version)\`"
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.wasm' \) \
+            | sort \
+            | while read -r f; do
+                h="sha384-$(openssl dgst -sha384 -binary "$f" | openssl base64 -A)"
+                rel="${f#dist/}"
+                printf '%s  %s\n' "$h" "$rel" | tee -a bundle-hashes.txt >> "$GITHUB_STEP_SUMMARY"
+              done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bundle hashes + resolved lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-bundle-hashes
+          path: |
+            client/bundle-hashes.txt
+            client/package-lock.json
+          if-no-files-found: error
