@@ -29,9 +29,11 @@ export type StoredGroup = {
   /** User, der die Gruppe angelegt hat (für Rollen/UI). */
   createdByUserId: string;
   createdAt: number;
-  /** Optional, klartext beim Server. Soll lediglich UX, nicht Sicherheit, leisten. */
+  /** #25: bei aktuellen Clients `GMETA1:`-Ciphertext (E2EE, server-opak — der
+   *  echte Name/Text wird nie sichtbar); nur Legacy/Krypto-Fallback ist Klartext. */
   description?: string;
-  /** data:image/...;base64,... Avatar. Klartext beim Server. */
+  /** #25: bei aktuellen Clients `GMETA1:`-Ciphertext (server-opak); sonst
+   *  data:image/...;base64,... Klartext (Legacy/Fallback). */
   avatar?: string;
   /** Wann zuletzt Name/Beschreibung/Avatar geändert (für UI-Cache). */
   updatedAt?: number;

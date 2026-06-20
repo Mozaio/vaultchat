@@ -95,8 +95,14 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
 
 ## Roadmap / open items
 
-- Security shipped since May: `#15` OTK-exhaustion mitigation,
-  `#26` sealed-sender for groups (opt-in
+- Security shipped since May: `#15` OTK-exhaustion mitigation, `#25` E2EE
+  group names/descriptions/avatars (client encrypts with the per-group master
+  key in `client/src/lib/groupSecret.ts` — `encryptGroupMeta`, `GMETA1:` wire;
+  `createGroup` registers a placeholder name then PATCHes ciphertext, so the
+  server stores only placeholder/ciphertext and **never the real name**;
+  `decryptGroupList` decrypts on display, placeholder when the GMK is absent;
+  GMK distributed over Olm in the `megolm_session_key` frame), `#26`
+  sealed-sender for groups (opt-in
   toggle in settings), sender-key rotation on every membership change,
   mailbox per-user byte quota (OOM-DoS guard), login timing-leak fix
   (dummy Argon2 verify against username enumeration), `#22` versioned KDF
@@ -104,11 +110,11 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
   JWT **sliding sessions** (`POST /api/token/refresh`, s0-claim caps absolute
   age at 30d; client refreshes when token >6h old), safety-number-change
   system notice in DMs (Signal pattern), WS pre-auth frame cap. Still open:
-  group **member list** AND group **name / description / avatar** are still
-  plaintext on the server (metadata gap — `#25` / Phase 1 in
-  `GROUP_METADATA_PRIVACY.md` is **NOT yet implemented**; the `/api/groups`
-  body takes a plaintext `name`. zkgroup-style membership fix speced in
-  `ZKGROUP_SPEC.md`, hard review gate). Token
+  group **member list** is plaintext on the server (metadata gap —
+  zkgroup-style fix speced in `ZKGROUP_SPEC.md`, hard review gate). NOTE: the
+  `name`/`description`/`avatar` fields the server stores hold `GMETA1:`
+  ciphertext from current clients (the "plaintext" comments in `memoryStore`/
+  `serverState` are legacy; the server treats them opaquely). Token
   **revocation** now exists: per-user `tokenEpoch` baked into JWTs (`te`
   claim), `POST /api/account/logout-all` bumps it + drops live WS;
   "Sign out of all devices" in Settings → Security. See

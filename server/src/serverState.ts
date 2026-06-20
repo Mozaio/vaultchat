@@ -24,9 +24,11 @@ export type PersistedGroup = {
   createdAt: number;
   /** Neuere Clients schreiben das Feld; alte State-Dateien können es weglassen. */
   createdByUserId?: string;
-  /** Optional, frei vom Creator gesetzt. Server speichert Klartext (nicht E2EE). */
+  /** #25: bei aktuellen Clients `GMETA1:`-Ciphertext (E2EE, server-opak); nur
+   *  Legacy/Fallback ist Klartext. */
   description?: string;
-  /** data:image/...;base64,... Avatar. Server speichert klartext. Max ~80 KB. */
+  /** #25: `GMETA1:`-Ciphertext bei aktuellen Clients (server-opak); sonst
+   *  data:image/...;base64,... Klartext (Legacy/Fallback). Max ~80 KB. */
   avatar?: string;
   /** Letzte Änderung an Profil (Name/Beschreibung/Avatar). */
   updatedAt?: number;
