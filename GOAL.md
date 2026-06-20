@@ -33,7 +33,9 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
   - [ ] 0.1d Blinde Discovery via OPRF/PSI (Server lernt Username auch live nie)
 - [ ] Verschlüsselte, serverseitige Offline-Mailbox als Option (Store-and-Forward), ohne dass der Server Absender/Inhalt sieht — Sealed-Sender bleibt intakt
 - [ ] Account-Recovery-Konzept entwerfen und umsetzen (Verlust des Geräts), ohne Zero-Knowledge zu brechen
-- [ ] Rate-Limit-/Abuse-Schutz serverseitig, der ohne Inhaltszugriff funktioniert
+- [ ] Rate-Limit-/Abuse-Schutz serverseitig, der ohne Inhaltszugriff funktioniert — vom denker erweitert (HTTP-Limiter + WS-Per-Conn-Schutz existierten bereits):
+  - [x] 0.4a Per-Account-Cap auf gleichzeitige WS-Sockets (Evict-Oldest, inhaltsblind, `VAULTCHAT_MAX_SOCKETS_PER_USER`=16) — deployed (2b03e65, live, Build grün)
+  - [ ] 0.4b Per-IP-Cap auf Pre-Auth-WS-Verbindungen (braucht sorgfältiges X-Forwarded-For-Handling hinter Renders Proxy + Verifikation; daher zurückgestellt)
 - [ ] Reproduzierbarer Build + veröffentlichter Bundle-Hash als Pipeline-Schritt
 
 ## Phase 1 — Alltagstauglichkeit (WhatsApp-Parität)
