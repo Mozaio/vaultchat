@@ -28,9 +28,10 @@ The user prefers **German (Du-Form)**. Reply in German unless asked otherwise.
   long recaps unless asked.
 - **Security & privacy are priority #1.** When adding features, preserve the
   E2EE/zero-knowledge-server model.
-- **Deployment is manual via Render** (the user clicks "Manual Deploy"). Render
-  is effectively the CI for web. End commit messages with:
-  `Co-Authored-By: Claude <noreply@anthropic.com>`.
+- **Deployment runs through Render.** After **waechter PASS**, the **tester**
+  triggers the deploy in the Render dashboard via Chrome (Manual Deploy ->
+  Deploy latest commit). Render is effectively the CI for web. End commit
+  messages with: `Co-Authored-By: Claude <noreply@anthropic.com>`.
 - **On the user's local Windows machine: do NOT run `npm`/builds** (their rule —
   builds go through CI/Render). In a **cloud/sandbox** session you *may* run
   `npm`/`tsc`/tests to verify, since that's isolated.
@@ -119,3 +120,62 @@ TOFU key pinning + verifiable safety numbers, Argon2id for at-rest/backup.
 
 `DESKTOP.md` (Tauri build/architecture), `THREAT_MODEL.md`, `SECURITY_ROADMAP.md`,
 `PRODUCT_STRATEGY.md`, `PRODUCT_READINESS.md`, `DEPLOY.md`, `CRYPTO_CORE.md`.
+
+
+<!-- ===== Angehängt aus files1.zip am 2026-06-20 (Agent-Loop-Setup) ===== -->
+
+# VaultChat / Umbra — Arbeitsweise für die autonome Schleife
+
+VaultChat/Umbra ist ein browserbasierter, Ende-zu-Ende-verschlüsselter
+Messenger (TypeScript, client/ + server/). Die App läuft in Produktion auf
+**render.com**, nicht lokal. Nordstern: **Sicherheit und Privatsphäre auf
+Signal-Niveau**, dabei der Funktionsumfang von WhatsApp/Discord/Telegram —
+entwickelt zu einem vollwertigen, bezahlbaren Produkt.
+
+## Oberste Regel
+
+Sicherheit und Privatsphäre haben **immer** Vorrang vor Features. Kein
+Feature, kein Design und kein "Wachstums"-Mechanismus darf die E2EE, den
+Sealed Sender, die Metadaten-Minimierung, die At-Rest-Verschlüsselung oder
+die strenge CSP aufweichen. Im Zweifel: Feature zurückstellen, Sicherheit
+behalten. Maßstab ist immer `THREAT_MODEL.md`.
+
+## Fester Ablauf je Aufgabe
+
+Wenn ich dich auf `GOAL.md` ansetze, arbeite jeden offenen Punkt (`- [ ]`)
+mit genau diesem Ablauf ab:
+
+1. **denker** — nächsten offenen Punkt wählen, im Internet recherchieren
+   (wie lösen Signal/WhatsApp/Discord/Telegram das?), und einen
+   privatsphäre-wahrenden Umsetzungsplan schreiben.
+2. **schreiber** — den Plan umsetzen (client/server), Krypto- und
+   CSP-Regeln strikt einhalten. Nur Dateien ändern, nicht committen/pushen
+   und nicht deployen — das macht der tester.
+3. **waechter** — die Änderung gegen `THREAT_MODEL.md` prüfen.
+   Bei **BLOCK**: zurück zu denker mit der Verstoßliste. Nicht deployen,
+   nicht abhaken.
+4. **tester** — nur den neuen Code auf Bugs prüfen. Bei `BUGS FOUND`:
+   zurück zu schreiber. Bei sauberem Ergebnis (und nur wenn waechter
+   PASS gegeben hat): über das Terminal committen + pushen und danach den
+   Deploy direkt im Render-Dashboard über Chrome auslösen (Manual Deploy →
+   Deploy latest commit).
+
+Nach `DEPLOY OK` automatisch zurück zum **denker** für den nächsten Punkt.
+
+## Wann ein Punkt erledigt ist
+
+Hake einen Punkt in `GOAL.md` erst dann auf `- [x]` ab, wenn **beide**
+Gates grün sind und der Deploy lief:
+- waechter: **PASS**
+- tester: **DEPLOY OK** (Bugs-Check sauber + Render-Deploy gestartet)
+
+Erst danach den nächsten offenen Punkt. Wenn alle Punkte abgehakt sind,
+ist das Ziel erreicht.
+
+## Krypto-Sicherheitsnetz
+
+Bei Änderungen, die Krypto, Schlüsselverwaltung, Sealed Sender oder das
+Threat-Model berühren: lieber kleinschrittig und mit klarer Begründung im
+Plan. Erfinde nie eigene Krypto — nutze die vorhandenen libsodium-Primitive.
+Da der tester direkt auf die Live-Seite deployt, muss der waechter solche
+Änderungen besonders streng prüfen.
