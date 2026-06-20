@@ -9,7 +9,7 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 ### Transport- und Server-Schicht
 
 - **TLS** in Produktion (`https` / `wss`); das Relay lehnt unauthentifizierte WS-Verbindungen ab. Tokens werden im ersten WebSocket-Auth-Frame gesendet, nicht in URLs.
-- **RAM-only Verzeichnis**: Benutzer (Name, Argon2id-Hash, Identity-Public-Key), Gruppenmitgliedschaften — nur flüchtig im Arbeitsspeicher. Bei Neustart verschwindet der Verzeichniszustand.
+- **Verzeichnis (Benutzer/Gruppen)**: Standardmäßig RAM-only — Benutzer (Name, Argon2id-Hash, Identity-Public-Key) und Gruppenmitgliedschaften sind nur flüchtig im Arbeitsspeicher und verschwinden bei Neustart. Optional persistent via `VAULTCHAT_STATE_FILE`; ist zusätzlich `VAULTCHAT_STATE_KEY` (32 Byte) gesetzt, wird der gesamte Verzeichnis-Blob **at rest mit AES-256-GCM verschlüsselt** geschrieben (zufälliger 96-bit-IV pro Write, 128-bit-Auth-Tag, AAD-Bindung an die Format-Version). Datei und Backups enthalten dann keine Klartext-Identitäten/-Metadaten. Der laufende Prozess hält den Schlüssel — echte Server-Blindheit gegen Identitäten (OPRF/PSI) bleibt ein offener Punkt (GOAL 0.1d).
 - **Keine Nachrichten-Persistenz**: Der Server leitet Ciphertexts direkt weiter und speichert sie weder kurzzeitig noch dauerhaft.
 - **Sealed-Sender DM-Protokoll**: Der Server sieht für DMs ausschließlich `toUserId` + einen opaken `envelope`. Er kennt den Absender einer DM nicht. Der Absender ist kryptografisch nur für den Empfänger sichtbar.
 - **Sealed Group Sender**: Gruppenframes werden ohne `fromUserId` relayiert. Der Absender ist Teil der E2EE-Payload; nur Gruppenmitglieder können ihn entschlüsseln.

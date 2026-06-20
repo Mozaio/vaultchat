@@ -1,5 +1,7 @@
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { log } from "./logger.js";
 
 export type PersistedUser = {
   id: string;
@@ -120,33 +122,162 @@ export function getStateStatus(): {
   }
 }
 
+// ---------------------------------------------------------------------------
+// At-rest encryption of the persisted directory (GOAL 0.1b).
+//
+// When VAULTCHAT_STATE_KEY is set (32 bytes as hex OR base64) the whole state
+// blob is written to disk encrypted with AES-256-GCM (node:crypto, an
+// established AEAD - no homegrown crypto). Without a key it stays plaintext
+// JSON (backwards compatible; a legacy plaintext file is upgraded to
+// encrypted on the next write). With a key, the persisted file / any backup
+// contains no plaintext usernames, keys or group metadata. The running
+// server still holds the key - true server blindness against identities is
+// GOAL 0.1d (OPRF/PSI).
+// ---------------------------------------------------------------------------
+
+const STATE_ENC_ALG = "aes-256-gcm";
+const STATE_ENC_AAD = Buffer.from("vaultchat-state-v2");
+
+type EncryptedState = {
+  v: 2;
+  alg: "aes-256-gcm";
+  iv: string;
+  tag: string;
+  data: string;
+};
+
+let plaintextWarned = false;
+let upgradeWarned = false;
+
+/**
+ * At-rest key from VAULTCHAT_STATE_KEY (32 bytes, hex or base64). Not set ->
+ * null (legacy plaintext). Set but wrong length -> throw (fail fast instead of
+ * silently writing plaintext).
+ */
+function loadStateKey(): Buffer | null {
+  const raw = process.env.VAULTCHAT_STATE_KEY?.trim();
+  if (!raw) return null;
+  const key = /^[0-9a-fA-F]{64}$/.test(raw)
+    ? Buffer.from(raw, "hex")
+    : Buffer.from(raw, "base64");
+  if (key.length !== 32) {
+    throw new Error(
+      "VAULTCHAT_STATE_KEY must be 32 bytes (64 hex chars or base64 of 32 bytes)"
+    );
+  }
+  return key;
+}
+
+function encryptState(plaintext: string, key: Buffer): EncryptedState {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv(STATE_ENC_ALG, key, iv, { authTagLength: 16 });
+  cipher.setAAD(STATE_ENC_AAD);
+  const data = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  return {
+    v: 2,
+    alg: "aes-256-gcm",
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+    data: data.toString("base64"),
+  };
+}
+
+function decryptState(envelope: EncryptedState, key: Buffer): string {
+  const decipher = createDecipheriv(
+    STATE_ENC_ALG,
+    key,
+    Buffer.from(envelope.iv, "base64"),
+    { authTagLength: 16 }
+  );
+  decipher.setAAD(STATE_ENC_AAD);
+  decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(envelope.data, "base64")),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+function isEncryptedEnvelope(parsed: unknown): parsed is EncryptedState {
+  if (typeof parsed !== "object" || parsed === null) return false;
+  const p = parsed as { v?: unknown; alg?: unknown };
+  return p.v === 2 && p.alg === "aes-256-gcm";
+}
+
+function normalizeState(parsed: Partial<ServerState>): ServerState {
+  return {
+    version: 1,
+    users: Array.isArray(parsed.users) ? parsed.users : [],
+    groups: Array.isArray(parsed.groups) ? parsed.groups : [],
+    preKeyBundles: Array.isArray(parsed.preKeyBundles) ? parsed.preKeyBundles : [],
+    redeemedInviteCodeHashes: Array.isArray(parsed.redeemedInviteCodeHashes)
+      ? parsed.redeemedInviteCodeHashes
+      : [],
+    groupInvites: Array.isArray(parsed.groupInvites) ? parsed.groupInvites : [],
+  };
+}
+
 function readState(): ServerState {
   const file = stateFile();
   if (!file) return emptyState();
+
+  const key = loadStateKey();
+  if (!key && !plaintextWarned) {
+    log.warn("state_plaintext", {
+      msg: "VAULTCHAT_STATE_FILE persists in plaintext; set VAULTCHAT_STATE_KEY (32 bytes) to encrypt the directory at rest.",
+    });
+    plaintextWarned = true;
+  }
+
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<ServerState>;
-    if (parsed.version !== 1) return emptyState();
-    return {
-      version: 1,
-      users: Array.isArray(parsed.users) ? parsed.users : [],
-      groups: Array.isArray(parsed.groups) ? parsed.groups : [],
-      preKeyBundles: Array.isArray(parsed.preKeyBundles) ? parsed.preKeyBundles : [],
-      redeemedInviteCodeHashes: Array.isArray(parsed.redeemedInviteCodeHashes)
-        ? parsed.redeemedInviteCodeHashes
-        : [],
-      groupInvites: Array.isArray(parsed.groupInvites) ? parsed.groupInvites : [],
-    };
+    parsed = JSON.parse(readFileSync(file, "utf8"));
   } catch {
+    // File missing yet or not valid JSON -> empty start.
     return emptyState();
   }
+
+  if (isEncryptedEnvelope(parsed)) {
+    if (!key) {
+      // Encrypted file but no key: do NOT continue with empty state, otherwise
+      // the next write would overwrite the whole directory. Fail closed.
+      throw new Error(
+        "VAULTCHAT_STATE_FILE is encrypted but VAULTCHAT_STATE_KEY is not set"
+      );
+    }
+    try {
+      return normalizeState(
+        JSON.parse(decryptState(parsed, key)) as Partial<ServerState>
+      );
+    } catch {
+      throw new Error(
+        "VAULTCHAT_STATE_FILE could not be decrypted (wrong VAULTCHAT_STATE_KEY or corrupt file)"
+      );
+    }
+  }
+
+  // Legacy plaintext.
+  const legacy = parsed as Partial<ServerState>;
+  if (legacy.version !== 1) return emptyState();
+  if (key && !upgradeWarned) {
+    log.warn("state_plaintext_upgrade", {
+      msg: "Legacy plaintext state file detected; re-writing it encrypted on the next change.",
+    });
+    upgradeWarned = true;
+  }
+  return normalizeState(legacy);
 }
 
 function writeState(next: ServerState): void {
   const file = stateFile();
   if (!file) return;
   mkdirSync(dirname(file), { recursive: true });
+  const key = loadStateKey();
+  const serialized = `${JSON.stringify(next, null, 2)}\n`;
+  const payload = key
+    ? `${JSON.stringify(encryptState(serialized, key))}\n`
+    : serialized;
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(tmp, payload, { mode: 0o600 });
   renameSync(tmp, file);
 }
 
