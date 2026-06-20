@@ -28,7 +28,7 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 
 - [ ] Durable, blind gespeicherte Konten: Identitäts-/Routing-Daten serverseitig persistent, aber für den Server inhaltlich blind (keine Klartext-Identität, keine lesbaren Metadaten) — vom denker zerlegt:
   - [ ] 0.1a Durable Storage-Backend, das Render-Restart übersteht (Render Disk oder externer KV/DB) — Infra-/Kostenentscheidung
-  - [ ] 0.1b Verzeichnis at-rest verschlüsseln (AES-256-GCM unter `VAULTCHAT_STATE_KEY`) — persistierte Datei/Backups ohne Klartext-Identität/Metadaten
+  - [x] 0.1b Verzeichnis at-rest verschlüsseln (AES-256-GCM unter `VAULTCHAT_STATE_KEY`) — persistierte Datei/Backups ohne Klartext-Identität/Metadaten. Deployed (19895c5, live, Build grün). **Aktiv sobald 0.1a + `VAULTCHAT_STATE_FILE`/`VAULTCHAT_STATE_KEY` gesetzt** — Service läuft aktuell ephemeral.
   - [ ] 0.1c Gruppen-Metadaten (Name/Beschreibung/Avatar) E2EE statt Server-Klartext
   - [ ] 0.1d Blinde Discovery via OPRF/PSI (Server lernt Username auch live nie)
 - [ ] Verschlüsselte, serverseitige Offline-Mailbox als Option (Store-and-Forward), ohne dass der Server Absender/Inhalt sieht — Sealed-Sender bleibt intakt
