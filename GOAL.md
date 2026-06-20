@@ -36,7 +36,8 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 - [ ] Rate-Limit-/Abuse-Schutz serverseitig, der ohne Inhaltszugriff funktioniert — vom denker erweitert (HTTP-Limiter + WS-Per-Conn-Schutz existierten bereits):
   - [x] 0.4a Per-Account-Cap auf gleichzeitige WS-Sockets (Evict-Oldest, inhaltsblind, `VAULTCHAT_MAX_SOCKETS_PER_USER`=16) — deployed (2b03e65, live, Build grün)
   - [ ] 0.4b Per-IP-Cap auf Pre-Auth-WS-Verbindungen (braucht sorgfältiges X-Forwarded-For-Handling hinter Renders Proxy + Verifikation; daher zurückgestellt)
-- [ ] Reproduzierbarer Build + veröffentlichter Bundle-Hash als Pipeline-Schritt
+- [x] Reproduzierbarer Build + veröffentlichter Bundle-Hash als Pipeline-Schritt — CI-Workflow `reproducible-build.yml`: baut Client auf gepinntem Node 20.20.2, publiziert SHA-384 (SRI-Format) aller Bundle-Assets (Job-Summary + Artefakt) + aufgelöstes `package-lock.json`. Run #1 (15e5df6) grün.
+  - [ ] 0.5b `package-lock.json` committen + SOURCE_DATE_EPOCH-Honoring für bit-genaue Reproduzierbarkeit (lockfile liegt bereits als CI-Artefakt vor)
 
 ## Phase 1 — Alltagstauglichkeit (WhatsApp-Parität)
 
