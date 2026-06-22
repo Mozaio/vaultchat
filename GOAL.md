@@ -72,7 +72,7 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 
 - [ ] Multi-Device: zweites Gerät sicher koppeln (QR/Sicherheitsnummer), Schlüssel sealed übertragen
 - [ ] Geräte-Verwaltung: aktive Geräte sehen, einzeln widerrufen
-- [ ] Verschlüsseltes Backup & Restore der Historie (passphrase-/key-basiert, Server sieht nur Ciphertext)
+- [x] Verschlüsseltes Backup & Restore der Historie (passphrase-/key-basiert, Server sieht nur Ciphertext). **Umgesetzt + Cloud-verifiziert (tsc 0, 11 neue Unit-Tests grün, Build grün)** (`client/src/lib/historyBackup.ts`): spiegelt exakt das Identity-Backup (`backup.ts`) — Argon2id (INTERACTIVE, versionierte/geclampte KDF-Params #22) → `crypto_secretbox_easy` über das serialisierte History-Bündel (alle DM+Gruppen-Nachrichten aus IDB via `idbListAllDm`/`idbListAllGroupMsgs`). Reiner Ciphertext-Blob als Datei-Export/-Import; Server sieht NICHTS (kein Inhalt, keine Peer-IDs/Zeitstempel — der Blob wird nicht hochgeladen). `expiresAt` wird bewusst NICHT mitgesichert (verschwindende Nachrichten auferstehen nicht). MAC-Fehler → generischer Fehler (kein Oracle wrong-pass vs. tamper), Shape-Validierung gegen Malformed-but-authenticated. UI in `SecuritySettings` (Export/Import-Buttons im Backup-Tab) + `ChatShell`-Handler (Datei-Download/-Upload, Passphrase-Prompt, Reload-nach-Restore zur vollen Rehydrierung), alle Strings via `t()` in 10 Sprachen. Tests: round-trip, wrong-passphrase-reject, tamper-reject, wrong-shape-reject, empty-history, fresh-salt/nonce. **USER: einmal auf Render deployen, um live zu schalten.**
 - [ ] Konsistente Historie über Geräte hinweg (sealed Sync), ohne Metadaten preiszugeben
 
 ## Phase 3 — Gruppen & Communities (Discord-Parität)

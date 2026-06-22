@@ -159,6 +159,8 @@ interface SecuritySettingsProps {
   serverStatus?: ServerStatus | null;
   serverStatusError?: string | null;
   onExportBackup?: () => void;
+  onExportHistory?: () => void;
+  onImportHistory?: () => void;
   sendTypingIndicators?: boolean;
   onSendTypingIndicatorsChange?: (value: boolean) => void;
   sendReadReceipts?: boolean;
@@ -181,6 +183,8 @@ export function SecuritySettings({
   serverStatus,
   serverStatusError,
   onExportBackup,
+  onExportHistory,
+  onImportHistory,
   sendTypingIndicators = false,
   onSendTypingIndicatorsChange,
   sendReadReceipts = false,
@@ -662,6 +666,59 @@ export function SecuritySettings({
                   {t("settings.downloadBackup")}
                 </button>
               </div>
+
+              {(onExportHistory || onImportHistory) && (
+                <div
+                  className="rounded-lg border p-3"
+                  style={{
+                    borderColor: "var(--border)",
+                    background: "var(--bg-elevated)",
+                  }}
+                >
+                  <h3
+                    className="mb-1 text-sm font-medium"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {t("settings.historyBackup")}
+                  </h3>
+                  <p
+                    className="mb-3 text-xs"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {t("settings.historyBackupDesc")}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {onExportHistory && (
+                      <button
+                        type="button"
+                        onClick={onExportHistory}
+                        className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        style={{
+                          background: "var(--accent-soft)",
+                          color: "var(--accent)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        {t("settings.exportHistory")}
+                      </button>
+                    )}
+                    {onImportHistory && (
+                      <button
+                        type="button"
+                        onClick={onImportHistory}
+                        className="w-full rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        style={{
+                          background: "transparent",
+                          color: "var(--text)",
+                          border: "1px solid var(--border)",
+                        }}
+                      >
+                        {t("settings.importHistory")}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

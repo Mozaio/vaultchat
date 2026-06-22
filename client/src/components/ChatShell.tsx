@@ -47,6 +47,8 @@ import {
   idbCountUnreadByPeer,
   idbDeleteDm,
   idbDeleteGroupMsg,
+  idbListAllDm,
+  idbListAllGroupMsgs,
   idbListDm,
   idbListDmPeerIds,
   idbListGroup,
@@ -72,6 +74,11 @@ import { observePeerKey, getPin, type PeerPin } from "../lib/trust";
 import { isGroupMessageDuplicate } from "../lib/replayProtection";
 import { buildUploadBodyWithOlm } from "../lib/keyStore";
 import { encryptIdentityBackup } from "../lib/backup";
+import {
+  buildHistoryBundle,
+  encryptHistoryBackup,
+  parseHistoryBackup,
+} from "../lib/historyBackup";
 import { loadLocalIdentity } from "../lib/localIdentity";
 import { previewForPayload } from "../lib/messagePreview";
 import {
@@ -5245,6 +5252,92 @@ export function ChatShell({
             }
             setBackupReminderVisible(false);
             pushToast(t("chat.toastBackupDownloaded"), "success");
+          }}
+          onExportHistory={async () => {
+            const local = loadLocalIdentity();
+            if (!local) return;
+            const passphrase = window.prompt(t("chat.historyBackupPassPrompt"));
+            if (!passphrase) return;
+            try {
+              const [dm, group] = await Promise.all([
+                idbListAllDm(),
+                idbListAllGroupMsgs(),
+              ]);
+              const bundle = buildHistoryBundle(dm, group);
+              const backup = await encryptHistoryBackup(bundle, passphrase);
+              const blob = new Blob([JSON.stringify(backup)], {
+                type: "application/json",
+              });
+              const a = document.createElement("a");
+              a.href = URL.createObjectURL(blob);
+              a.download = `vaultchat-history-${local.username}-encrypted.json`;
+              a.click();
+              URL.revokeObjectURL(a.href);
+              pushToast(
+                t("chat.toastHistoryExported", {
+                  n: String(bundle.dm.length + bundle.group.length),
+                }),
+                "success"
+              );
+            } catch {
+              pushToast(t("chat.toastHistoryExportFailed"), "danger");
+            }
+          }}
+          onImportHistory={async () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "application/json,.json";
+            input.onchange = async () => {
+              const file = input.files?.[0];
+              if (!file) return;
+              const passphrase = window.prompt(
+                t("chat.historyRestorePassPrompt")
+              );
+              if (!passphrase) return;
+              try {
+                const raw = await file.text();
+                const bundle = await parseHistoryBackup(raw, () => passphrase);
+                let restored = 0;
+                for (const m of bundle.dm) {
+                  await idbPutDm({
+                    id: m.id,
+                    peerId: m.peerId,
+                    fromMe: m.fromMe,
+                    plainJson: m.plainJson,
+                    at: m.at,
+                  });
+                  restored += 1;
+                }
+                for (const m of bundle.group) {
+                  await idbPutGroupMsg({
+                    id: m.id,
+                    groupId: m.groupId,
+                    fromUserId: m.fromUserId,
+                    plainJson: m.plainJson,
+                    at: m.at,
+                  });
+                  restored += 1;
+                }
+                pushToast(
+                  t("chat.toastHistoryRestored", { n: String(restored) }),
+                  "success"
+                );
+                // Voll aus IDB rehydrieren: ein Reload ist der robusteste Weg,
+                // die wiederhergestellten Nachrichten in alle In-Memory-Views
+                // (Konversationsliste, aktiver Chat, Suchindex) zu bringen,
+                // ohne die komplexe Hydrations-Logik anzufassen.
+                setTimeout(() => window.location.reload(), 800);
+              } catch (e) {
+                const msg = e instanceof Error ? e.message : "unknown";
+                pushToast(
+                  msg === "history_backup_passphrase_wrong_or_tampered"
+                    ? t("chat.toastHistoryRestoreWrongPass")
+                    : t("chat.toastHistoryRestoreFailed"),
+                  "danger"
+                );
+              }
+            };
+            input.click();
           }}
         />
       )}
