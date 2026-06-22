@@ -107,9 +107,9 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 
 ## Phase 6 — Monetarisierung (ohne die Privatsphäre zu verraten)
 
-- [ ] Abo-/Tier-Modell definieren (Free vs. Plus/Pro: z.B. mehr Speicher, Communities, größere Calls)
-- [ ] Zahlungs-/Abo-Schicht, die Identität NICHT an den Zahlungsanbieter bindet (blind/anonymisiert, Entitlement-Token statt Klarname)
-- [ ] Feature-Gating sauber im Client umsetzen, ohne sensible Daten an den Server zu geben
+- [x] Abo-/Tier-Modell definieren (Free vs. Plus/Pro: z.B. mehr Speicher, Communities, größere Calls). **Umgesetzt** (`client/src/lib/plan.ts`): drei Tiers `free`/`pro`/`team` mit Limits (Custom-Emojis, Voice-Dauer, Gruppengröße, Ordner) + Preisen + lokalisierten Feature-Bullets. Tier liegt rein clientseitig (localStorage), Server sieht nur den Tier-Namen, nie Inhalt. Cloud-verifiziert (tsc 0, +11 Unit-Tests für die Limits/Boundaries, Build grün).
+- [-] Zahlungs-/Abo-Schicht, die Identität NICHT an den Zahlungsanbieter bindet (blind/anonymisiert, Entitlement-Token statt Klarname). **USER: braucht Stripe-Keys (Nutzer-Secret, nicht bereitgestellt).** Code-seitig vorbereitet: `setPlanLocal()` ist der Phase-1-Stub, der in Phase 2 durch einen server-signierten Entitlement-/JWT-Claim ersetzt wird (Design in `plan.ts` dokumentiert). Stripe-Checkout-Webhook + Entitlement-Token NICHT gebaut — übersprungen bis Keys vorliegen.
+- [x] Feature-Gating sauber im Client umsetzen, ohne sensible Daten an den Server zu geben. **Umgesetzt + verifiziert**: reine Client-Gates (`canAddCustomEmoji`/`canRecordVoice`/`canAddFolder`/`isGroupSizeAllowed`), verdrahtet in `customEmojis.ts`, `useVoiceRecorder.ts`, `FoldersManageModal.tsx`, `ChatShell.tsx` (Gruppen-Anlegen über `isGroupSizeAllowed` vereinheitlicht). Keine Tier-Info verlässt den Client außer dem Tier-Namen. +11 Boundary-Tests (strikte Grenzen, Monotonie der Tiers) lock die Logik. Cloud-verifiziert (tsc 0, Tests, Build grün).
 - [ ] Optionaler Self-Hosting-/Business-Tier dokumentiert
 
 ## Phase 7 — Vertrauen, Sicherheit & Compliance

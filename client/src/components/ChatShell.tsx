@@ -144,7 +144,7 @@ import { ChatEmptyState } from "./ChatEmptyState";
 import { ComposerToolsMenu } from "./ComposerToolsMenu";
 import { ThreadPanel } from "./ThreadPanel";
 import { loadThreadSeen, type ThreadSeenMap } from "../lib/threadState";
-import { isPro, loadPlan, getLimits, PLAN_LABELS } from "../lib/plan";
+import { isPro, loadPlan, getLimits, isGroupSizeAllowed, PLAN_LABELS } from "../lib/plan";
 import { EmojiPicker } from "./EmojiPicker";
 import { OnboardingOverlay, readOnboardingPending } from "./OnboardingOverlay";
 import { ToastRegion } from "./ToastRegion";
@@ -3688,7 +3688,7 @@ export function ChatShell({
     setError(null);
     const memberIds = [...new Set([...newGroupMembers, session.user.id])];
     const memberLimit = getLimits().groupMemberMax;
-    if (memberIds.length > memberLimit) {
+    if (!isGroupSizeAllowed(memberIds.length)) {
       setError(
         t("chat.errGroupTooLarge", { n: memberIds.length, limit: memberLimit })
       );

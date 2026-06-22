@@ -110,6 +110,15 @@ export function canAddFolder(currentCount: number, plan: PlanId = loadPlan()): b
 }
 
 /**
+ * Ob eine Gruppe mit `memberCount` Mitgliedern (inkl. Ersteller) im aktuellen
+ * Plan erlaubt ist. Spiegelt die Inline-Prüfung beim Gruppen-Anlegen wider und
+ * vereinheitlicht die Gating-Semantik (Gesamtzahl <= Limit).
+ */
+export function isGroupSizeAllowed(memberCount: number, plan: PlanId = loadPlan()): boolean {
+  return memberCount <= getLimits(plan).groupMemberMax;
+}
+
+/**
  * Per-plan feature bullets as i18n keys. Resolve each with t() at render
  * time so the pricing cards follow the chosen language.
  */
