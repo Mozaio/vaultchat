@@ -61,7 +61,7 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 - [ ] Kontakte & Profile: Anzeigename + Avatar, E2E-verschlüsselt geteilt (Signal-Profile-Keys; Server sieht nur Ciphertext, analog #25). Vom denker zerlegt:
   - [x] Krypto-Grundlage `client/src/lib/profileCrypto.ts`: 32-B Profile-Key + libsodium `crypto_secretbox` encrypt/decrypt von {displayName, avatar} → `PROFILE1:`-Wire, Avatar-Größencap, Shape-Validierung. Spiegelt `groupSecret.ts` (#25), keine eigene Krypto. CI-typgeprüft (a5759ff), **dormant** (unwired, tree-shaken → kein Live-Effekt).
   - [ ] Profile-Key-Verteilung an Kontakte über den bestehenden Olm-Kanal (+ Rotation/Re-Share)
-  - [ ] Server-Ciphertext-Feld + API für das Profil-Blob (Server-opak, wie GMETA)
+  - [x] Server-Ciphertext-Feld + API für das Profil-Blob: `profileCipher` am User-Record (persistiert), `PUT /api/profile` (auth, rate-limited, nur `PROFILE1:`-Blob, size-capped), Auslieferung über `/api/users`. Server-opak (wie GMETA), nie Klartext. Deployed (133586c, live, Build grün). Dormant bis Client-Wiring.
   - [ ] Profil-Editor-UI (eigener Name/Avatar setzen) + Kontakt-Anzeige (Name/Avatar entschlüsseln & rendern)
   - ⚠️ Die offenen Sub-Punkte berühren Live-Flows/Krypto-Verteilung → **Verifikation am laufenden Client nötig (Cloud/Sandbox)**, nicht blind auf Live deployen.
 - [ ] Entwürfe und Scroll-Position pro Chat persistent (lokal). Entwürfe ✅ (per-Chat, verschlüsselt, „Draft:"-Preview). Scroll-to-bottom-Button + Unread-beim-Hochscrollen ✅ **verdrahtet + live** (`onScroll`→`handleDmScroll`/`handleGroupScroll`, 19d8f64, deployed + im Browser geprüft). **Offen:** Scroll-Position pro Chat über Reload persistent merken.
