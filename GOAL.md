@@ -41,7 +41,7 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
     - [ ] 0.1d-3 Account-Index per OPRF-Tag (Registrierung/Discovery per Tag, Klartext-Name raus aus Server-State; Migration/Back-Compat)
     - [ ] 0.1d-4 Client-Blinding + Verdrahtung (Tag bei Register+Lookup; `?q=<name>` → blinder Tag-Lookup) — ⚠️ Client-Runtime-Risiko, braucht Verifikation (Client wird beim Deploy NICHT typgecheckt)
     - [-] 0.1d-5 **USER:** `VAULTCHAT_DISCOVERY_OPRF_KEY` dauerhaft stabil setzen + durable State (hängt an 0.1a)
-- [ ] Verschlüsselte, serverseitige Offline-Mailbox als Option (Store-and-Forward), ohne dass der Server Absender/Inhalt sieht — Sealed-Sender bleibt intakt
+- [x] Verschlüsselte, serverseitige Offline-Mailbox (Store-and-Forward), ohne dass der Server Absender/Inhalt sieht — Sealed-Sender bleibt intakt. **Bereits implementiert & live** (`server/src/mailboxStore.ts`): speichert nur Ciphertext (DM = Sealed-Sender-`envelope` ohne `fromUserId`, Gruppe = `ciphertext`+`groupId`), TTL (7 d) + Count-Cap (500) + Byte-Quota (48 MB/Empfänger) gegen OOM-DoS, Dedup per `cid`, periodischer Sweep, Clear-on-Account-Deletion. Offline-Enqueue ist im Send-Pfad verdrahtet (`delivered===0` → enqueue). **Rest = Persistenz über Restart**, hängt an 0.1a (heute RAM-only, `state: ephemeral`).
 - [ ] Account-Recovery-Konzept entwerfen und umsetzen (Verlust des Geräts), ohne Zero-Knowledge zu brechen
 - [ ] Rate-Limit-/Abuse-Schutz serverseitig, der ohne Inhaltszugriff funktioniert — vom denker erweitert (HTTP-Limiter + WS-Per-Conn-Schutz existierten bereits):
   - [x] 0.4a Per-Account-Cap auf gleichzeitige WS-Sockets (Evict-Oldest, inhaltsblind, `VAULTCHAT_MAX_SOCKETS_PER_USER`=16) — deployed (2b03e65, live, Build grün)
