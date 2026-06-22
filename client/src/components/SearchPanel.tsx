@@ -12,6 +12,7 @@ import {
 } from "../lib/searchIndex";
 import { IconSearch, IconX } from "./Icons";
 import { t, useLocale } from "../lib/i18n";
+import { useFocusTrap } from "../lib/useFocusTrap";
 
 /**
  * Wrap each occurrence of a query term in <mark> so matches stand out in
@@ -66,6 +67,8 @@ export function SearchPanel({
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(panelRef);
 
   const userById = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
   const groupById = useMemo(
@@ -131,9 +134,25 @@ export function SearchPanel({
     return () => clearTimeout(t);
   }, [query, performSearch]);
 
+  // Escape schließt auch, wenn der Fokus auf einem Ergebnis-Button liegt
+  // (der Input-onKeyDown greift nur, solange das Eingabefeld fokussiert ist).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div className="search-panel-overlay" onClick={onClose}>
-      <div className="search-panel" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="search-panel-overlay"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("search.title")}
+    >
+      <div ref={panelRef} className="search-panel" onClick={(e) => e.stopPropagation()}>
         <div className="search-header">
           <input
             ref={inputRef}
