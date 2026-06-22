@@ -1268,6 +1268,7 @@ export function SecuritySettings({
                   </p>
                 </div>
               )}
+              <DevicesSection />
               <LogoutAllSection />
               <ZkgroupExperimentalSection />
               <AccountDangerZone />
@@ -1319,6 +1320,159 @@ export function SecuritySettings({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+type DeviceRow = {
+  deviceId: string | null;
+  connectedAt: number;
+  current: boolean;
+};
+
+function DevicesSection() {
+  useLocale();
+  const [sessions, setSessions] = useState<DeviceRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState<string | null>(null);
+
+  async function load() {
+    setError(null);
+    setLoading(true);
+    try {
+      const li = await import("../lib/localIdentity");
+      const token = li.loadToken();
+      if (!token) throw new Error("no_token");
+      const { listDevices } = await import("../lib/api");
+      const { sessions } = await listDevices(token);
+      setSessions(sessions);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function handleRevoke(deviceId: string, current: boolean) {
+    setError(null);
+    setRevoking(deviceId);
+    try {
+      const li = await import("../lib/localIdentity");
+      const token = li.loadToken();
+      if (!token) throw new Error("no_token");
+      const { revokeDevice } = await import("../lib/api");
+      await revokeDevice(token, deviceId);
+      if (current) {
+        // Eigene Session widerrufen → eigenes Token ist nun entwertet.
+        // Token verwerfen, Identität + lokale Daten behalten, Reload → Login.
+        li.clearToken();
+        location.reload();
+        return;
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRevoking(null);
+    }
+  }
+
+  return (
+    <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <h3
+          className="text-sm font-medium"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {t("settings.devicesTitle")}
+        </h3>
+        <button
+          type="button"
+          className="rounded px-2 py-1 text-xs transition-colors"
+          style={{ background: "var(--bg-elevated)", color: "var(--text-muted)" }}
+          onClick={() => void load()}
+          disabled={loading}
+        >
+          {t("settings.devicesRefresh")}
+        </button>
+      </div>
+      <p className="mb-2 text-xs" style={{ color: "var(--text-muted)" }}>
+        {t("settings.devicesDesc")}
+      </p>
+      {error && (
+        <p className="mb-2 text-xs" style={{ color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
+      {loading && !sessions ? (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {t("settings.devicesLoading")}
+        </p>
+      ) : sessions && sessions.length > 0 ? (
+        <ul className="space-y-2">
+          {sessions.map((s, i) => {
+            const label = s.deviceId
+              ? s.deviceId.slice(0, 8)
+              : t("settings.devicesUnknown");
+            const canRevoke = s.deviceId != null;
+            return (
+              <li
+                key={s.deviceId ?? `legacy-${i}`}
+                className="flex items-center justify-between gap-2 rounded-lg border p-2"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                }}
+              >
+                <div className="min-w-0">
+                  <p
+                    className="truncate font-mono text-xs"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {label}
+                    {s.current ? ` · ${t("settings.devicesThisDevice")}` : ""}
+                  </p>
+                  <p
+                    className="text-[11px]"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    {t("settings.devicesConnectedAt", {
+                      time: new Date(s.connectedAt).toLocaleString(),
+                    })}
+                  </p>
+                </div>
+                {canRevoke && (
+                  <button
+                    type="button"
+                    disabled={revoking === s.deviceId}
+                    className="shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                    style={{ background: "var(--danger-soft)", color: "var(--danger)" }}
+                    onClick={() =>
+                      void handleRevoke(s.deviceId as string, s.current)
+                    }
+                  >
+                    {revoking === s.deviceId
+                      ? t("settings.devicesRevoking")
+                      : s.current
+                        ? t("settings.devicesSignOutThis")
+                        : t("settings.devicesRevoke")}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {t("settings.devicesNone")}
+        </p>
+      )}
     </div>
   );
 }

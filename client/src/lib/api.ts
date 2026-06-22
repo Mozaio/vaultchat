@@ -130,6 +130,8 @@ export async function register(body: {
   recoveryEmail?: string;
   requestedPlan?: "personal" | "pro" | "team";
   inviteCode?: string;
+  /** Opake, client-erzeugte Geräte-ID für die Einzel-Geräte-Revocation. */
+  deviceId?: string;
 }) {
   return req<{ token: string; user: ApiUser }>("/api/register", {
     method: "POST",
@@ -200,7 +202,12 @@ export async function serverStatus(token: string) {
   return req<ServerStatus>("/api/server/status", { token });
 }
 
-export async function login(body: { username: string; password: string }) {
+export async function login(body: {
+  username: string;
+  password: string;
+  /** Opake, client-erzeugte Geräte-ID für die Einzel-Geräte-Revocation. */
+  deviceId?: string;
+}) {
   return req<{ token: string; user: ApiUser }>("/api/login", {
     method: "POST",
     body: JSON.stringify(body),
@@ -222,6 +229,30 @@ export async function logoutAllDevices(token: string) {
   return req<{ ok: boolean }>("/api/account/logout-all", {
     method: "POST",
     token,
+  });
+}
+
+export type DeviceSession = {
+  /** Opake Geräte-ID (oder null bei Alt-Clients ohne ID). */
+  deviceId: string | null;
+  /** Verbindungszeit (Unix-ms). */
+  connectedAt: number;
+  /** Markiert die Session des aufrufenden Geräts. */
+  current: boolean;
+};
+
+/** Aktuell verbundene Geräte/Sessions des Users (rein ephemere Live-WS-Liste;
+ *  keine persistenten Metadaten, keine IP/User-Agent). */
+export async function listDevices(token: string) {
+  return req<{ sessions: DeviceSession[] }>("/api/account/devices", { token });
+}
+
+/** Meldet EIN Gerät (per opaker deviceId) ab, ohne die anderen mitzunehmen. */
+export async function revokeDevice(token: string, deviceId: string) {
+  return req<{ ok: boolean }>("/api/account/devices/revoke", {
+    method: "POST",
+    token,
+    body: JSON.stringify({ deviceId }),
   });
 }
 

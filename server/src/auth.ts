@@ -14,6 +14,11 @@ const JwtPayload = z.object({
    *  Users (via Resolver), gilt das Token als entwertet ("auf allen
    *  Geräten abmelden"). Fehlt bei Alt-Tokens → wie 0 behandelt. */
   te: z.number().optional(),
+  /** Geräte-/Session-ID (opak, vom CLIENT zufällig erzeugt — NICHT an
+   *  Hardware/IP/Identität gebunden). Erlaubt EINZELNE Geräte-Revocation
+   *  (ein Gerät abmelden statt "alle"). Fehlt bei Alt-Tokens → keine
+   *  Einzel-Revocation, aber logout-all (te) greift weiter. */
+  dv: z.string().max(64).optional(),
 });
 
 export type JwtUser = {
@@ -21,6 +26,8 @@ export type JwtUser = {
   username: string;
   sessionStart?: number;
   tokenEpoch?: number;
+  /** Opake Geräte-/Session-ID (siehe `dv`-Claim). */
+  deviceId?: string;
 };
 
 /**
@@ -32,6 +39,21 @@ export type JwtUser = {
 let tokenEpochResolver: ((userId: string) => number) | null = null;
 export function setTokenEpochResolver(fn: (userId: string) => number): void {
   tokenEpochResolver = fn;
+}
+
+/**
+ * Resolver für die EINZEL-Geräte-Revocation (per DI, gleicher Grund wie oben).
+ * Liefert `true`, wenn `(userId, deviceId)` widerrufen wurde → das Token gilt
+ * als entwertet, OBWOHL die Token-Epoch noch passt. Nicht gesetzt → keine
+ * Einzel-Revocation (fail-open, wie beim Epoch-Resolver).
+ */
+let deviceRevokedResolver:
+  | ((userId: string, deviceId: string) => boolean)
+  | null = null;
+export function setDeviceRevokedResolver(
+  fn: (userId: string, deviceId: string) => boolean
+): void {
+  deviceRevokedResolver = fn;
 }
 
 const JWT_SECRET = process.env.VAULTCHAT_JWT_SECRET;
@@ -105,7 +127,13 @@ export function signToken(
 ) {
   const s0 = sessionStartSec ?? Math.floor(Date.now() / 1000);
   return jwt.sign(
-    { sub: user.userId, u: user.username, s0, te: user.tokenEpoch ?? 0 },
+    {
+      sub: user.userId,
+      u: user.username,
+      s0,
+      te: user.tokenEpoch ?? 0,
+      ...(user.deviceId ? { dv: user.deviceId } : {}),
+    },
     secret(),
     { expiresIn: ttlSec, issuer: "vaultchat" }
   );
@@ -127,11 +155,24 @@ export function verifyToken(token: string): JwtUser | null {
       }
       if (te < current) return null; // via logout-all entwertet
     }
+    // Einzel-Geräte-Revocation: ein bestimmtes Gerät wurde abgemeldet, ohne
+    // die Token-Epoch zu bumpen (= ohne alle anderen Geräte mitzunehmen).
+    if (deviceRevokedResolver && typeof p.dv === "string" && p.dv.length > 0) {
+      try {
+        if (deviceRevokedResolver(p.sub, p.dv)) return null;
+      } catch {
+        // Wie beim Epoch-Resolver: ein Resolver-Fehler darf nicht alle
+        // aussperren (Verfügbarkeit vor Edge-Case-Revoke).
+      }
+    }
     return {
       userId: p.sub,
       username: p.u,
       ...(typeof p.s0 === "number" ? { sessionStart: p.s0 } : {}),
       tokenEpoch: te,
+      ...(typeof p.dv === "string" && p.dv.length > 0
+        ? { deviceId: p.dv }
+        : {}),
     };
   } catch {
     return null;

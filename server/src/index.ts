@@ -27,15 +27,27 @@ import {
 } from "./memoryStore.js";
 import {
   hashPassword,
+  setDeviceRevokedResolver,
   setTokenEpochResolver,
   signToken,
   verifyPasswordOrDummy,
   verifyToken,
 } from "./auth.js";
+import {
+  clearRevokedDevices,
+  isDeviceRevoked,
+  revokeDevice,
+} from "./deviceSessions.js";
 
 // Token-Revocation: verifyToken prüft die Token-Epoch gegen den User-Store.
 // Muss vor dem ersten Request gesetzt sein (Modul-Load genügt).
 setTokenEpochResolver((userId) => getTokenEpoch(userId));
+// Einzel-Geräte-Revocation (GOAL Phase 2): verifyToken entwertet ein einzelnes
+// Token, dessen (userId, deviceId) widerrufen wurde — ohne alle Geräte zu
+// treffen. DI wie beim Epoch-Resolver (kein Modul-Zyklus).
+setDeviceRevokedResolver((userId, deviceId) =>
+  isDeviceRevoked(userId, deviceId)
+);
 import {
   currentRedemptionTime,
   getZkgroupStatus,
@@ -44,8 +56,10 @@ import {
   verifyPresentation,
 } from "./zkgroup.js";
 import {
+  disconnectDevice,
   disconnectUser,
   getWsStats,
+  listUserDevices,
   registerClient,
   sendToUser,
 } from "./wsHub.js";
@@ -351,11 +365,16 @@ const RegisterBody = z.object({
   recoveryEmail: z.string().email().max(254).optional(),
   requestedPlan: Plan.optional(),
   inviteCode: z.string().max(256).optional(),
+  /** Opake, client-erzeugte Geräte-/Session-ID (für Einzel-Geräte-Revocation,
+   *  GOAL Phase 2). Nicht identitäts-/hardware-gebunden; reine Zufalls-ID. */
+  deviceId: z.string().min(1).max(64).optional(),
 });
 
 const LoginBody = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
+  /** Siehe RegisterBody.deviceId. */
+  deviceId: z.string().min(1).max(64).optional(),
 });
 
 // E2EE-Gruppen-Metadaten: Avatar/Name/Beschreibung werden client-seitig mit
@@ -481,6 +500,7 @@ app.post("/api/register", authLimiter, async (req, res) => {
     userId: user.id,
     username: user.username,
     tokenEpoch: getTokenEpoch(user.id),
+    ...(parsed.data.deviceId ? { deviceId: parsed.data.deviceId } : {}),
   });
   res.json({
     token,
@@ -519,6 +539,7 @@ app.post("/api/login", authLimiter, async (req, res) => {
     userId: user.id,
     username: user.username,
     tokenEpoch: getTokenEpoch(user.id),
+    ...(parsed.data.deviceId ? { deviceId: parsed.data.deviceId } : {}),
   });
   log.info("auth_login_ok", {
     reqId: req.id,
@@ -574,6 +595,9 @@ app.post("/api/token/refresh", apiLimiter, (req, res) => {
         userId: user.id,
         username: user.username,
         tokenEpoch: getTokenEpoch(user.id),
+        // Geräte-ID wandert beim Refresh unverändert mit, damit eine
+        // Einzel-Geräte-Revocation auch nach einem Refresh greift.
+        ...(u.deviceId ? { deviceId: u.deviceId } : {}),
       },
       undefined,
       s0
@@ -602,7 +626,68 @@ app.post("/api/account/logout-all", apiLimiter, (req, res) => {
   // Token-Revocation greift beim nächsten verifyToken; bereits offene WS
   // zusätzlich SOFORT trennen, damit keine Verbindung überlebt.
   const dropped = disconnectUser(jwtUser.userId);
+  // Der Epoch-Bump entwertet ohnehin ALLE Tokens → die explizite
+  // Einzel-Geräte-Revocationsliste ist danach nur Ballast.
+  clearRevokedDevices(jwtUser.userId);
   log.info("auth_logout_all", { userId: jwtUser.userId, droppedSockets: dropped });
+  res.json({ ok: true });
+});
+
+/**
+ * Geräte-Verwaltung (GOAL Phase 2): listet die AKTUELL VERBUNDENEN Sessions
+ * des aufrufenden Users. Quelle ist rein die ephemere Live-WS-Registry —
+ * keine persistenten Metadaten, keine IP, kein User-Agent, kein Label. Pro
+ * Session nur die opake `deviceId` (client-erzeugt, nicht identitätsgebunden)
+ * und die Verbindungszeit. Die eigene Session wird markiert, damit die UI
+ * „dieses Gerät" anzeigen kann. ZK-Grenze: der Server verrät hier nichts, was
+ * er nicht ohnehin schon weiß (die Socket-Zahl war via /status sichtbar).
+ */
+app.get("/api/account/devices", apiLimiter, (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const sessions = listUserDevices(jwtUser.userId).map((s) => ({
+    deviceId: s.deviceId,
+    connectedAt: s.connectedAt,
+    current: s.deviceId != null && s.deviceId === (jwtUser.deviceId ?? null),
+  }));
+  res.json({ sessions });
+});
+
+const RevokeDeviceBody = z.object({
+  deviceId: z.string().min(1).max(64),
+});
+
+/**
+ * Meldet EIN Gerät (per opaker deviceId) ab, ohne alle anderen mitzunehmen:
+ * markiert die deviceId als widerrufen (künftige verifyToken-Aufrufe für
+ * dieses Token scheitern) UND trennt die bereits offene WS-Verbindung sofort.
+ * Der `tokenEpoch` bleibt unangetastet — andere Geräte des Users bleiben
+ * angemeldet (im Gegensatz zu logout-all).
+ */
+app.post("/api/account/devices/revoke", apiLimiter, (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = RevokeDeviceBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const { deviceId } = parsed.data;
+  revokeDevice(jwtUser.userId, deviceId);
+  const dropped = disconnectDevice(jwtUser.userId, deviceId);
+  log.info("auth_device_revoke", {
+    userId: jwtUser.userId,
+    droppedSockets: dropped,
+    self: deviceId === (jwtUser.deviceId ?? null),
+  });
   res.json({ ok: true });
 });
 
@@ -1850,7 +1935,11 @@ wss.on("connection", (ws, req) => {
   const urlToken = url.searchParams.get("token");
   const allowUrlToken = process.env.VAULTCHAT_ALLOW_WS_URL_TOKEN === "1";
   const verifiedFromUrl = allowUrlToken && urlToken ? verifyToken(urlToken) : null;
-  let jwtUser: { userId: string; username: string } | null = verifiedFromUrl;
+  let jwtUser: {
+    userId: string;
+    username: string;
+    deviceId?: string;
+  } | null = verifiedFromUrl;
   let authTimer: ReturnType<typeof setTimeout> | null = null;
 
   if (urlToken && !allowUrlToken) {
@@ -1863,7 +1952,7 @@ wss.on("connection", (ws, req) => {
       ws.close(4401, "unauthorized");
       return;
     }
-    registerClient(jwtUser.userId, ws);
+    registerClient(jwtUser.userId, ws, jwtUser.deviceId);
     releasePreAuth(); // authenticated → no longer counts against the pre-auth cap
     flushMailboxToSocket(jwtUser.userId, ws);
   } else {
@@ -1930,7 +2019,7 @@ wss.on("connection", (ws, req) => {
         clearTimeout(authTimer);
         authTimer = null;
       }
-      registerClient(u.userId, ws);
+      registerClient(u.userId, ws, u.deviceId);
       releasePreAuth(); // authenticated → no longer counts against the pre-auth cap
       ws.send(JSON.stringify({ type: "auth_ok" }));
       flushMailboxToSocket(u.userId, ws);

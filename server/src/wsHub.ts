@@ -1,7 +1,14 @@
 import type { WebSocket } from "ws";
 import { log } from "./logger.js";
 
-type Client = { ws: WebSocket; userId: string; connectedAt: number };
+type Client = {
+  ws: WebSocket;
+  userId: string;
+  connectedAt: number;
+  /** Opake, client-erzeugte Geräte-/Session-ID (aus dem `dv`-JWT-Claim).
+   *  Nicht identitäts-/hardware-gebunden. Fehlt bei Alt-Clients. */
+  deviceId?: string;
+};
 
 const byUser = new Map<string, Set<Client>>();
 
@@ -15,8 +22,17 @@ const byUser = new Map<string, Set<Client>>();
  */
 const MAX_SOCKETS_PER_USER = Number(process.env.VAULTCHAT_MAX_SOCKETS_PER_USER ?? 16);
 
-export function registerClient(userId: string, ws: WebSocket) {
-  const c: Client = { ws, userId, connectedAt: Date.now() };
+export function registerClient(
+  userId: string,
+  ws: WebSocket,
+  deviceId?: string
+) {
+  const c: Client = {
+    ws,
+    userId,
+    connectedAt: Date.now(),
+    ...(deviceId ? { deviceId } : {}),
+  };
   let set = byUser.get(userId);
   if (!set) {
     set = new Set();
@@ -95,6 +111,57 @@ export function disconnectUser(
   if (!set) return 0;
   let n = 0;
   for (const c of [...set]) {
+    try {
+      c.ws.close(code, reason);
+      n++;
+    } catch {
+      /* socket bereits am Schließen */
+    }
+  }
+  return n;
+}
+
+/**
+ * Listet die AKTUELL VERBUNDENEN Sessions eines Users (für die Geräte-
+ * Verwaltung). Quelle ist rein die ephemere Live-WS-Registry — keine
+ * persistenten Metadaten. Pro Session nur die opake `deviceId` und die
+ * Verbindungszeit; KEINE IP, kein User-Agent, kein Label (ZK-Grenze).
+ * Sessions ohne deviceId (Alt-Clients) werden mit `null` gemeldet, damit die
+ * UI sie zumindest zählen kann.
+ */
+export function listUserDevices(
+  userId: string
+): Array<{ deviceId: string | null; connectedAt: number }> {
+  const set = byUser.get(userId);
+  if (!set) return [];
+  const out: Array<{ deviceId: string | null; connectedAt: number }> = [];
+  for (const c of set) {
+    if (c.ws.readyState !== c.ws.OPEN) continue;
+    out.push({ deviceId: c.deviceId ?? null, connectedAt: c.connectedAt });
+  }
+  // Älteste zuerst (stabile Anzeige).
+  out.sort((a, b) => a.connectedAt - b.connectedAt);
+  return out;
+}
+
+/**
+ * Trennt sofort alle offenen Sockets EINES Geräts (per opaker deviceId) eines
+ * Users. Ergänzt die Einzel-Token-Revocation (`deviceSessions`): die
+ * Revocation entwertet künftige verifyToken-Aufrufe, dieser Aufruf wirft die
+ * bereits offene Verbindung sofort raus. Gibt die Anzahl getrennter Sockets
+ * zurück.
+ */
+export function disconnectDevice(
+  userId: string,
+  deviceId: string,
+  code = 4401,
+  reason = "device_revoked"
+): number {
+  const set = byUser.get(userId);
+  if (!set) return 0;
+  let n = 0;
+  for (const c of [...set]) {
+    if (c.deviceId !== deviceId) continue;
     try {
       c.ws.close(code, reason);
       n++;

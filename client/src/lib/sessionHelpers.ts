@@ -1,4 +1,5 @@
 import * as api from "./api";
+import { getDeviceId } from "./deviceSession";
 import type { LocalIdentity } from "./localIdentity";
 import {
   fingerprintFromPublicKeyB64,
@@ -24,7 +25,11 @@ export async function buildSessionFromLogin(
   password: string,
   local: LocalIdentity | null
 ): Promise<Session> {
-  const { token, user } = await api.login({ username, password });
+  const { token, user } = await api.login({
+    username,
+    password,
+    deviceId: getDeviceId(),
+  });
   if (
     !local ||
     local.username !== user.username ||
@@ -54,6 +59,7 @@ export async function buildSessionFromRegister(
     username,
     password,
     publicKey,
+    deviceId: getDeviceId(),
     ...(options?.recoveryEmail ? { recoveryEmail: options.recoveryEmail } : {}),
     ...(options?.requestedPlan ? { requestedPlan: options.requestedPlan } : {}),
     ...(inviteCode ? { inviteCode } : {}),
