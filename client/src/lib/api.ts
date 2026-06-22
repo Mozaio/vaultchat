@@ -490,7 +490,7 @@ export async function uploadBlob(
         "Content-Type": "application/octet-stream",
         Authorization: `Bearer ${token}`,
       },
-      body: bytes,
+      body: bytes as BodyInit,
     });
     if (!r.ok) {
       let msg = `blob_upload_${r.status}`;

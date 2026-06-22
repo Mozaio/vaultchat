@@ -117,7 +117,6 @@ export class GroupCallController {
   private rtcConfig: { iceServers: RTCIceServer[]; forceRelay: boolean };
   private events: GroupCallEvents;
   private myUserId: string;
-  private myUsername: string;
   private groupId: string;
   private joinedAt: number;
   private localMuted = false;
@@ -129,7 +128,7 @@ export class GroupCallController {
   constructor(
     groupId: string,
     myUserId: string,
-    myUsername: string,
+    _myUsername: string,
     localStream: MediaStream,
     rtcConfig: { iceServers: RTCIceServer[]; forceRelay: boolean },
     relayOnly: boolean,
@@ -137,7 +136,6 @@ export class GroupCallController {
   ) {
     this.groupId = groupId;
     this.myUserId = myUserId;
-    this.myUsername = myUsername;
     this.localStream = localStream;
     this.rtcConfig = rtcConfig;
     this.relayOnly = relayOnly || rtcConfig.forceRelay;

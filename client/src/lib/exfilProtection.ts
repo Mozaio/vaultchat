@@ -51,8 +51,11 @@ export async function immediateWipe(): Promise<void> {
   await sodiumReady();
   const sodium = getSodium();
   
+  // _keyRef wird bewusst NICHT gewiped (Session-Key, s.o.), aber referenziert,
+  // damit der gehaltene Schlüssel nicht als "ungenutzt" wegoptimiert wird.
+  void _keyRef;
   // Wipe aller registrierten Referenzen (temporäre Daten/Puffer)
-  for (const { ref, name } of _sensitiveRefs) {
+  for (const { ref } of _sensitiveRefs) {
     if (ref && ref.length > 0) {
       sodium.memzero(ref);
       // Ersetzen mit Zufallsdaten (additional confusion)

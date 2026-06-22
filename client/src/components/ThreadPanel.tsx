@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatMsg } from "../lib/incomingDm";
+import type { ChatMsg } from "./MessageBubble";
 import { previewForPayload } from "../lib/messagePreview";
 import { markThreadSeen } from "../lib/threadState";
 import { IconX, IconSend, IconMessageSquare } from "./Icons";

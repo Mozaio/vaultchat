@@ -38,7 +38,6 @@ type Props = {
 
 export function GroupCallBar({
   state,
-  selfUserId,
   selfUsername,
   onJoin,
   onLeave,

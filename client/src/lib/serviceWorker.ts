@@ -87,7 +87,6 @@ export function registerServiceWorker(): void {
 function isProductionLike(): boolean {
   try {
     if (typeof import.meta !== "undefined") {
-      // @ts-expect-error vite-only flag
       if (import.meta.env?.DEV === true) return false;
     }
   } catch {

@@ -185,12 +185,6 @@ export function SecuritySettings({
   onSendTypingIndicatorsChange,
   sendReadReceipts = false,
   onSendReadReceiptsChange,
-  notificationEnabled = false,
-  onNotificationEnabledChange,
-  notificationPreview = false,
-  onNotificationPreviewChange,
-  notificationPermission = "default",
-  onRequestNotificationPermission,
   blockedContacts = [],
   onUnblockContact,
 }: SecuritySettingsProps) {

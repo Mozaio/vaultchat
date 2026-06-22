@@ -93,7 +93,6 @@ export function logSilentCryptoFailure(
   try {
     const isDev =
       typeof import.meta !== "undefined" &&
-      // @ts-expect-error vite-only flag
       import.meta.env?.DEV !== false;
     if (isDev && code) {
       // eslint-disable-next-line no-console

@@ -151,7 +151,7 @@ export async function rebuildFile(
   expectedSha256B64?: string
 ): Promise<Blob> {
   const sorted = [...chunks].sort((a, b) => a.idx - b.idx);
-  const blob = new Blob(sorted.map((c) => c.data), { type: mime });
+  const blob = new Blob(sorted.map((c) => c.data as BlobPart), { type: mime });
   if (expectedSha256B64) {
     const buf = new Uint8Array(await blob.arrayBuffer());
     const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", buf));
