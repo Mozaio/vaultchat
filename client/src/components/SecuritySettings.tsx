@@ -1269,6 +1269,7 @@ export function SecuritySettings({
                 </div>
               )}
               <DevicesSection />
+              <DevicePairingSection />
               <LogoutAllSection />
               <ZkgroupExperimentalSection />
               <AccountDangerZone />
@@ -1320,6 +1321,285 @@ export function SecuritySettings({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Multi-Device-Kopplung (GOAL Phase 2) — manueller, dependency-freier
+ * Copy/Paste-Flow (kein QR-Lib im Bundle). Der versiegelte Schlüssel-Transfer
+ * läuft NICHT über den Server: das Secondary zeigt sein Kopplungs-Angebot
+ * (ephemerer PK + Nonce) als Text, das Primary versiegelt die Identität daran
+ * (`crypto_box_seal`) und gibt den Blob zurück, den das Secondary öffnet.
+ *
+ * ⚠️ NUR die Krypto + Unit-Tests sind verifiziert. Der vollständige
+ * Verhaltenspfad (zwei echte Geräte, Self-Sync der Historie, Geräte-Fan-out
+ * beim Senden) braucht ZWEI ECHTE GERÄTE — siehe Hinweis in der UI.
+ */
+function DevicePairingSection() {
+  useLocale();
+  const [open, setOpen] = useState(false);
+  const [role, setRole] = useState<"secondary" | "primary">("secondary");
+
+  // --- Secondary-State (dieses Gerät als NEUES Gerät koppeln) ---
+  type Session = import("../lib/deviceProvisioning").PairingSession;
+  const [session, setSession] = useState<Session | null>(null);
+  const [offerText, setOfferText] = useState("");
+  const [safety, setSafety] = useState("");
+  const [sealedIn, setSealedIn] = useState("");
+  const [secErr, setSecErr] = useState<string | null>(null);
+  const [secOk, setSecOk] = useState(false);
+
+  // --- Primary-State (ein neues Gerät von HIER aus koppeln) ---
+  const [pasteOffer, setPasteOffer] = useState("");
+  const [primSafety, setPrimSafety] = useState("");
+  const [sealedOut, setSealedOut] = useState("");
+  const [primErr, setPrimErr] = useState<string | null>(null);
+
+  async function startSecondary() {
+    setSecErr(null);
+    setSecOk(false);
+    try {
+      const dp = await import("../lib/deviceProvisioning");
+      const s = await dp.createPairingSession();
+      setSession(s);
+      setOfferText(dp.encodePairingOffer(s.offer));
+      setSafety(await dp.pairingSafetyNumber(s.offer));
+    } catch (e) {
+      setSecErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function finishSecondary() {
+    setSecErr(null);
+    if (!session) return;
+    try {
+      const dp = await import("../lib/deviceProvisioning");
+      const identity = await dp.openProvisioningPayload(
+        session,
+        sealedIn.trim()
+      );
+      // Identität dieses (neuen) Geräts setzen. Danach Re-Login mit Passwort
+      // (der wrapped Key wird mit dem Passwort entsperrt — das Passwort ist
+      // NICHT im Transfer enthalten, by design).
+      const li = await import("../lib/localIdentity");
+      li.saveLocalIdentity(identity);
+      setSecOk(true);
+    } catch (e) {
+      setSecErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function sealForNewDevice() {
+    setPrimErr(null);
+    setSealedOut("");
+    try {
+      const dp = await import("../lib/deviceProvisioning");
+      const li = await import("../lib/localIdentity");
+      const local = li.loadLocalIdentity();
+      if (!local) throw new Error("no_local_identity");
+      const offer = dp.decodePairingOffer(pasteOffer.trim());
+      setPrimSafety(await dp.pairingSafetyNumber(offer));
+      setSealedOut(await dp.sealProvisioningPayload(offer, local));
+    } catch (e) {
+      setPrimErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div className="border-t pt-3" style={{ borderColor: "var(--border)" }}>
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-2 text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <h3
+          className="text-sm font-medium"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          {t("settings.pairTitle")}
+        </h3>
+        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+          {open ? "▾" : "▸"}
+        </span>
+      </button>
+      <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>
+        {t("settings.pairDesc")}
+      </p>
+
+      {open && (
+        <div className="mt-2 space-y-3">
+          <div
+            className="rounded-lg border p-2 text-xs"
+            style={{
+              borderColor: "var(--warning)",
+              background: "var(--warning-soft, var(--bg-elevated))",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {t("settings.pairBeta")}
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className="flex-1 rounded-lg px-2 py-1 text-xs font-medium"
+              style={{
+                background:
+                  role === "secondary" ? "var(--accent-soft)" : "var(--bg-elevated)",
+                color: role === "secondary" ? "var(--accent)" : "var(--text-muted)",
+                border: "1px solid var(--border)",
+              }}
+              onClick={() => setRole("secondary")}
+            >
+              {t("settings.pairRoleSecondary")}
+            </button>
+            <button
+              type="button"
+              className="flex-1 rounded-lg px-2 py-1 text-xs font-medium"
+              style={{
+                background:
+                  role === "primary" ? "var(--accent-soft)" : "var(--bg-elevated)",
+                color: role === "primary" ? "var(--accent)" : "var(--text-muted)",
+                border: "1px solid var(--border)",
+              }}
+              onClick={() => setRole("primary")}
+            >
+              {t("settings.pairRolePrimary")}
+            </button>
+          </div>
+
+          {role === "secondary" ? (
+            <div className="space-y-2">
+              {!session ? (
+                <button
+                  type="button"
+                  className="w-full rounded-lg px-3 py-2 text-sm font-medium"
+                  style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                  onClick={() => void startSecondary()}
+                >
+                  {t("settings.pairGenerateOffer")}
+                </button>
+              ) : (
+                <>
+                  <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                    {t("settings.pairOfferLabel")}
+                  </label>
+                  <textarea
+                    readOnly
+                    value={offerText}
+                    rows={3}
+                    className="w-full rounded-lg border p-2 font-mono text-[11px]"
+                    style={{
+                      borderColor: "var(--border)",
+                      background: "var(--bg-elevated)",
+                      color: "var(--text)",
+                    }}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                    {t("settings.pairSafety")}{" "}
+                    <span className="font-mono" style={{ color: "var(--accent)" }}>
+                      {safety}
+                    </span>
+                  </p>
+                  <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                    {t("settings.pairSealedInLabel")}
+                  </label>
+                  <textarea
+                    value={sealedIn}
+                    onChange={(e) => setSealedIn(e.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border p-2 font-mono text-[11px]"
+                    style={{
+                      borderColor: "var(--border)",
+                      background: "var(--bg-elevated)",
+                      color: "var(--text)",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={!sealedIn.trim()}
+                    className="w-full rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50"
+                    style={{ background: "var(--accent)", color: "#fff" }}
+                    onClick={() => void finishSecondary()}
+                  >
+                    {t("settings.pairAdopt")}
+                  </button>
+                  {secOk && (
+                    <p className="text-xs" style={{ color: "var(--success)" }}>
+                      {t("settings.pairAdoptOk")}
+                    </p>
+                  )}
+                </>
+              )}
+              {secErr && (
+                <p className="text-xs" style={{ color: "var(--danger)" }}>
+                  {secErr}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                {t("settings.pairPasteOfferLabel")}
+              </label>
+              <textarea
+                value={pasteOffer}
+                onChange={(e) => setPasteOffer(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border p-2 font-mono text-[11px]"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--bg-elevated)",
+                  color: "var(--text)",
+                }}
+              />
+              <button
+                type="button"
+                disabled={!pasteOffer.trim()}
+                className="w-full rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-50"
+                style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                onClick={() => void sealForNewDevice()}
+              >
+                {t("settings.pairSeal")}
+              </button>
+              {primSafety && (
+                <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                  {t("settings.pairSafetyVerify")}{" "}
+                  <span className="font-mono" style={{ color: "var(--accent)" }}>
+                    {primSafety}
+                  </span>
+                </p>
+              )}
+              {sealedOut && (
+                <>
+                  <label className="block text-xs" style={{ color: "var(--text-muted)" }}>
+                    {t("settings.pairSealedOutLabel")}
+                  </label>
+                  <textarea
+                    readOnly
+                    value={sealedOut}
+                    rows={3}
+                    className="w-full rounded-lg border p-2 font-mono text-[11px]"
+                    style={{
+                      borderColor: "var(--border)",
+                      background: "var(--bg-elevated)",
+                      color: "var(--text)",
+                    }}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </>
+              )}
+              {primErr && (
+                <p className="text-xs" style={{ color: "var(--danger)" }}>
+                  {primErr}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
