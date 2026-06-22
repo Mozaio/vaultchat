@@ -363,6 +363,19 @@ export function ChatShell({
   const [groupText, setGroupText] = useState("");
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [groupMessages, setGroupMessages] = useState<ChatMsg[]>([]);
+  // cid → Nachricht-Index, damit das Auflösen von Antwort-Vorschauen O(1) ist
+  // statt pro Antwort die ganze Liste linear zu durchsuchen (vorher O(M·N) je
+  // Render bei großen Chats). Nur neu berechnet, wenn sich die Liste ändert.
+  const messagesByCid = useMemo(() => {
+    const map = new Map<string, ChatMsg>();
+    for (const m of messages) if (m.plain.cid) map.set(m.plain.cid, m);
+    return map;
+  }, [messages]);
+  const groupMessagesByCid = useMemo(() => {
+    const map = new Map<string, ChatMsg>();
+    for (const m of groupMessages) if (m.plain.cid) map.set(m.plain.cid, m);
+    return map;
+  }, [groupMessages]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   // 0 = noch nie versucht, >0 = wir reconnecten gerade (für UI-State).
@@ -4403,11 +4416,11 @@ export function ChatShell({
   }
 
   function findReplyPreview(
-    list: ChatMsg[],
+    byCid: Map<string, ChatMsg>,
     cid: string | undefined
   ): { author: string; text: string; cid?: string } | null {
     if (!cid) return null;
-    const m = list.find((x) => x.plain.cid === cid);
+    const m = byCid.get(cid);
     if (!m) return null;
     return {
       author: m.fromMe ? t("chat.you") : peer?.username ?? t("chat.peerFallback"),
@@ -4417,12 +4430,12 @@ export function ChatShell({
   }
 
   function replyPreviewForMessage(
-    list: ChatMsg[],
+    byCid: Map<string, ChatMsg>,
     msg: ChatMsg,
     fallbackAuthor: string
   ): { author: string; text: string; cid?: string } | null {
     if (msg.plain.replyToCid) {
-      const found = findReplyPreview(list, msg.plain.replyToCid);
+      const found = findReplyPreview(byCid, msg.plain.replyToCid);
       if (found) return found;
       // referenced message gone (expired/deleted) -> use stored preview if any
       if (msg.plain.replyPreview) {
@@ -7113,7 +7126,7 @@ export function ChatShell({
                     isPinned={!!m.plain.cid && dmPinnedSet.has(m.plain.cid)}
                     peerLabel={peer.username}
                     replyToPreview={replyPreviewForMessage(
-                      messages,
+                      messagesByCid,
                       m,
                       peer.username
                     )}
@@ -8124,7 +8137,7 @@ export function ChatShell({
                     )
                     .filter((n): n is string => Boolean(n))}
                   replyToPreview={replyPreviewForMessage(
-                    groupMessages,
+                    groupMessagesByCid,
                     m,
                     users.find((u) => u.id === m.fromUserId)?.username ?? t("chat.memberFallback")
                   )}
