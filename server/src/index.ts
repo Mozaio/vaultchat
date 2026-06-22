@@ -48,6 +48,7 @@ import {
   registerClient,
   sendToUser,
 } from "./wsHub.js";
+import { evaluateBlinded } from "./discoveryOprf.js";
 import {
   enqueueMailboxDm,
   clearMailboxForUser,
@@ -258,6 +259,16 @@ const keysLimiter = rateLimit({
 // Strenger Limiter für den UNAUTHENTIFIZIERTEN Sealed-Sender-Endpunkt (#26):
 // begrenzt die DoS-Verstärkung (1 Request → N Zustellungen) pro IP.
 const sealedGroupLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+// GOAL 0.1d-2: limits online OPRF evaluations per IP. The OPRF lets a client
+// derive a discovery tag, so a tight cap bounds client-side enumeration of the
+// exact-match directory (the server-side brute-force limitation is documented
+// in DISCOVERY_SPEC.md / THREAT_MODEL.md).
+const discoveryLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,
   standardHeaders: true,
@@ -974,6 +985,34 @@ app.get("/api/users/search", searchLimiter, async (req, res) => {
   );
 
   res.json({ users: results });
+});
+
+// GOAL 0.1d-2: OPRF evaluation for blind contact discovery. The client sends a
+// blinded ristretto255 point; the server returns k*B without learning the
+// username (see DISCOVERY_SPEC.md). DORMANT — no client uses it until 0.1d-4;
+// fail-closed (503) until VAULTCHAT_DISCOVERY_OPRF_KEY is set.
+const DiscoveryEvaluateBody = z.object({
+  blinded: z.string().min(1).max(64),
+});
+app.post("/api/discovery/evaluate", discoveryLimiter, async (req, res) => {
+  const t = bearer(req);
+  if (!t || !verifyToken(t)) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = DiscoveryEvaluateBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const result = await evaluateBlinded(parsed.data.blinded);
+  if (!result.ok) {
+    res
+      .status(result.reason === "unconfigured" ? 503 : 400)
+      .json({ error: result.reason === "unconfigured" ? "discovery_unconfigured" : "invalid_point" });
+    return;
+  }
+  res.json({ evaluated: result.evaluated });
 });
 
 app.post("/api/groups", groupLimiter, async (req, res) => {
