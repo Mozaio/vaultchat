@@ -128,6 +128,6 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 ## Phase 8 — Go-to-Market-Reife
 
 - [ ] Statusseite/Monitoring, das keine Nutzer-Metadaten preisgibt
-- [ ] Performance bei großen Chats/Communities (Historie + Medien flüssig)
+- [ ] Performance bei großen Chats/Communities (Historie + Medien flüssig) — laufend; erste sichere, verhaltens-erhaltende Optimierungen im Render-Pfad: Antwort-Vorschauen über memoisierten cid→Nachricht-Index O(1) statt O(M·N)-Listen-Scan; Sendername-/Lese-Quittungs-Auflösung in Gruppen über memoisierten userId→Kontakt-Index O(1) statt `users.find()` pro Nachricht. Cloud-verifiziert (tsc 0, Tests, Build grün). **Offen:** `MessageBubble`-Memoization (braucht stabile Callback-Refs, größerer Umbau in ChatShell → eigene Runde mit Verhaltens-Test), ggf. Virtualisierung der Liste, Medien-Lazy-Loading.
 - [ ] Last-/Skalierungstest des Relays unter realistischer Nutzung
 - [ ] Beta-Programm + Feedback-Kanal (privatsphäre-freundlich)
