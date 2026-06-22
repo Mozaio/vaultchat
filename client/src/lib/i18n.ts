@@ -930,6 +930,76 @@ const DICT: Record<string, Dict> = {
     pt: "Buscar", ru: "Поиск", ar: "بحث", zh: "搜索", hi: "खोजें",
   },
 
+  // ── Profile (Anzeigename + Avatar, E2E-verschlüsselt) ───────────────
+  "profile.edit": {
+    en: "Edit profile", de: "Profil bearbeiten", tr: "Profili düzenle",
+    es: "Editar perfil", fr: "Modifier le profil", pt: "Editar perfil",
+    ru: "Редактировать профиль", ar: "تعديل الملف الشخصي", zh: "编辑资料",
+    hi: "प्रोफ़ाइल संपादित करें",
+  },
+  "profile.title": {
+    en: "Your profile", de: "Dein Profil", tr: "Profilin",
+    es: "Tu perfil", fr: "Votre profil", pt: "Seu perfil",
+    ru: "Ваш профиль", ar: "ملفك الشخصي", zh: "你的资料",
+    hi: "आपकी प्रोफ़ाइल",
+  },
+  "profile.privacyHint": {
+    en: "Your name and picture are end-to-end encrypted and only shared with your contacts. The server never sees them.",
+    de: "Name und Bild sind Ende-zu-Ende verschlüsselt und nur für deine Kontakte sichtbar. Der Server sieht sie nie.",
+    tr: "Adın ve resmin uçtan uca şifrelidir ve yalnızca kişilerinle paylaşılır. Sunucu bunları asla görmez.",
+    es: "Tu nombre y tu foto están cifrados de extremo a extremo y solo se comparten con tus contactos. El servidor nunca los ve.",
+    fr: "Votre nom et votre photo sont chiffrés de bout en bout et partagés uniquement avec vos contacts. Le serveur ne les voit jamais.",
+    pt: "Seu nome e sua foto são criptografados de ponta a ponta e compartilhados apenas com seus contatos. O servidor nunca os vê.",
+    ru: "Ваше имя и фото зашифрованы сквозным шифрованием и доступны только вашим контактам. Сервер их никогда не видит.",
+    ar: "اسمك وصورتك مشفّران من طرف إلى طرف ويُشاركان فقط مع جهات اتصالك. لا يراهما الخادم أبدًا.",
+    zh: "你的名称和头像经过端到端加密，仅与你的联系人共享。服务器永远看不到它们。",
+    hi: "आपका नाम और चित्र एंड-टू-एंड एन्क्रिप्टेड हैं और केवल आपके संपर्कों के साथ साझा किए जाते हैं। सर्वर उन्हें कभी नहीं देखता।",
+  },
+  "profile.displayName": {
+    en: "Display name", de: "Anzeigename", tr: "Görünen ad",
+    es: "Nombre visible", fr: "Nom affiché", pt: "Nome de exibição",
+    ru: "Отображаемое имя", ar: "الاسم المعروض", zh: "显示名称",
+    hi: "प्रदर्शित नाम",
+  },
+  "profile.pickAvatar": {
+    en: "Choose a picture", de: "Bild auswählen", tr: "Resim seç",
+    es: "Elegir una foto", fr: "Choisir une photo", pt: "Escolher uma foto",
+    ru: "Выбрать фото", ar: "اختر صورة", zh: "选择图片",
+    hi: "चित्र चुनें",
+  },
+  "profile.removeAvatar": {
+    en: "Remove picture", de: "Bild entfernen", tr: "Resmi kaldır",
+    es: "Quitar foto", fr: "Supprimer la photo", pt: "Remover foto",
+    ru: "Удалить фото", ar: "إزالة الصورة", zh: "移除图片",
+    hi: "चित्र हटाएँ",
+  },
+  "profile.saving": {
+    en: "Saving…", de: "Speichern…", tr: "Kaydediliyor…",
+    es: "Guardando…", fr: "Enregistrement…", pt: "Salvando…",
+    ru: "Сохранение…", ar: "جارٍ الحفظ…", zh: "保存中…",
+    hi: "सहेजा जा रहा है…",
+  },
+  "profile.saved": {
+    en: "Profile saved", de: "Profil gespeichert", tr: "Profil kaydedildi",
+    es: "Perfil guardado", fr: "Profil enregistré", pt: "Perfil salvo",
+    ru: "Профиль сохранён", ar: "تم حفظ الملف الشخصي", zh: "资料已保存",
+    hi: "प्रोफ़ाइल सहेजी गई",
+  },
+  "profile.errSaveFailed": {
+    en: "Couldn't save profile", de: "Profil konnte nicht gespeichert werden",
+    tr: "Profil kaydedilemedi", es: "No se pudo guardar el perfil",
+    fr: "Impossible d'enregistrer le profil", pt: "Não foi possível salvar o perfil",
+    ru: "Не удалось сохранить профиль", ar: "تعذّر حفظ الملف الشخصي",
+    zh: "无法保存资料", hi: "प्रोफ़ाइल सहेजी नहीं जा सकी",
+  },
+  "profile.errAvatarTooLarge": {
+    en: "Picture is too large", de: "Bild ist zu groß",
+    tr: "Resim çok büyük", es: "La foto es demasiado grande",
+    fr: "L'image est trop grande", pt: "A foto é grande demais",
+    ru: "Изображение слишком большое", ar: "الصورة كبيرة جدًا",
+    zh: "图片太大", hi: "चित्र बहुत बड़ा है",
+  },
+
   // ── Empty states ──────────────────────────────────────────────────
   "empty.welcomeTitle": {
     en: "Welcome to Umbra", de: "Willkommen bei Umbra",

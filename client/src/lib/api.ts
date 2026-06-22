@@ -32,6 +32,10 @@ export type ApiUser = {
   publicKey: string;
   plan?: "personal" | "pro" | "team";
   recoveryEmailConfigured?: boolean;
+  /** Server-opaker `PROFILE1:`-Blob (E2EE Anzeigename/Avatar). Wird mit dem
+   *  über Olm geteilten Profile-Key des Nutzers clientseitig entschlüsselt;
+   *  fehlt, solange der Nutzer kein Profil gesetzt hat. */
+  profileCipher?: string;
 };
 
 export type ApiGroup = {
@@ -259,6 +263,17 @@ export async function zkgroupSetGroupParams(
 
 export async function me(token: string) {
   return req<ApiUser>("/api/me", { headers: {}, token });
+}
+
+/** Lädt den eigenen server-opaken Profil-Blob (`PROFILE1:`-Ciphertext) hoch.
+ *  Der Server validiert nur das Präfix + die Größe und speichert ihn blind;
+ *  er sieht NIE Anzeigename/Avatar. */
+export async function putProfile(token: string, profileCipher: string) {
+  return req<{ ok: boolean }>("/api/profile", {
+    method: "PUT",
+    token,
+    body: JSON.stringify({ profileCipher }),
+  });
 }
 
 export async function listUsers(token: string, ids: string[] = []) {

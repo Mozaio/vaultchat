@@ -20,6 +20,19 @@ import {
   decryptGroupMeta,
   isEncryptedGroupMeta,
 } from "../lib/groupSecret";
+import {
+  getOwnProfileKey,
+  ensureOwnProfileKey,
+  adoptContactProfileKey,
+  type ProfileKey,
+} from "../lib/profileKeys";
+import { encryptProfile, type ProfileData } from "../lib/profileCrypto";
+import {
+  resolveContactProfile,
+  profileDisplayName,
+  invalidateContactProfile,
+  clearProfileCache,
+} from "../lib/contactProfiles";
 
 /** Server-sichtbarer Platzhalter-Name, während der echte Name als
  *  GMETA1-Ciphertext nachgereicht wird (Server sieht den echten Namen nie). */
@@ -133,6 +146,7 @@ import {
   IconBookmark,
   IconCopy,
   IconDownload,
+  IconEdit,
   IconFileText,
   IconInfo,
   IconHelpCircle,
@@ -269,6 +283,13 @@ export function ChatShell({
 }) {
   useLocale(); // re-render chat UI on language change
   const [users, setUsers] = useState<api.ApiUser[]>([]);
+  // Entschlüsselte Kontakt-Profile (Anzeigename/Avatar), keyed by userId.
+  // `null` = kein Profil/nicht entschlüsselbar → Username/Initialen-Fallback.
+  const [contactProfiles, setContactProfiles] = useState<
+    Record<string, ProfileData | null>
+  >({});
+  // Eigenes Profil (für Editor-Vorbelegung + Selbst-Anzeige).
+  const [ownProfile, setOwnProfile] = useState<ProfileData | null>(null);
   const [groups, setGroups] = useState<api.ApiGroup[]>([]);
   const [tab, setTab] = useState<Tab>("dm");
   const [peer, setPeer] = useState<api.ApiUser | null>(null);
@@ -631,6 +652,11 @@ export function ChatShell({
   const [dmMenuOpen, setDmMenuOpen] = useState(false);
   const [groupMenuOpen, setGroupMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  // Profil-Editor (eigener Anzeigename + Avatar, E2EE geteilt).
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [profileEditName, setProfileEditName] = useState("");
+  const [profileEditAvatar, setProfileEditAvatar] = useState("");
+  const [profileSaving, setProfileSaving] = useState(false);
   const [sendTypingIndicators, setSendTypingIndicators] = useState(
     () => localStorage.getItem("vaultchat.privacy.typing") !== "off"
   );
@@ -970,15 +996,57 @@ export function ChatShell({
     const contacts = list.filter((u) => contactIds.includes(u.id));
     setUsers(contacts);
 
-    // Also observe peer keys for contacts
+    // Also observe peer keys for contacts + entschlüssle ihre Profile (sofern
+    // wir ihren Profile-Key haben). Ergebnis fließt in contactProfiles → die
+    // Anzeige zeigt Anzeigename/Avatar statt Username/Initialen.
+    const resolved: Record<string, ProfileData | null> = {};
     for (const u of contacts) {
       try {
         await observePeerKeyNoticed(u.id, u.publicKey, u.username);
       } catch {
         /* ignore */
       }
+      resolved[u.id] = await resolveContactProfile(u).catch(() => null);
     }
+    setContactProfiles((prev) => ({ ...prev, ...resolved }));
   }, [session.token, session.user.id]);
+
+  /** Re-resolves (decrypts) a single contact's profile and updates state — used
+   *  after a fresh profile key arrives over Olm, or when the cipher changes. */
+  const refreshContactProfile = useCallback(
+    async (userId: string): Promise<void> => {
+      if (!userId || userId === session.user.id) return;
+      const u =
+        usersRef.current.find((x) => x.id === userId) ??
+        (await resolveUser(userId).catch(() => null));
+      if (!u) return;
+      // Frischen Cipher vom Server holen (er kann sich seit loadContacts geändert
+      // haben — z.B. der Kontakt hat sein Profil aktualisiert).
+      let cipher = u.profileCipher;
+      try {
+        const { users: fresh } = await api.listUsers(session.token, [userId]);
+        const f = fresh.find((x) => x.id === userId);
+        if (f) {
+          cipher = f.profileCipher;
+          // usersRef-Eintrag mit aktuellem Cipher anreichern.
+          setUsers((prev) =>
+            prev.map((x) =>
+              x.id === userId ? { ...x, profileCipher: cipher } : x
+            )
+          );
+        }
+      } catch {
+        /* offline / Server-Hiccup — mit vorhandenem Cipher weiter */
+      }
+      invalidateContactProfile(userId);
+      const profile = await resolveContactProfile({
+        id: userId,
+        profileCipher: cipher,
+      }).catch(() => null);
+      setContactProfiles((prev) => ({ ...prev, [userId]: profile }));
+    },
+    [session.token, session.user.id, resolveUser]
+  );
 
   /** Content kinds that constitute a real, user-visible incoming message
    *  (as opposed to receipts, typing, key distribution, etc.) and therefore
@@ -1217,6 +1285,34 @@ export function ChatShell({
     void initUnread();
   }, [loadContacts, loadGroups, refreshPendingCount, initUnread]);
 
+  // Profil-Klartext-Cache beim Unmount (Lock/Logout) leeren — kein
+  // entschlüsselter Name/Avatar darf eine gesperrte Session überdauern.
+  useEffect(() => {
+    return () => clearProfileCache();
+  }, []);
+
+  // Eigenes Profil aus dem server-opaken Blob laden (falls gesetzt) — mit dem
+  // EIGENEN Profile-Key entschlüsselt, damit der Editor + die Selbst-Anzeige
+  // den aktuellen Namen/Avatar zeigen. Reiner Client-Vorgang.
+  useEffect(() => {
+    void (async () => {
+      try {
+        const pk = await getOwnProfileKey().catch(() => null);
+        ownProfileKeyRef.current = pk;
+        const meUser = await api.me(session.token);
+        if (meUser.profileCipher && pk) {
+          const { decryptProfile } = await import("../lib/profileCrypto");
+          const p = await decryptProfile(meUser.profileCipher, pk.keyB64).catch(
+            () => null
+          );
+          if (p) setOwnProfile(p);
+        }
+      } catch {
+        /* offline / kein Profil — Fallback auf Username */
+      }
+    })();
+  }, [session.token]);
+
   /** Title-bar badge: shows total unread count when the tab is in the
    *  background, e.g. "(3) VaultChat". Reverts to plain "VaultChat"
    *  on unmount or when there is nothing unread. */
@@ -1343,6 +1439,14 @@ export function ChatShell({
   // keyRequestServedRef: `${requesterId}:${groupId}` → ts der letzten Antwort WIR→Anfragender.
   const keyRequestSentRef = useRef<Map<string, number>>(new Map());
   const keyRequestServedRef = useRef<Map<string, number>>(new Map());
+
+  // In-memory: an welche Kontakte haben wir UNSEREN Profile-Key (für diese
+  // Epoche) schon via Olm-1:1 verteilt? `userId → epoch`. Bei Rotation des
+  // eigenen Keys steigt die Epoche, sodass alle Kontakte neu beschickt werden.
+  const profileKeyDistributedRef = useRef<Map<string, number>>(new Map());
+  // Eigener Profile-Key (sync gecacht, damit der DM-Sendepfad nicht bei jedem
+  // Frame IDB lesen muss). `null` = kein Profil gesetzt → kein Huckepack.
+  const ownProfileKeyRef = useRef<ProfileKey | null>(null);
 
   // Purge expired messages continuously so they disappear "live".
   useEffect(() => {
@@ -1747,6 +1851,33 @@ export function ChatShell({
         if (!quiet) setError(t("chat.errContactBlocked"));
         return null;
       }
+      // Profile-Key huckepack: auf echten Inhalts-Frames (kein Meta/Receipt)
+      // hängen wir UNSEREN aktuellen Profile-Key an, falls der Empfänger ihn
+      // für diese Epoche noch nicht hat — analog zur GMK-Verteilung auf dem
+      // megolm_session_key-Frame. So lernt jeder Kontakt, mit dem wir wirklich
+      // schreiben, organisch unseren Schlüssel, ohne einen Extra-Frame. Eigener
+      // Versand an sich selbst (Notiz-an-mich) wird übersprungen.
+      let outgoing = payload;
+      if (
+        toUser.id !== session.user.id &&
+        isRequestContentKind(payload.kind) &&
+        payload.profileKey === undefined
+      ) {
+        const pk = ownProfileKeyRef.current;
+        if (pk) {
+          const sentEpoch = profileKeyDistributedRef.current.get(toUser.id);
+          if (sentEpoch === undefined || sentEpoch < pk.epoch) {
+            outgoing = {
+              ...payload,
+              profileKey: pk.keyB64,
+              profileKeyEpoch: pk.epoch,
+            };
+            // Optimistisch markieren: der Frame geht in die Outbox und wird
+            // zugestellt; bei Fehlschlag re-verteilt der nächste Send.
+            profileKeyDistributedRef.current.set(toUser.id, pk.epoch);
+          }
+        }
+      }
       // Phase 5: auditiertes Olm (Matrix.org) ist der einzige Krypto-Pfad
       // für DMs. Wenn der Empfänger kein Olm-Bundle hat (z.B. noch nicht
       // gebootet seit der Migration), fail-fast statt schleichender
@@ -1756,7 +1887,7 @@ export function ChatShell({
         innerB64 = await olmEncryptJson(
           toUser.id,
           tokenRef.current,
-          JSON.stringify(payload)
+          JSON.stringify(outgoing)
         );
       } catch (olmErr) {
         const reason =
@@ -1829,6 +1960,118 @@ export function ChatShell({
       markAccepted,
     ]
   );
+
+  /**
+   * Teilt UNSEREN Profile-Key (für die aktuelle Epoche) über einen dedizierten
+   * `profile_key`-Olm-Frame mit einem Kontakt — aber nur, wenn er ihn für diese
+   * Epoche noch nicht hat (gedrosselt über profileKeyDistributedRef). Damit kann
+   * der Kontakt unseren server-opaken Profil-Blob (Anzeigename/Avatar)
+   * entschlüsseln. `quiet`, weil es eine Hintergrund-Op ist (kein Toast, wenn
+   * der Empfänger noch kein Olm-Bundle hat). Eigene userId wird übersprungen.
+   */
+  const shareProfileKeyWith = useCallback(
+    async (toUser: api.ApiUser): Promise<void> => {
+      if (!toUser || toUser.id === session.user.id) return;
+      if (blockedPeers.has(toUser.id)) return;
+      const pk =
+        ownProfileKeyRef.current ?? (await getOwnProfileKey().catch(() => null));
+      if (!pk) return; // Wir haben (noch) kein Profil gesetzt → nichts zu teilen.
+      const sentEpoch = profileKeyDistributedRef.current.get(toUser.id);
+      if (sentEpoch !== undefined && sentEpoch >= pk.epoch) return;
+      const payload: PlainPayload = {
+        v: 2,
+        cid: newCid(),
+        kind: "profile_key",
+        profileKey: pk.keyB64,
+        profileKeyEpoch: pk.epoch,
+        senderUserId: session.user.id,
+      };
+      // suppressLocal=true (kein DM-Eintrag), quiet=true (Hintergrund).
+      const ok = await sendDmWire(toUser, payload, true, true).catch(() => null);
+      if (ok !== null) {
+        profileKeyDistributedRef.current.set(toUser.id, pk.epoch);
+      }
+    },
+    [session.user.id, blockedPeers, sendDmWire]
+  );
+
+  /**
+   * Re-verteilt UNSEREN Profile-Key an ALLE bekannten Kontakte — nach dem
+   * Setzen/Rotieren des eigenen Profils. Die Drossel (profileKeyDistributedRef)
+   * sorgt dafür, dass nur Kontakte ohne aktuelle Epoche tatsächlich einen Frame
+   * erhalten.
+   */
+  const distributeProfileKeyToAllContacts = useCallback(async (): Promise<void> => {
+    const contacts = usersRef.current.filter(
+      (u) => u.id !== session.user.id && !blockedPeers.has(u.id)
+    );
+    for (const u of contacts) {
+      await shareProfileKeyWith(u).catch(() => {});
+    }
+  }, [session.user.id, blockedPeers, shareProfileKeyWith]);
+
+  /**
+   * Speichert das eigene Profil (Anzeigename + Avatar): verschlüsselt es mit dem
+   * eigenen Profile-Key (PROFILE1), lädt den server-opaken Blob hoch und re-
+   * verteilt den Key an alle Kontakte. Server sieht NIE Name/Avatar.
+   */
+  const saveProfile = useCallback(async (): Promise<void> => {
+    setProfileSaving(true);
+    try {
+      const profile: ProfileData = {
+        ...(profileEditName.trim() ? { displayName: profileEditName.trim() } : {}),
+        ...(profileEditAvatar ? { avatar: profileEditAvatar } : {}),
+      };
+      const pk = await ensureOwnProfileKey();
+      // Cache aktualisieren; bei (erstmaliger) Schlüsselerzeugung oder Rotation
+      // die Verteilungs-Marker zurücksetzen, damit alle Kontakte den (neuen)
+      // Key erhalten.
+      if (ownProfileKeyRef.current?.epoch !== pk.epoch) {
+        profileKeyDistributedRef.current.clear();
+      }
+      ownProfileKeyRef.current = pk;
+      let wire: string;
+      try {
+        wire = await encryptProfile(profile, pk.keyB64);
+      } catch (e) {
+        if (e instanceof Error && e.message === "profile_avatar_too_large") {
+          pushToast(t("profile.errAvatarTooLarge"), "danger");
+          return;
+        }
+        throw e;
+      }
+      await api.putProfile(session.token, wire);
+      setOwnProfile(profile);
+      // Eigenen ApiUser-Cipher lokal aktualisieren (Selbst-Anzeige).
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === session.user.id ? { ...u, profileCipher: wire } : u
+        )
+      );
+      // Den (ggf. neuen) Key an alle Kontakte verteilen, damit sie den neuen
+      // Namen/Avatar entschlüsseln können.
+      void distributeProfileKeyToAllContacts();
+      setProfileEditorOpen(false);
+      pushToast(t("profile.saved"), "success");
+    } catch {
+      pushToast(t("profile.errSaveFailed"), "danger");
+    } finally {
+      setProfileSaving(false);
+    }
+  }, [
+    profileEditName,
+    profileEditAvatar,
+    session.token,
+    session.user.id,
+    distributeProfileKeyToAllContacts,
+  ]);
+
+  /** Öffnet den Profil-Editor und füllt ihn mit dem aktuellen eigenen Profil. */
+  const openProfileEditor = useCallback(() => {
+    setProfileEditName(ownProfile?.displayName ?? "");
+    setProfileEditAvatar(ownProfile?.avatar ?? "");
+    setProfileEditorOpen(true);
+  }, [ownProfile]);
 
   const commitForward = useCallback(async () => {
     const src = forwardTarget;
@@ -2406,6 +2649,35 @@ export function ChatShell({
             if (!peerUser) return;
 
             const plain = dec.plain;
+
+            // Profile-Key huckepack: jeder DM-Frame kann den (aktuellen)
+            // Profile-Key des Absenders mitführen (siehe sendDmWire). Übernehmen,
+            // falls neuer (höhere Epoche), und die Profil-Anzeige des Kontakts
+            // invalidieren, damit ein bisher nicht entschlüsselbarer Name/Avatar
+            // jetzt erscheint.
+            if (
+              typeof plain.profileKey === "string" &&
+              plain.profileKey &&
+              typeof plain.profileKeyEpoch === "number"
+            ) {
+              const adopted = await adoptContactProfileKey(
+                dec.senderUserId,
+                plain.profileKey,
+                plain.profileKeyEpoch
+              ).catch(() => false);
+              if (adopted) {
+                invalidateContactProfile(dec.senderUserId);
+                void refreshContactProfile(dec.senderUserId);
+              }
+            }
+
+            // Dedizierter Profile-Key-Frame (explizite (Re-)Verteilung /
+            // Rotation): nur den Key übernehmen, NICHT als Nachricht speichern
+            // oder rendern.
+            if (plain.kind === "profile_key") {
+              return;
+            }
+
             if (
               plain.kind === "megolm_session_key" &&
               plain.groupId &&
@@ -2944,6 +3216,7 @@ export function ChatShell({
     blockedPeers,
     maybeNotify,
     sendReadReceipts,
+    refreshContactProfile,
   ]);
 
   /**
@@ -4536,6 +4809,8 @@ export function ChatShell({
           u={u}
           subtitle={subtitle}
           draftText={draft && draft.trim() ? draft : undefined}
+          displayName={isReq ? undefined : contactProfiles[u.id]?.displayName}
+          avatarUrl={isReq ? undefined : contactProfiles[u.id]?.avatar}
           isTyping={peer?.id === u.id && typing}
           metaRight={fmtListTime(prev?.at)}
           unread={unreadByPeer[u.id] ?? 0}
@@ -4574,6 +4849,7 @@ export function ChatShell({
     mutedPeers,
     onlinePeers,
     requestPeerIds,
+    contactProfiles,
     togglePinPeer,
     openRowMenu,
     startRowLongPress,
@@ -4971,6 +5247,109 @@ export function ChatShell({
             pushToast(t("chat.toastBackupDownloaded"), "success");
           }}
         />
+      )}
+      {profileEditorOpen && (
+        <div
+          className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => {
+            if (!profileSaving) setProfileEditorOpen(false);
+          }}
+        >
+          <div
+            className="app-surface u-modal-card w-full max-w-md rounded-2xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+                {t("profile.title")}
+              </h2>
+              <button
+                type="button"
+                className="rounded-lg p-1 hover:bg-[var(--bg-hover)]"
+                aria-label={t("common.close")}
+                onClick={() => setProfileEditorOpen(false)}
+                disabled={profileSaving}
+              >
+                <IconX size={18} />
+              </button>
+            </div>
+            <p className="mb-4 text-xs" style={{ color: "var(--text-muted)" }}>
+              {t("profile.privacyHint")}
+            </p>
+            <div className="mb-4 flex items-center gap-3">
+              <label
+                className="group-avatar-edit cursor-pointer"
+                title={t("profile.pickAvatar")}
+              >
+                {profileEditAvatar ? (
+                  <img src={profileEditAvatar} alt="" />
+                ) : (
+                  <span aria-hidden>＋</span>
+                )}
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!f) return;
+                    try {
+                      const url = await resizeImageToDataUrl(f);
+                      setProfileEditAvatar(url);
+                    } catch {
+                      pushToast(t("chat.toastImageReadFailed"), "danger");
+                    }
+                  }}
+                />
+              </label>
+              <div className="min-w-0 flex-1">
+                <label
+                  className="mb-1 block text-xs font-medium"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  {t("profile.displayName")}
+                </label>
+                <input
+                  className="app-input w-full !py-2 text-sm"
+                  placeholder={session.user.username}
+                  value={profileEditName}
+                  maxLength={80}
+                  onChange={(e) => setProfileEditName(e.target.value.slice(0, 80))}
+                  aria-label={t("profile.displayName")}
+                />
+              </div>
+            </div>
+            {profileEditAvatar && (
+              <button
+                type="button"
+                className="mb-4 text-xs underline"
+                style={{ color: "var(--text-muted)" }}
+                onClick={() => setProfileEditAvatar("")}
+              >
+                {t("profile.removeAvatar")}
+              </button>
+            )}
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setProfileEditorOpen(false)}
+                disabled={profileSaving}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void saveProfile()}
+                disabled={profileSaving}
+              >
+                {profileSaving ? t("profile.saving") : t("common.save")}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {forwardTarget && (
         <div
@@ -5712,12 +6091,28 @@ export function ChatShell({
           className="relative mt-auto flex items-center gap-3 border-t px-4 py-2.5 text-xs"
           style={{ borderColor: "var(--border)", color: "var(--text-muted)" }}
         >
-          <div
-            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
-            style={{ background: userGradient(session.user.id) }}
+          <button
+            type="button"
+            onClick={openProfileEditor}
+            className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full text-xs font-semibold text-white"
+            style={
+              safeMediaSrc(ownProfile?.avatar, "image")
+                ? undefined
+                : { background: userGradient(session.user.id) }
+            }
+            title={t("profile.edit")}
+            aria-label={t("profile.edit")}
           >
-            {session.user.username.slice(0, 1).toUpperCase()}
-          </div>
+            {safeMediaSrc(ownProfile?.avatar, "image") ? (
+              <img
+                src={safeMediaSrc(ownProfile?.avatar, "image")}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              session.user.username.slice(0, 1).toUpperCase()
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setSecurityOpen(true)}
@@ -5725,7 +6120,9 @@ export function ChatShell({
             style={{ color: "var(--text)" }}
             title={myFp ? `Fingerprint: ${myFp}` : t("chat.ownProfile")}
           >
-            <span className="truncate">{session.user.username}</span>
+            <span className="truncate">
+              {profileDisplayName(ownProfile, session.user.username)}
+            </span>
             {isPro() && (
               <span className="user-tile-pro-badge" title={`${PLAN_LABELS[loadPlan()]}-Plan aktiv`}>
                 {loadPlan() === "team" ? "Team" : "Pro"}
@@ -5759,6 +6156,16 @@ export function ChatShell({
           </button>
           {userMenuOpen && (
             <div className="user-menu">
+              <button
+                type="button"
+                className="chat-menu-item"
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  openProfileEditor();
+                }}
+              >
+                <IconEdit size={16} /> {t("profile.edit")}
+              </button>
               {!isPro() && (
                 <button
                   type="button"
@@ -5968,15 +6375,21 @@ export function ChatShell({
                   >
                     <div className="header-avatar-wrap">
                       <div
-                        className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold text-white shadow-md${
+                        className={`grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full text-sm font-semibold text-white shadow-md${
                           requestPeerIds.has(peer.id) ? " avatar-blurred" : ""
                         }`}
-                        style={{
-                          background:
-                            peer.id === session.user.id
-                              ? "var(--accent)"
-                              : userGradient(peer.id),
-                        }}
+                        style={
+                          peer.id !== session.user.id &&
+                          !requestPeerIds.has(peer.id) &&
+                          safeMediaSrc(contactProfiles[peer.id]?.avatar, "image")
+                            ? undefined
+                            : {
+                                background:
+                                  peer.id === session.user.id
+                                    ? "var(--accent)"
+                                    : userGradient(peer.id),
+                              }
+                        }
                         aria-label={
                           requestPeerIds.has(peer.id)
                             ? t("requests.unknownSender")
@@ -5985,6 +6398,19 @@ export function ChatShell({
                       >
                         {peer.id === session.user.id ? (
                           <IconBookmark size={16} />
+                        ) : !requestPeerIds.has(peer.id) &&
+                          safeMediaSrc(
+                            contactProfiles[peer.id]?.avatar,
+                            "image"
+                          ) ? (
+                          <img
+                            src={safeMediaSrc(
+                              contactProfiles[peer.id]?.avatar,
+                              "image"
+                            )}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
                         ) : (
                           peer.username.slice(0, 1).toUpperCase()
                         )}
@@ -6000,7 +6426,12 @@ export function ChatShell({
                     </div>
                     <div className="header-identity-text min-w-0">
                       <p className="truncate font-semibold text-base" style={{ color: "var(--text)" }}>
-                        {peer.username}
+                        {peer.id === session.user.id || requestPeerIds.has(peer.id)
+                          ? peer.username
+                          : profileDisplayName(
+                              contactProfiles[peer.id] ?? null,
+                              peer.username
+                            )}
                       </p>
                       {peer.id === session.user.id ? (
                         <p
@@ -7869,6 +8300,16 @@ export function ChatShell({
             peer={peer}
             group={group}
             peerFp={peerFp}
+            peerDisplayName={
+              peer && !requestPeerIds.has(peer.id)
+                ? contactProfiles[peer.id]?.displayName
+                : undefined
+            }
+            peerAvatar={
+              peer && !requestPeerIds.has(peer.id)
+                ? contactProfiles[peer.id]?.avatar
+                : undefined
+            }
             onSafety={() => setSafetyOpen(true)}
             onOpenSearch={() => setSearchOpen(true)}
             onClearChat={async () => {
@@ -7941,6 +8382,16 @@ export function ChatShell({
               peer={peer}
               group={group}
               peerFp={peerFp}
+              peerDisplayName={
+                peer && !requestPeerIds.has(peer.id)
+                  ? contactProfiles[peer.id]?.displayName
+                  : undefined
+              }
+              peerAvatar={
+                peer && !requestPeerIds.has(peer.id)
+                  ? contactProfiles[peer.id]?.avatar
+                  : undefined
+              }
               onSafety={() => {
                 setInfoOpen(false);
                 setSafetyOpen(true);

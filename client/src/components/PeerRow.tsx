@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import * as api from "../lib/api";
 import { userGradient } from "../lib/chatHelpers";
+import { safeMediaSrc } from "../lib/safeMedia";
 import { getPin, type PeerPin } from "../lib/trust";
 import { IconPin, IconVolumeMute } from "./Icons";
 import { t, useLocale } from "../lib/i18n";
@@ -11,6 +12,8 @@ export function PeerRow({
   draftText,
   metaRight,
   unread,
+  displayName,
+  avatarUrl,
   isFavorite,
   isBlocked,
   isPinned,
@@ -33,6 +36,10 @@ export function PeerRow({
   draftText?: string;
   metaRight?: string;
   unread?: number;
+  /** E2E-entschlüsselter Anzeigename des Kontakts (Profil). Fallback: Username. */
+  displayName?: string;
+  /** E2E-entschlüsselter Avatar (data-URL) des Kontakts. Fallback: Initialen. */
+  avatarUrl?: string;
   isFavorite?: boolean;
   isBlocked?: boolean;
   isPinned?: boolean;
@@ -62,6 +69,7 @@ export function PeerRow({
   onSelect: () => void;
 }) {
   useLocale();
+  const safeAvatar = avatarUrl ? safeMediaSrc(avatarUrl, "image") : "";
   const [pin, setPin] = useState<PeerPin | null>(null);
   useEffect(() => {
     void getPin(u.id).then(setPin);
@@ -84,13 +92,25 @@ export function PeerRow({
       >
         <div className="peer-avatar-wrap">
           <div
-            className={`contact-avatar !h-9 !w-9 !text-sm${
+            className={`contact-avatar !h-9 !w-9 !text-sm overflow-hidden${
               blurAvatar ? " avatar-blurred" : ""
             }`}
-            style={{ background: userGradient(u.id) }}
+            style={
+              safeAvatar && !blurAvatar
+                ? undefined
+                : { background: userGradient(u.id) }
+            }
             aria-label={blurAvatar ? t("requests.unknownSender") : undefined}
           >
-            {u.username.slice(0, 1).toUpperCase()}
+            {safeAvatar && !blurAvatar ? (
+              <img
+                src={safeAvatar}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              (displayName || u.username).slice(0, 1).toUpperCase()
+            )}
           </div>
           {isOnline && !blurAvatar && (
             <span className="peer-online-dot" aria-label={t("chat.online")} />
@@ -98,7 +118,7 @@ export function PeerRow({
         </div>
         <div className="contact-info min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="contact-name">{u.username}</span>
+            <span className="contact-name">{displayName || u.username}</span>
             {isRequest && (
               <span className="row-badge row-badge-request" title={t("requests.rowBadge")}>
                 {t("requests.rowBadge")}

@@ -36,11 +36,17 @@ export function InfoPanel({
   isBlocked,
   onToggleBlocked,
   sharedMediaItems,
+  peerDisplayName,
+  peerAvatar,
 }: {
   mode: "dm" | "group";
   peer: api.ApiUser | null;
   group: api.ApiGroup | null;
   peerFp: string | null;
+  /** E2E-entschlüsselter Anzeigename des Kontakts (Profil). Fallback: Username. */
+  peerDisplayName?: string;
+  /** E2E-entschlüsselter Avatar (data-URL) des Kontakts. Fallback: Initialen. */
+  peerAvatar?: string;
   onSafety: () => void;
   onOpenSearch: () => void;
   onClearChat: () => void | Promise<void>;
@@ -55,7 +61,10 @@ export function InfoPanel({
   sharedMediaItems: SharedMediaItem[];
 }) {
   useLocale(); // re-render on language change
-  const title = mode === "dm" ? peer?.username ?? t("chat.contactFallback") : group?.name ?? t("chat.groupFallback");
+  const title =
+    mode === "dm"
+      ? (peerDisplayName?.trim() || peer?.username) ?? t("chat.contactFallback")
+      : group?.name ?? t("chat.groupFallback");
   const initials = (title.slice(0, 1) || "•").toUpperCase();
   const status =
     mode === "dm"
@@ -101,6 +110,13 @@ export function InfoPanel({
             <img
               src={safeMediaSrc(group?.avatar, "image")}
               alt={`${group?.name ?? t("chat.groupFallback")} Avatar`}
+              className="info-avatar-large"
+              style={{ objectFit: "cover" }}
+            />
+          ) : mode === "dm" && safeMediaSrc(peerAvatar, "image") ? (
+            <img
+              src={safeMediaSrc(peerAvatar, "image")}
+              alt={`${title} Avatar`}
               className="info-avatar-large"
               style={{ objectFit: "cover" }}
             />
