@@ -89,10 +89,10 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 
 ## Phase 7 — Vertrauen, Sicherheit & Compliance
 
-- [ ] THREAT_MODEL.md je Feature aktuell halten (jede Phase aktualisiert es mit)
+- [ ] THREAT_MODEL.md je Feature aktuell halten (jede Phase aktualisiert es mit) — laufend; zuletzt 2026-06-22 um 0.1b/0.4a/0.5/#25 ergänzt
 - [ ] Externe Sicherheits-Review / Audit vorbereiten (Doku, Scope, Bedrohungsmodell)
 - [ ] Privatsphäre-wahrendes Abuse-/Spam-Handling (Reporting ohne Inhalts-Deanonymisierung)
-- [ ] Transparenz-Seite: was der Server sieht/nicht sieht, in klarer Sprache
+- [ ] Transparenz-Seite: was der Server sieht/nicht sieht, in klarer Sprache — Inhalt als `TRANSPARENCY.md` fertig (2026-06-22); In-App-Seite (Client-Route) noch offen
 - [ ] Datenschutz-/Rechtstexte und Lösch-/Export-Flows (DSGVO-konform, ohne Zero-Knowledge zu brechen)
 
 ## Phase 8 — Go-to-Market-Reife

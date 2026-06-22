@@ -15,7 +15,7 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 - **Sealed Group Sender**: Gruppenframes werden ohne `fromUserId` relayiert. Der Absender ist Teil der E2EE-Payload; nur Gruppenmitglieder können ihn entschlüsseln.
 - **Keine Delivery-Receipts am Server**: Zustell-/Lesebestätigungen sind E2EE-Payloads, kein Server-Metadatum.
 - **Strenge HTTP-Header**: `Content-Security-Policy` ohne Inline-Scripts oder externe Ressourcen, `X-Frame-Options: DENY`, `Permissions-Policy` für Kamera/Mikrofon nur auf `self`, `Referrer-Policy: no-referrer`, HSTS.
-- **Rate-Limits**: getrennte Limits für Auth, Suche, Gruppen-Operationen und allgemeine API sowie pro WebSocket-Socket (Token-Bucket im Server).
+- **Rate-Limits**: getrennte Limits für Auth, Suche, Gruppen-Operationen und allgemeine API sowie pro WebSocket-Socket (Token-Bucket im Server). Zusätzlich ein **Cap auf gleichzeitige WebSocket-Verbindungen pro Account** (`VAULTCHAT_MAX_SOCKETS_PER_USER`, Default 16, evict-oldest) gegen Verbindungs-/Speicher-Exhaustion des RAM-only-Relays — inhaltsblind.
 - **Ciphertext-Cap**: WS akzeptiert nur begrenzte Frames für E2EE-Umschläge und verwirft zu große Socket-Messages.
 
 ### Kryptografie (Client)
@@ -105,3 +105,4 @@ Es ist **kein** auditierter Ersatz für Signal/WhatsApp/Matrix. Das Projekt ist 
 - `package-lock.json` committen, Docker-Build mit festen Node-Images nutzen (`node:20-alpine`), `npm ci` für Determinismus.
 - Bit-genaue Reproduzierbarkeit benötigt zusätzlich `SOURCE_DATE_EPOCH` und eine fixierte Toolchain.
 - Den resultierenden Bundle-SHA-384-Hash unabhängig publizieren, damit Nutzer beim ersten Aufruf den im Banner angezeigten Hash verifizieren können.
+- **Umgesetzt (Pipeline-Schritt, GOAL 0.5):** `.github/workflows/reproducible-build.yml` baut den Client auf gepinntem Node 20.20.2 und publiziert die SHA-384 (SRI-Format) aller Bundle-Assets als Job-Summary + Artefakt; das in CI aufgelöste `package-lock.json` wird als Artefakt mitgeliefert. Für **bit-genaue** Reproduzierbarkeit noch offen: lockfile committen + auf `npm ci` umstellen (`0.5b`).
