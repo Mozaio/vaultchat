@@ -376,6 +376,14 @@ export function ChatShell({
     for (const m of groupMessages) if (m.plain.cid) map.set(m.plain.cid, m);
     return map;
   }, [groupMessages]);
+  // userId → Kontakt-Index für O(1)-Lookups im Render-Pfad (Gruppen-Nachrichten
+  // lösten Sendernamen/Lese-Quittungen vorher pro Nachricht per users.find()
+  // linear auf → O(Nachrichten·Kontakte) je Render).
+  const usersById = useMemo(() => {
+    const map = new Map<string, api.ApiUser>();
+    for (const u of users) map.set(u.id, u);
+    return map;
+  }, [users]);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   // 0 = noch nie versucht, >0 = wir reconnecten gerade (für UI-State).
@@ -7514,7 +7522,7 @@ export function ChatShell({
                     if (ts && ts.size > 0) {
                       const names = [...ts].map(
                         (id) =>
-                          users.find((u) => u.id === id)?.username ?? t("chat.memberFallback")
+                          usersById.get(id)?.username ?? t("chat.memberFallback")
                       );
                       const label =
                         names.length === 1
@@ -8119,7 +8127,7 @@ export function ChatShell({
                   }
                   isPinned={!!m.plain.cid && groupPinnedSet.has(m.plain.cid)}
                   peerLabel={
-                    users.find((u) => u.id === m.fromUserId)?.username ?? group.name
+                    usersById.get(m.fromUserId ?? "")?.username ?? group.name
                   }
                   groupAvatar={
                     m.fromMe
@@ -8132,19 +8140,17 @@ export function ChatShell({
                   }
                   groupReadTotal={Math.max(0, group.memberIds.length - 1)}
                   groupReadNames={(m.readByUserIds ?? [])
-                    .map(
-                      (uid) => users.find((u) => u.id === uid)?.username
-                    )
+                    .map((uid) => usersById.get(uid)?.username)
                     .filter((n): n is string => Boolean(n))}
                   replyToPreview={replyPreviewForMessage(
                     groupMessagesByCid,
                     m,
-                    users.find((u) => u.id === m.fromUserId)?.username ?? t("chat.memberFallback")
+                    usersById.get(m.fromUserId ?? "")?.username ?? t("chat.memberFallback")
                   )}
                   onReply={(x) => {
                     const author = x.fromMe
                       ? t("chat.you")
-                      : users.find((u) => u.id === x.fromUserId)?.username ?? t("chat.memberFallback");
+                      : usersById.get(x.fromUserId ?? "")?.username ?? t("chat.memberFallback");
                     setReplyGroup({
                       cid: x.plain.cid ?? "",
                       author,
@@ -8592,8 +8598,8 @@ export function ChatShell({
         const resolveAuthor = isGroupCtx
           ? (m: ChatMsg) =>
               m.fromMe
-                ? "Du"
-                : users.find((u) => u.id === m.fromUserId)?.username ?? t("chat.memberFallback")
+                ? t("chat.you")
+                : usersById.get(m.fromUserId ?? "")?.username ?? t("chat.memberFallback")
           : (m: ChatMsg) => (m.fromMe ? t("chat.you") : peer!.username);
 
         return (
