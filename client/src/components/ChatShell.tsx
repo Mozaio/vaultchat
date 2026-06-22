@@ -34,6 +34,11 @@ import {
   canDemote,
 } from "../lib/groupRoles";
 import {
+  shouldNotify,
+  levelFor as notifyLevelFor,
+  type NotifyLevel,
+} from "../lib/notifyPrefs";
+import {
   resolveContactProfile,
   profileDisplayName,
   invalidateContactProfile,
@@ -348,6 +353,12 @@ export function ChatShell({
   const [mutedGroups, setMutedGroups] = useState<Set<string>>(() =>
     loadStringSet("vaultchat.muted.groups")
   );
+  // "Nur Erwähnungen"-Stufe für Gruppen (Discord-Pattern). Separat vom Mute-Set,
+  // damit bestehender Mute-State unverändert bleibt. Rein lokal — der Server
+  // erfährt nichts über die Stufe.
+  const [mentionsOnlyGroups, setMentionsOnlyGroups] = useState<Set<string>>(() =>
+    loadStringSet("vaultchat.mentionsOnly.groups")
+  );
   const [favoritePeers, setFavoritePeers] = useState<Set<string>>(
     () => loadStringSet("vaultchat.favorites.peers")
   );
@@ -404,15 +415,27 @@ export function ChatShell({
       return next;
     });
   }, []);
-  const toggleMuteGroup = useCallback((id: string) => {
-    setMutedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      saveStringSet("vaultchat.muted.groups", next);
-      return next;
-    });
-  }, []);
+  // Setzt die 3-stufige Benachrichtigungs-Stufe einer Gruppe (all/mentions/none)
+  // und hält Mute-/MentionsOnly-Set konsistent (eine ID in höchstens einem Set).
+  const setGroupNotifyLevel = useCallback(
+    (id: string, level: NotifyLevel) => {
+      setMutedGroups((prevMuted) => {
+        const muted = new Set(prevMuted);
+        if (level === "none") muted.add(id);
+        else muted.delete(id);
+        saveStringSet("vaultchat.muted.groups", muted);
+        return muted;
+      });
+      setMentionsOnlyGroups((prevMo) => {
+        const mo = new Set(prevMo);
+        if (level === "mentions") mo.add(id);
+        else mo.delete(id);
+        saveStringSet("vaultchat.mentionsOnly.groups", mo);
+        return mo;
+      });
+    },
+    []
+  );
   const toggleFavoritePeer = useCallback((id: string) => {
     setFavoritePeers((prev) => {
       const next = new Set(prev);
@@ -3116,9 +3139,16 @@ export function ChatShell({
                 `@${myName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9_])`,
                 "i"
               ).test(plain.body);
+            // 3-stufige Benachrichtigung (all / mentions / none). Mute = "none",
+            // mentionsOnly = "mentions", sonst "all". Ein direkter @-Ping kommt
+            // auch bei stummer/mentions-Gruppe durch (Discord-Verhalten).
+            const groupNotifyLevel: NotifyLevel = notifyLevelFor(
+              { muted: mutedGroups, mentionsOnly: mentionsOnlyGroups },
+              gid
+            );
             if (
               groupRef.current?.id !== gid &&
-              (!mutedGroups.has(gid) || mentioned)
+              shouldNotify(groupNotifyLevel, mentioned)
             ) {
               const groupName = groupsRef.current.find((x) => x.id === gid)?.name ?? t("chat.groupFallback");
               maybeNotify(
@@ -3239,6 +3269,7 @@ export function ChatShell({
     refreshPendingCount,
     mutedPeers,
     mutedGroups,
+    mentionsOnlyGroups,
     blockedPeers,
     maybeNotify,
     sendReadReceipts,
@@ -4979,11 +5010,18 @@ export function ChatShell({
             <div className="contact-info min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="contact-name">{g.name}</span>
-                {mutedGroups.has(g.id) && (
-                  <span className="row-badge row-badge-muted" title={t("chat.muted")}>
+                {mutedGroups.has(g.id) ? (
+                  <span className="row-badge row-badge-muted" title={t("notify.none")}>
                     <IconVolumeMute size={11} />
                   </span>
-                )}
+                ) : mentionsOnlyGroups.has(g.id) ? (
+                  <span
+                    className="row-badge row-badge-muted"
+                    title={t("notify.mentionsOnly")}
+                  >
+                    @
+                  </span>
+                ) : null}
               </div>
               <p
                 className={`contact-preview${showGTyping ? " typing" : ""}`}
@@ -5198,19 +5236,39 @@ export function ChatShell({
                 )}
                 {menuGroup && (
                   <>
-                    <button
-                      type="button"
-                      className="chat-menu-item"
-                      onClick={() => {
-                        toggleMuteGroup(menuGroup.id);
-                        closeRowMenu();
-                      }}
-                    >
-                      <IconVolumeMute size={16} />{" "}
-                      {mutedGroups.has(menuGroup.id)
-                        ? t("chat.unmuteContact")
-                        : t("chat.muteContact")}
-                    </button>
+                    <p className="chat-menu-label">{t("notify.title")}</p>
+                    {(["all", "mentions", "none"] as NotifyLevel[]).map(
+                      (lvl) => {
+                        const current = notifyLevelFor(
+                          {
+                            muted: mutedGroups,
+                            mentionsOnly: mentionsOnlyGroups,
+                          },
+                          menuGroup.id
+                        );
+                        const label =
+                          lvl === "all"
+                            ? t("notify.all")
+                            : lvl === "mentions"
+                              ? t("notify.mentionsOnly")
+                              : t("notify.none");
+                        return (
+                          <button
+                            key={lvl}
+                            type="button"
+                            className="chat-menu-item"
+                            onClick={() => {
+                              setGroupNotifyLevel(menuGroup.id, lvl);
+                              closeRowMenu();
+                            }}
+                          >
+                            <IconVolumeMute size={16} />{" "}
+                            {label}
+                            {current === lvl ? " ✓" : ""}
+                          </button>
+                        );
+                      }
+                    )}
                     <button
                       type="button"
                       className="chat-menu-item"
@@ -7446,6 +7504,32 @@ export function ChatShell({
                         <button type="button" className="chat-menu-item" onClick={() => { setGroupMenuOpen(false); setGroupPanelOpen(true); }}>
                           <IconUsers size={16} /> {t("group.showMembers")}
                         </button>
+                        <label className="chat-menu-item cursor-default">
+                          <span>{t("notify.title")}</span>
+                          <select
+                            value={notifyLevelFor(
+                              {
+                                muted: mutedGroups,
+                                mentionsOnly: mentionsOnlyGroups,
+                              },
+                              group.id
+                            )}
+                            onChange={(e) =>
+                              setGroupNotifyLevel(
+                                group.id,
+                                e.target.value as NotifyLevel
+                              )
+                            }
+                            className="chat-menu-select"
+                            title={t("notify.title")}
+                          >
+                            <option value="all">{t("notify.all")}</option>
+                            <option value="mentions">
+                              {t("notify.mentionsOnly")}
+                            </option>
+                            <option value="none">{t("notify.none")}</option>
+                          </select>
+                        </label>
                         <button
                           type="button"
                           className="chat-menu-item"

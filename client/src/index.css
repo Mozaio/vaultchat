@@ -4496,6 +4496,15 @@ select:focus-visible {
   color: var(--danger);
 }
 
+.chat-menu-label {
+  padding: 0.4rem 0.75rem 0.2rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .chat-menu-select {
   margin-left: auto;
   border: 1px solid var(--border);

@@ -2129,6 +2129,28 @@ const DICT: Record<string, Dict> = {
     es: "Silenciado", fr: "Mis en sourdine", pt: "Silenciado",
     ru: "Без звука", ar: "مكتوم", zh: "已静音", hi: "म्यूट किया गया",
   },
+  "notify.title": {
+    en: "Notifications", de: "Benachrichtigungen", tr: "Bildirimler",
+    es: "Notificaciones", fr: "Notifications", pt: "Notificações",
+    ru: "Уведомления", ar: "الإشعارات", zh: "通知", hi: "सूचनाएँ",
+  },
+  "notify.all": {
+    en: "All messages", de: "Alle Nachrichten", tr: "Tüm mesajlar",
+    es: "Todos los mensajes", fr: "Tous les messages", pt: "Todas as mensagens",
+    ru: "Все сообщения", ar: "كل الرسائل", zh: "所有消息",
+    hi: "सभी संदेश",
+  },
+  "notify.mentionsOnly": {
+    en: "Mentions only", de: "Nur Erwähnungen", tr: "Yalnızca bahsetmeler",
+    es: "Solo menciones", fr: "Mentions uniquement", pt: "Apenas menções",
+    ru: "Только упоминания", ar: "الإشارات فقط", zh: "仅提及",
+    hi: "केवल उल्लेख",
+  },
+  "notify.none": {
+    en: "Nothing", de: "Nichts", tr: "Hiçbiri",
+    es: "Nada", fr: "Rien", pt: "Nada",
+    ru: "Ничего", ar: "لا شيء", zh: "无", hi: "कुछ नहीं",
+  },
   "settings.pairTitle": {
     en: "Link another device", de: "Weiteres Gerät koppeln",
     tr: "Başka cihaz bağla", es: "Vincular otro dispositivo",
