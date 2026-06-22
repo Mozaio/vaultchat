@@ -15,6 +15,10 @@ export type PersistedUser = {
   /** Token-Revocation-Zähler ("auf allen Geräten abmelden"). Persistiert,
    *  damit eine Entwertung einen Restart im persistenten Modus überlebt. */
   tokenEpoch?: number;
+  /** E2E-verschlüsseltes Profil (Anzeigename+Avatar) als `PROFILE1:`-Ciphertext,
+   *  vom Server NUR opak gespeichert/ausgeliefert (analog zu Gruppen-#25). Der
+   *  Server sieht nie Klartext-Profil; der Profile-Key wird per Olm geteilt. */
+  profileCipher?: string;
 };
 
 export type PersistedGroup = {

@@ -20,6 +20,9 @@ export type StoredUser = {
   /** Token-Revocation: in jedes ausgestellte JWT eingebacken (te). Ein Bump
    *  entwertet alle bisherigen Tokens dieses Users. */
   tokenEpoch?: number;
+  /** E2E-Profil (Name+Avatar) als `PROFILE1:`-Ciphertext — server-opak, nie
+   *  Klartext. Profile-Key wird per Olm an Kontakte geteilt. */
+  profileCipher?: string;
 };
 
 export type StoredGroup = {
@@ -140,7 +143,20 @@ export function listUsersSafe() {
     username: u.username,
     publicKey: u.publicKey,
     createdAt: u.createdAt,
+    ...(u.profileCipher ? { profileCipher: u.profileCipher } : {}),
   }));
+}
+
+/**
+ * Speichert das E2E-verschlüsselte Profil-Blob eines Users (`PROFILE1:`-
+ * Ciphertext, server-opak). Gibt false zurück, wenn der User nicht existiert.
+ */
+export function setProfileCipher(userId: string, profileCipher: string): boolean {
+  const u = users.get(userId);
+  if (!u) return false;
+  u.profileCipher = profileCipher;
+  persistDirectory();
+  return true;
 }
 
 /**

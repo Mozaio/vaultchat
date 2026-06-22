@@ -22,6 +22,7 @@ import {
   listUsersSafe,
   removeGroupMember,
   setGroupZkgParams,
+  setProfileCipher,
   updateGroupProfile,
 } from "./memoryStore.js";
 import {
@@ -955,7 +956,16 @@ app.get("/api/users", async (req, res) => {
   }
   const users = ids.flatMap((id) => {
     const u = findUserById(id);
-    return u ? [{ id: u.id, username: u.username, publicKey: u.publicKey }] : [];
+    return u
+      ? [
+          {
+            id: u.id,
+            username: u.username,
+            publicKey: u.publicKey,
+            ...(u.profileCipher ? { profileCipher: u.profileCipher } : {}),
+          },
+        ]
+      : [];
   });
   res.json({ users });
 });
@@ -1013,6 +1023,33 @@ app.post("/api/discovery/evaluate", discoveryLimiter, async (req, res) => {
     return;
   }
   res.json({ evaluated: result.evaluated });
+});
+
+// GOAL Phase 1 (Profil/Avatar E2E): store a user's own E2E-encrypted profile
+// blob. Server-opaque — only a `PROFILE1:` ciphertext is accepted and stored;
+// the server never sees the plaintext name/avatar. It is returned to contacts
+// via /api/users so they decrypt it with the Olm-shared profile key. DORMANT
+// until the client editor + key distribution land.
+const ProfileBody = z.object({
+  profileCipher: z.string().min(1).max(300_000),
+});
+app.put("/api/profile", apiLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = ProfileBody.safeParse(req.body);
+  if (!parsed.success || !parsed.data.profileCipher.startsWith("PROFILE1:")) {
+    res.status(400).json({ error: "invalid_profile" });
+    return;
+  }
+  if (!setProfileCipher(jwtUser.userId, parsed.data.profileCipher)) {
+    res.status(404).json({ error: "unknown_user" });
+    return;
+  }
+  res.json({ ok: true });
 });
 
 app.post("/api/groups", groupLimiter, async (req, res) => {
