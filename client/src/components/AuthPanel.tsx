@@ -757,10 +757,11 @@ export function AuthPanel({
           )}
 
           {error && (
-            <div className="auth-error">
+            <div className="auth-error" role="alert">
               <IconAlertTriangle
                 size={16}
                 style={{ flexShrink: 0, marginTop: 1 }}
+                aria-hidden
               />
               <span>{error}</span>
             </div>
