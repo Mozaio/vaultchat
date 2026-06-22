@@ -26,7 +26,7 @@ import {
   adoptContactProfileKey,
   type ProfileKey,
 } from "../lib/profileKeys";
-import { encryptProfile, type ProfileData } from "../lib/profileCrypto";
+import { encryptProfile, decryptProfile, type ProfileData } from "../lib/profileCrypto";
 import { useFocusTrap } from "../lib/useFocusTrap";
 import {
   isGroupAdmin,
@@ -1391,7 +1391,6 @@ export function ChatShell({
         ownProfileKeyRef.current = pk;
         const meUser = await api.me(session.token);
         if (meUser.profileCipher && pk) {
-          const { decryptProfile } = await import("../lib/profileCrypto");
           const p = await decryptProfile(meUser.profileCipher, pk.keyB64).catch(
             () => null
           );
