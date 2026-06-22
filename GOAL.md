@@ -49,7 +49,9 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
   - [x] 0.4a Per-Account-Cap auf gleichzeitige WS-Sockets (Evict-Oldest, inhaltsblind, `VAULTCHAT_MAX_SOCKETS_PER_USER`=16) — deployed (2b03e65, live, Build grün)
   - [x] 0.4b Per-IP-Cap auf gleichzeitige Pre-Auth-WS-Verbindungen pro Quell-IP (default 30, `VAULTCHAT_MAX_PREAUTH_WS_PER_IP`); ein Socket wird beim Authentifizieren sofort freigegeben → NAT-Nutzer (Firma/Uni/Mobilfunk) NICHT limitiert, nur gleichzeitige unauth Sockets. Fail-open ohne ermittelbare IP / bei cap<=0. Client-IP aus erstem X-Forwarded-For-Hop (Render-Proxy), nur transient im RAM, nie persistiert/identitäts-geloggt. Deployed (398413e, live, Build grün).
 - [x] Reproduzierbarer Build + veröffentlichter Bundle-Hash als Pipeline-Schritt — CI-Workflow `reproducible-build.yml`: baut Client auf gepinntem Node 20.20.2, publiziert SHA-384 (SRI-Format) aller Bundle-Assets (Job-Summary + Artefakt) + aufgelöstes `package-lock.json`. Run #1 (15e5df6) grün.
-  - [-] 0.5b `package-lock.json` committen + SOURCE_DATE_EPOCH-Honoring für bit-genaue Reproduzierbarkeit. **BLOCKED:** kein `package-lock.json` im Repo; der CI-Artefakt-Lockfile ist nach dem libsodium-Add (11ac596) veraltet, und ohne lokales npm kann der Agent keinen korrekten Lockfile erzeugen/verifizieren. Braucht eine Umgebung mit npm (Cloud/Sandbox) oder einen frischen CI-Lauf.
+  - [ ] 0.5b `package-lock.json` committen + SOURCE_DATE_EPOCH-Honoring für bit-genaue Reproduzierbarkeit. Wieder machbar: ein lokales `npm install` erzeugt jetzt einen aktuellen Lockfile (inkl. libsodium). Rest: Lockfile committen + verifizieren, dass der Render-Build damit sauber durchläuft, + SOURCE_DATE_EPOCH im Build honorieren.
+
+- [x] Client type-clean + Typecheck-CI-Gate: `tsc --noEmit` über den Client ist grün (34→0 Fehler) und läuft als CI bei jedem Push (`.github/workflows/client-typecheck.yml` + `client typecheck`-Script). **Damit sind Client-Änderungen vor dem Deploy verifizierbar → die client-lastige Roadmap (Phase 1+) ist sicher autonom shippbar.** Behoben u.a.: stale `UploadBody`-Typ nach Olm-Migration, `SharedMediaItem` voice/file-Union, JSX-Namespace (React 19), Node-vs-Browser-`Timeout`, ungenutzte Imports/Setter.
 
 ## Phase 1 — Alltagstauglichkeit (WhatsApp-Parität)
 
@@ -57,7 +59,7 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 - [ ] Medien-/Datei-Galerie pro Chat (verschlüsselt, nur im Browser)
 - [ ] Nachrichten/Medien weiterleiten (E2EE-konform, mit Weiterleitungs-Markierung)
 - [ ] Kontakte & Profile: Anzeigename + Avatar, E2E-verschlüsselt geteilt
-- [ ] Entwürfe und Scroll-Position pro Chat persistent (lokal)
+- [ ] Entwürfe und Scroll-Position pro Chat persistent (lokal). Hinweis: halbfertige, nicht verdrahtete Scroll-Handler (`handleDmScroll`/`handleGroupScroll`/`scrollToBottom`, „Scroll-to-bottom"/Unread-beim-Hochscrollen) liegen in `ChatShell.tsx` (per `void` erhalten, tsc-clean) — hier entweder verdrahten (mit Verifikation) oder entfernen.
 - [ ] Push-Benachrichtigungen ohne Inhalts-Leak an den Push-Dienst (nur „Wakeup", Inhalt wird lokal entschlüsselt)
 - [ ] Link-Vorschauen clientseitig erzeugt (kein Server-Fetch, kein Leak an Dritte)
 
