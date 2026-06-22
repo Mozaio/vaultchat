@@ -5,6 +5,14 @@ import {
   persistUsersAndGroups,
   type PersistedGroup,
 } from "./serverState.js";
+import {
+  canAddMember,
+  canDemote,
+  canPromote,
+  canRemoveMember,
+  canUpdateProfile,
+  effectiveAdminIds,
+} from "./groupRoles.js";
 
 /** User/group directory. RAM-only unless VAULTCHAT_STATE_FILE is configured. */
 
@@ -31,6 +39,10 @@ export type StoredGroup = {
   memberIds: string[];
   /** User, der die Gruppe angelegt hat (für Rollen/UI). */
   createdByUserId: string;
+  /** Phase 3: explizite Admin-Liste (Untermenge von memberIds). Der Ersteller
+   *  gilt IMMER als Admin (siehe groupRoles.effectiveAdminIds), auch wenn er
+   *  hier nicht gelistet ist. Reine Autorisierungs-Metadaten — kein Krypto. */
+  adminIds: string[];
   createdAt: number;
   /** #25: bei aktuellen Clients `GMETA1:`-Ciphertext (E2EE, server-opak — der
    *  echte Name/Text wird nie sichtbar); nur Legacy/Krypto-Fallback ist Klartext. */
@@ -64,12 +76,21 @@ const usersByName = new Map<string, string>(
   [...users.values()].map((user) => [user.username.toLowerCase(), user.id])
 );
 function persistedGroupToStored(group: PersistedGroup): StoredGroup {
+  const memberIds = [...group.memberIds];
+  const creator = group.createdByUserId ?? memberIds[0] ?? "";
+  // Admin-Liste rekonstruieren: persistierte adminIds (auf aktuelle Mitglieder
+  // beschränkt) ∪ Ersteller. Legacy-Gruppen ohne Feld → nur der Ersteller.
+  const adminSet = new Set<string>(
+    (group.adminIds ?? []).filter((id) => memberIds.includes(id))
+  );
+  if (memberIds.includes(creator)) adminSet.add(creator);
   return {
     id: group.id,
     name: group.name,
-    memberIds: [...group.memberIds],
+    memberIds,
+    adminIds: [...adminSet],
     createdAt: group.createdAt,
-    createdByUserId: group.createdByUserId ?? group.memberIds[0] ?? "",
+    createdByUserId: creator,
     ...(group.description ? { description: group.description } : {}),
     ...(group.avatar ? { avatar: group.avatar } : {}),
     ...(group.updatedAt ? { updatedAt: group.updatedAt } : {}),
@@ -204,6 +225,8 @@ export function createGroup(input: {
     id: randomUUID(),
     name: input.name,
     memberIds: [...new Set(input.memberIds)],
+    // Der Ersteller ist der erste (und initial einzige) Admin.
+    adminIds: [input.createdByUserId],
     createdByUserId: input.createdByUserId,
     createdAt: now,
     ...(input.description ? { description: input.description } : {}),
@@ -228,7 +251,7 @@ export function updateGroupProfile(
 ): StoredGroup | null {
   const g = groups.get(groupId);
   if (!g) return null;
-  if (g.createdByUserId !== actorId) return null;
+  if (!canUpdateProfile(g, actorId)) return null;
   if (typeof updates.name === "string") {
     const trimmed = updates.name.trim();
     if (trimmed) g.name = trimmed;
@@ -274,7 +297,23 @@ export function listGroupsForUser(userId: string) {
 export function addGroupMember(groupId: string, actorId: string, memberId: string) {
   const g = groups.get(groupId);
   if (!g) return null;
-  if (!g.memberIds.includes(actorId)) return null;
+  // Rolle: nur Admins (inkl. Ersteller) dürfen hinzufügen.
+  if (!canAddMember(g, actorId)) return null;
+  if (!users.get(memberId)) return null;
+  if (!g.memberIds.includes(memberId)) g.memberIds.push(memberId);
+  persistDirectory();
+  return g;
+}
+
+/**
+ * Fügt ein Mitglied über einen gültigen Einladungs-Token hinzu — der Token IST
+ * die Autorisierung (vom Server geprüft in inviteStore), daher KEINE
+ * Admin-Rollenprüfung. Verwendet ausschließlich vom Invite-Redeem-Pfad; ein
+ * normaler API-Aufruf muss `addGroupMember` (rollen-gated) nehmen.
+ */
+export function addGroupMemberByInvite(groupId: string, memberId: string) {
+  const g = groups.get(groupId);
+  if (!g) return null;
   if (!users.get(memberId)) return null;
   if (!g.memberIds.includes(memberId)) g.memberIds.push(memberId);
   persistDirectory();
@@ -288,8 +327,12 @@ export function removeGroupMember(
 ) {
   const g = groups.get(groupId);
   if (!g) return null;
-  if (!g.memberIds.includes(actorId)) return null;
+  // Rolle: Selbst-Verlassen immer ok; sonst nur Admins, und Ersteller/andere
+  // Admins sind durch canRemoveMember geschützt.
+  if (!canRemoveMember(g, actorId, memberId)) return null;
   g.memberIds = g.memberIds.filter((id) => id !== memberId);
+  // Entfernten User auch aus der Admin-Liste streichen (Konsistenz).
+  g.adminIds = g.adminIds.filter((id) => id !== memberId);
   if (g.memberIds.length === 0) {
     groups.delete(groupId);
     persistDirectory();
@@ -297,12 +340,54 @@ export function removeGroupMember(
       id: groupId,
       name: g.name,
       memberIds: [],
+      adminIds: [],
       createdByUserId: g.createdByUserId,
       createdAt: g.createdAt,
     };
   }
   persistDirectory();
   return g;
+}
+
+/**
+ * Befördert ein Mitglied zum Admin. Nur bestehende Admins dürfen das. Gibt die
+ * Gruppe zurück (oder null bei fehlender Berechtigung / unbekannter Gruppe).
+ */
+export function promoteGroupAdmin(
+  groupId: string,
+  actorId: string,
+  targetId: string
+) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (!canPromote(g, actorId, targetId)) return null;
+  if (!g.adminIds.includes(targetId)) g.adminIds.push(targetId);
+  persistDirectory();
+  return g;
+}
+
+/**
+ * Degradiert einen Admin zum Mitglied. Nur der Ersteller darf das; der
+ * Ersteller selbst kann nicht degradiert werden.
+ */
+export function demoteGroupAdmin(
+  groupId: string,
+  actorId: string,
+  targetId: string
+) {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  if (!canDemote(g, actorId, targetId)) return null;
+  g.adminIds = g.adminIds.filter((id) => id !== targetId);
+  persistDirectory();
+  return g;
+}
+
+/** Effektive Admin-IDs einer Gruppe (für die API-Ausgabe). */
+export function getGroupAdminIds(groupId: string): string[] | null {
+  const g = groups.get(groupId);
+  if (!g) return null;
+  return [...effectiveAdminIds(g)];
 }
 
 export function leaveGroup(groupId: string, userId: string) {

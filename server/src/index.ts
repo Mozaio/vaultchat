@@ -12,6 +12,7 @@ import {
   createGroup,
   createUser,
   deleteUserCompletely,
+  demoteGroupAdmin,
   findUserById,
   findUserByUsername,
   getDirectoryStats,
@@ -20,11 +21,13 @@ import {
   leaveGroup,
   listGroupsForUser,
   listUsersSafe,
+  promoteGroupAdmin,
   removeGroupMember,
   setGroupZkgParams,
   setProfileCipher,
   updateGroupProfile,
 } from "./memoryStore.js";
+import { effectiveAdminIds } from "./groupRoles.js";
 import {
   hashPassword,
   setDeviceRevokedResolver,
@@ -418,6 +421,8 @@ type GroupResponse = {
   id: string;
   name: string;
   memberIds: string[];
+  /** Effektive Admin-IDs (inkl. Ersteller) — für die Rollen-UI. */
+  adminIds: string[];
   createdByUserId: string;
   createdAt: number;
   description?: string;
@@ -429,6 +434,7 @@ function shapeGroup(g: {
   id: string;
   name: string;
   memberIds: string[];
+  adminIds?: string[];
   createdByUserId: string;
   createdAt: number;
   description?: string;
@@ -439,6 +445,8 @@ function shapeGroup(g: {
     id: g.id,
     name: g.name,
     memberIds: g.memberIds,
+    // Ersteller ist immer Admin; nur aktuelle Mitglieder zählen.
+    adminIds: [...effectiveAdminIds(g)],
     createdByUserId: g.createdByUserId,
     createdAt: g.createdAt,
   };
@@ -1422,6 +1430,69 @@ app.post("/api/invites/:token/redeem", groupLimiter, async (req, res) => {
     }
   }
   res.json(result);
+});
+
+// Rollen-Management (Phase 3): Admin befördern / degradieren. Reine
+// Autorisierungs-Metadaten — keine Krypto. Die Rollenpolitik (wer darf)
+// liegt zentral in groupRoles.ts und wird in promoteGroupAdmin/demoteGroupAdmin
+// erzwungen.
+app.post("/api/groups/:id/admins", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const parsed = MemberBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid_body" });
+    return;
+  }
+  const groupId = String(req.params.id);
+  const g = promoteGroupAdmin(groupId, jwtUser.userId, parsed.data.memberId);
+  if (!g) {
+    res.status(403).json({ error: "cannot_promote" });
+    return;
+  }
+  // Alle anderen Mitglieder über die Rollenänderung informieren (UI-Refresh).
+  for (const memberId of g.memberIds) {
+    if (memberId === jwtUser.userId) continue;
+    sendToUser(memberId, { type: "group_role_changed", groupId });
+  }
+  log.info("group_admin_promoted", {
+    reqId: req.id,
+    groupId,
+    actorId: jwtUser.userId,
+    memberId: parsed.data.memberId,
+  });
+  res.json({ group: shapeGroup(g) });
+});
+
+app.delete("/api/groups/:id/admins/:memberId", groupLimiter, async (req, res) => {
+  const t = bearer(req);
+  const jwtUser = t ? verifyToken(t) : null;
+  if (!jwtUser) {
+    res.status(401).json({ error: "unauthorized" });
+    return;
+  }
+  const groupId = String(req.params.id);
+  const memberId = String(req.params.memberId);
+  const g = demoteGroupAdmin(groupId, jwtUser.userId, memberId);
+  if (!g) {
+    res.status(403).json({ error: "cannot_demote" });
+    return;
+  }
+  for (const m of g.memberIds) {
+    if (m === jwtUser.userId) continue;
+    sendToUser(m, { type: "group_role_changed", groupId });
+  }
+  log.info("group_admin_demoted", {
+    reqId: req.id,
+    groupId,
+    actorId: jwtUser.userId,
+    memberId,
+  });
+  res.json({ group: shapeGroup(g) });
 });
 
 app.post("/api/groups/:id/leave", async (req, res) => {

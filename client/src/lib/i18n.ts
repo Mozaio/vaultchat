@@ -2797,6 +2797,20 @@ const DICT: Record<string, Dict> = {
     ru: "{user} удалил(а) {member}", ar: "{user} أزال {member}",
     zh: "{user} 移除了 {member}", hi: "{user} ने {member} को हटाया",
   },
+  "chat.sysAdminPromoted": {
+    en: "{user} made {member} an admin", de: "{user} hat {member} zum Admin gemacht",
+    tr: "{user}, {member} kişisini yönetici yaptı", es: "{user} nombró admin a {member}",
+    fr: "{user} a nommé {member} administrateur", pt: "{user} tornou {member} administrador",
+    ru: "{user} назначил(а) {member} администратором", ar: "{user} عيّن {member} مشرفًا",
+    zh: "{user} 将 {member} 设为管理员", hi: "{user} ने {member} को एडमिन बनाया",
+  },
+  "chat.sysAdminDemoted": {
+    en: "{user} removed {member} as admin", de: "{user} hat {member} als Admin entfernt",
+    tr: "{user}, {member} kişisinin yöneticiliğini kaldırdı", es: "{user} quitó a {member} como admin",
+    fr: "{user} a retiré {member} comme administrateur", pt: "{user} removeu {member} como administrador",
+    ru: "{user} снял(а) с {member} права администратора", ar: "{user} أزال {member} كمشرف",
+    zh: "{user} 取消了 {member} 的管理员身份", hi: "{user} ने {member} का एडमिन हटाया",
+  },
   "chat.sysLeft": {
     en: "{user} left the group", de: "{user} hat die Gruppe verlassen",
     tr: "{user} gruptan ayrıldı", es: "{user} salió del grupo",
@@ -5488,6 +5502,29 @@ const DICT: Record<string, Dict> = {
     en: "Founder", de: "Gründer", tr: "Kurucu", es: "Fundador",
     fr: "Fondateur", pt: "Fundador", ru: "Создатель", ar: "المؤسس",
     zh: "创建者", hi: "संस्थापक",
+  },
+  "group.admin": {
+    en: "Admin", de: "Admin", tr: "Yönetici", es: "Administrador",
+    fr: "Administrateur", pt: "Administrador", ru: "Администратор", ar: "مشرف",
+    zh: "管理员", hi: "एडमिन",
+  },
+  "group.makeAdmin": {
+    en: "Make admin", de: "Zum Admin machen", tr: "Yönetici yap",
+    es: "Hacer administrador", fr: "Nommer administrateur", pt: "Tornar administrador",
+    ru: "Назначить администратором", ar: "تعيين كمشرف", zh: "设为管理员",
+    hi: "एडमिन बनाएँ",
+  },
+  "group.removeAdmin": {
+    en: "Remove admin", de: "Admin entfernen", tr: "Yöneticiliği kaldır",
+    es: "Quitar administrador", fr: "Retirer administrateur", pt: "Remover administrador",
+    ru: "Снять администратора", ar: "إزالة المشرف", zh: "取消管理员",
+    hi: "एडमिन हटाएँ",
+  },
+  "group.editProfile": {
+    en: "Edit profile", de: "Profil bearbeiten", tr: "Profili düzenle",
+    es: "Editar perfil", fr: "Modifier le profil", pt: "Editar perfil",
+    ru: "Изменить профиль", ar: "تعديل الملف الشخصي", zh: "编辑资料",
+    hi: "प्रोफ़ाइल संपादित करें",
   },
   "group.leave": {
     en: "Leave", de: "Verlassen", tr: "Ayrıl", es: "Salir", fr: "Quitter",

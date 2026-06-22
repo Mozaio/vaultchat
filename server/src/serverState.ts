@@ -28,6 +28,10 @@ export type PersistedGroup = {
   createdAt: number;
   /** Neuere Clients schreiben das Feld; alte State-Dateien können es weglassen. */
   createdByUserId?: string;
+  /** Phase 3: explizite Admin-Liste (Untermenge von memberIds). Der Ersteller
+   *  ist immer Admin, auch wenn das Feld fehlt (Legacy-Gruppen). Reine
+   *  Server-Autorisierungs-Metadaten — verändert das Schlüsselmodell nicht. */
+  adminIds?: string[];
   /** #25: bei aktuellen Clients `GMETA1:`-Ciphertext (E2EE, server-opak); nur
    *  Legacy/Fallback ist Klartext. */
   description?: string;

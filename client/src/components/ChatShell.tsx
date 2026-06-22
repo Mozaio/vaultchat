@@ -28,6 +28,12 @@ import {
 } from "../lib/profileKeys";
 import { encryptProfile, type ProfileData } from "../lib/profileCrypto";
 import {
+  isGroupAdmin,
+  canKick,
+  canPromote,
+  canDemote,
+} from "../lib/groupRoles";
+import {
   resolveContactProfile,
   profileDisplayName,
   invalidateContactProfile,
@@ -757,12 +763,13 @@ export function ChatShell({
     setGroupEditAvatarRemoved(false);
   }, [group?.id, groupPanelOpen]);
 
-  // Load invites whenever the group panel opens for a group I created.
+  // Load invites whenever the group panel opens for a group where I'm an admin
+  // (the server only returns invites to admins; mirror that here).
   useEffect(() => {
     if (
       !group ||
       !groupPanelOpen ||
-      group.createdByUserId !== session.user.id
+      !isGroupAdmin(group, session.user.id)
     ) {
       setGroupInvites([]);
       return;
@@ -2635,6 +2642,18 @@ export function ChatShell({
             return;
           }
           if (
+            data.type === "group_role_changed" &&
+            typeof data.groupId === "string"
+          ) {
+            // Rollenwechsel (Admin promote/demote) ist reine Autorisierungs-
+            // Metadaten — KEINE Megolm-Rotation, nur die Gruppenliste neu laden,
+            // damit Rollen-Badges und Admin-Buttons aktuell sind.
+            const { groups: latestRaw } = await api.listGroups(session.token);
+            const latest = await decryptGroupList(latestRaw);
+            setGroups(latest);
+            return;
+          }
+          if (
             data.type === "dm" &&
             typeof data.id === "string" &&
             typeof data.envelope === "string"
@@ -4058,6 +4077,55 @@ export function ChatShell({
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "remove_failed");
+    }
+  }
+
+  async function promoteMember(memberId: string) {
+    if (!group) return;
+    const memberLabel =
+      users.find((u) => u.id === memberId)?.username ?? t("chat.memberFallback");
+    try {
+      // Rollenwechsel ist reine Autorisierungs-Metadaten — KEINE Megolm-Rotation.
+      const { group: g2 } = await api.promoteGroupAdmin(
+        session.token,
+        group.id,
+        memberId
+      );
+      setGroup(g2);
+      await loadGroups();
+      await sendGroupSystemMessage(
+        g2,
+        t("chat.sysAdminPromoted", {
+          user: session.user.username,
+          member: memberLabel,
+        })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "promote_failed");
+    }
+  }
+
+  async function demoteMember(memberId: string) {
+    if (!group) return;
+    const memberLabel =
+      users.find((u) => u.id === memberId)?.username ?? t("chat.memberFallback");
+    try {
+      const { group: g2 } = await api.demoteGroupAdmin(
+        session.token,
+        group.id,
+        memberId
+      );
+      setGroup(g2);
+      await loadGroups();
+      await sendGroupSystemMessage(
+        g2,
+        t("chat.sysAdminDemoted", {
+          user: session.user.username,
+          member: memberLabel,
+        })
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "demote_failed");
     }
   }
 
@@ -7510,7 +7578,7 @@ export function ChatShell({
                               {t("group.noDescription")}
                             </p>
                           )}
-                          {group.createdByUserId === session.user.id && (
+                          {isGroupAdmin(group, session.user.id) && (
                             <button
                               type="button"
                               onClick={() => {
@@ -7520,14 +7588,14 @@ export function ChatShell({
                               }}
                               className="btn btn-secondary !px-2 !py-1 !text-[10px]"
                             >
-                              Profil bearbeiten
+                              {t("group.editProfile")}
                             </button>
                           )}
                         </div>
                       )}
                     </div>
                   )}
-                  {group.createdByUserId === session.user.id && (
+                  {isGroupAdmin(group, session.user.id) && (
                     <div
                       className="mb-2 border-b pb-2"
                       style={{ borderColor: "var(--border)" }}
@@ -7627,9 +7695,10 @@ export function ChatShell({
                       const isFounder =
                         Boolean(group.createdByUserId) &&
                         mid === group.createdByUserId;
-                      const canManageMembers =
-                        !group.createdByUserId ||
-                        group.createdByUserId === session.user.id;
+                      const isAdminRole = isGroupAdmin(group, mid);
+                      const showKick = canKick(group, session.user.id, mid);
+                      const showPromote = canPromote(group, session.user.id, mid);
+                      const showDemote = canDemote(group, session.user.id, mid);
                       return (
                         <li key={mid} className="gmember-row">
                           <span
@@ -7644,12 +7713,38 @@ export function ChatShell({
                             <span className="gmember-role founder">
                               {t("group.founder")}
                             </span>
+                          ) : isAdminRole ? (
+                            <span className="gmember-role admin">
+                              {t("group.admin")}
+                            </span>
                           ) : mid === session.user.id ? (
                             <span className="gmember-role you">
                               {t("chat.you")}
                             </span>
                           ) : null}
-                          {mid !== session.user.id && canManageMembers && (
+                          {showPromote && (
+                            <button
+                              type="button"
+                              onClick={() => void promoteMember(mid)}
+                              className="gmember-role-btn"
+                              title={t("group.makeAdmin")}
+                              aria-label={t("group.makeAdmin")}
+                            >
+                              ↑
+                            </button>
+                          )}
+                          {showDemote && (
+                            <button
+                              type="button"
+                              onClick={() => void demoteMember(mid)}
+                              className="gmember-role-btn"
+                              title={t("group.removeAdmin")}
+                              aria-label={t("group.removeAdmin")}
+                            >
+                              ↓
+                            </button>
+                          )}
+                          {showKick && (
                             <button
                               type="button"
                               onClick={() => void removeMember(mid)}
@@ -7664,30 +7759,32 @@ export function ChatShell({
                       );
                     })}
                   </ul>
-                  <div className="mt-2 flex gap-2">
-                    <select
-                      value={addMemberId}
-                      onChange={(e) => setAddMemberId(e.target.value)}
-                      className="app-input flex-1 !py-1.5 !text-xs"
-                    >
-                      <option value="">{t("group.pickMember")}</option>
-                      {users
-                        .filter((u) => !group.memberIds.includes(u.id))
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.username}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => void addMember()}
-                      disabled={!addMemberId}
-                      className="btn btn-primary shrink-0 !px-3 !py-1.5 !text-xs disabled:opacity-40"
-                    >
-                      {t("common.add")}
-                    </button>
-                  </div>
+                  {isGroupAdmin(group, session.user.id) && (
+                    <div className="mt-2 flex gap-2">
+                      <select
+                        value={addMemberId}
+                        onChange={(e) => setAddMemberId(e.target.value)}
+                        className="app-input flex-1 !py-1.5 !text-xs"
+                      >
+                        <option value="">{t("group.pickMember")}</option>
+                        {users
+                          .filter((u) => !group.memberIds.includes(u.id))
+                          .map((u) => (
+                            <option key={u.id} value={u.id}>
+                              {u.username}
+                            </option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => void addMember()}
+                        disabled={!addMemberId}
+                        className="btn btn-primary shrink-0 !px-3 !py-1.5 !text-xs disabled:opacity-40"
+                      >
+                        {t("common.add")}
+                      </button>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => void leaveCurrentGroup()}

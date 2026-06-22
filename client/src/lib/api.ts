@@ -42,6 +42,9 @@ export type ApiGroup = {
   id: string;
   name: string;
   memberIds: string[];
+  /** Phase 3: effektive Admin-IDs (inkl. Ersteller). Fehlt bei sehr alten
+   *  Servern → der Client behandelt dann nur den Ersteller als Admin. */
+  adminIds?: string[];
   /** Fehlt bei älteren Servern bis Neustart. */
   createdByUserId?: string;
   createdAt: number;
@@ -399,6 +402,31 @@ export async function removeGroupMember(
   memberId: string
 ) {
   return req<{ group: ApiGroup }>(`/api/groups/${groupId}/members/${memberId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+/** Befördert ein Mitglied zum Admin (nur Admins dürfen das, server-enforced). */
+export async function promoteGroupAdmin(
+  token: string,
+  groupId: string,
+  memberId: string
+) {
+  return req<{ group: ApiGroup }>(`/api/groups/${groupId}/admins`, {
+    method: "POST",
+    body: JSON.stringify({ memberId }),
+    token,
+  });
+}
+
+/** Degradiert einen Admin (nur der Ersteller darf das, server-enforced). */
+export async function demoteGroupAdmin(
+  token: string,
+  groupId: string,
+  memberId: string
+) {
+  return req<{ group: ApiGroup }>(`/api/groups/${groupId}/admins/${memberId}`, {
     method: "DELETE",
     token,
   });
