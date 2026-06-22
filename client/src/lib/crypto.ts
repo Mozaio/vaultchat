@@ -167,6 +167,18 @@ export type PlainPayload = {
   mime?: string;
   /** Originale Dateigröße in Bytes (für Anzeige in der Bubble). */
   fileSize?: number;
+  /**
+   * Kleines, verschlüsseltes Vorschaubild (data-URL, ~256px JPEG) für Bild-
+   * Attachments. Reist innerhalb der bereits sealed PlainPayload — also
+   * automatisch E2EE, kein separater Schlüssel/Server-Fetch. Der Empfänger
+   * kann es sofort rendern, während das (ggf. große) Vollbild aus `body`
+   * lazy geladen wird. Optional/rückwärtskompatibel: ältere Clients lassen
+   * das Feld weg, der Empfänger fällt dann auf `body` zurück. */
+  thumb?: string;
+  /** Originalmaße des Bildes in Pixeln (für stabiles Layout / Seitenverhältnis,
+   *  ohne das Vollbild zu dekodieren). */
+  width?: number;
+  height?: number;
   /** Laufzeit in Millisekunden für Sprachnachrichten. */
   durationMs?: number;
   /** Empfänger-IDs einer Weiterleitung (Vorschau/Markierung). */

@@ -357,6 +357,14 @@ export function MessageBubble({
   // A blocked image src falls back to the file-card download path below.
   const imageSrc = isImagePayload(msg.plain) ? safeMediaSrc(body, "image") : "";
   const isImage = isImagePayload(msg.plain) && imageSrc !== "";
+  // Inline preview prefers the small, sealed thumbnail (Phase 4.3) so the
+  // bubble paints instantly without decoding the full-size image; the
+  // lightbox still opens the full `imageSrc`. Peer-controlled, so sanitize.
+  const thumbSrc =
+    isImage && msg.plain.thumb
+      ? safeMediaSrc(msg.plain.thumb, "image")
+      : "";
+  const previewSrc = thumbSrc || imageSrc;
   const fileHref =
     msg.plain.kind === "file" ? safeMediaSrc(body, "file") : "";
   const isSystem = msg.plain.kind === "system";
@@ -544,11 +552,14 @@ export function MessageBubble({
               aria-label={t("msg.openImage")}
             >
               <img
-                src={imageSrc}
+                src={previewSrc}
                 alt={msg.plain.fileName ?? t("msg.imageFallback")}
                 className="image-attachment-img"
                 loading="lazy"
                 draggable={false}
+                {...(msg.plain.width && msg.plain.height
+                  ? { width: msg.plain.width, height: msg.plain.height }
+                  : {})}
               />
               {msg.plain.fileName && (
                 <span className="image-attachment-meta">

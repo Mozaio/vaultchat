@@ -107,6 +107,7 @@ import {
 import { PeerRow } from "./PeerRow";
 import { InfoPanel, type SharedMediaItem } from "./InfoPanel";
 import { safeMediaSrc } from "../lib/safeMedia";
+import { compressImageFile } from "../lib/mediaCompress";
 import { t, useLocale } from "../lib/i18n";
 import { GroupCallBar } from "./GroupCallBar";
 import {
@@ -288,6 +289,51 @@ async function resizeImageToDataUrl(
   if (!ctx) throw new Error("canvas_unavailable");
   ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
   return canvas.toDataURL("image/jpeg", quality);
+}
+
+type FileMedia = {
+  body: string;
+  mime: string;
+  fileSize: number;
+  thumb?: string;
+  width?: number;
+  height?: number;
+};
+
+/**
+ * Prepare a picked file for sending. Raster photos are downscaled/recompressed
+ * and get an inline thumbnail via the media pipeline (GOAL Phase 4.3); the
+ * thumbnail is sealed together with the payload (E2EE by construction). Any
+ * non-image, or a compression that fails/doesn't help, falls back to sending
+ * the original bytes verbatim — so a weird image never blocks a send.
+ */
+async function buildFileMedia(file: File): Promise<FileMedia> {
+  const readRaw = () =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
+  try {
+    const compressed = await compressImageFile(file);
+    if (compressed) {
+      return {
+        body: compressed.dataUrl,
+        mime: compressed.mime,
+        // Report the COMPRESSED size so the bubble's size label matches what
+        // actually traveled (and what counts against the mailbox quota).
+        fileSize: compressed.approxBytes,
+        thumb: compressed.thumb,
+        width: compressed.width,
+        height: compressed.height,
+      };
+    }
+  } catch {
+    /* fall through to raw send */
+  }
+  return { body: await readRaw(), mime: file.type, fileSize: file.size };
 }
 
 export function ChatShell({
@@ -3339,20 +3385,17 @@ export function ChatShell({
       );
       return;
     }
-    const body = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    const media = await buildFileMedia(file);
     const payload: PlainPayload = {
       v: 2,
       cid: newCid(),
       kind: "file",
-      body,
+      body: media.body,
       fileName: file.name,
-      mime: file.type,
-      fileSize: file.size,
+      mime: media.mime,
+      fileSize: media.fileSize,
+      ...(media.thumb ? { thumb: media.thumb } : {}),
+      ...(media.width ? { width: media.width, height: media.height } : {}),
       ...(ttlDm ? { ttlMs: ttlDm } : {}),
       ...(viewOnceDm ? { viewOnce: true } : {}),
     };
@@ -3432,20 +3475,17 @@ export function ChatShell({
       return;
     }
     setError(null);
-    const body = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result ?? ""));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
+    const media = await buildFileMedia(file);
     const payload: PlainPayload = {
       v: 2,
       cid: newCid(),
       kind: "file",
-      body,
+      body: media.body,
       fileName: file.name,
-      mime: file.type,
-      fileSize: file.size,
+      mime: media.mime,
+      fileSize: media.fileSize,
+      ...(media.thumb ? { thumb: media.thumb } : {}),
+      ...(media.width ? { width: media.width, height: media.height } : {}),
       ...(ttlGroup ? { ttlMs: ttlGroup } : {}),
       ...(viewOnceGroup ? { viewOnce: true } : {}),
     };
