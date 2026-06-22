@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "test": "tsx --test src/lib/backup.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/olmAdapter.test.ts src/lib/olmSession.test.ts src/lib/megolmSession.test.ts",
     "preview": "vite preview",
     "tauri": "tauri",

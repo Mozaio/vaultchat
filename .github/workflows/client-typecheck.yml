@@ -1,0 +1,24 @@
+# Client-Typecheck-Gate (GOAL: Client sicher autonom shippbar machen).
+#
+# Der Produktions-Build des Clients nutzt Vite/esbuild und prüft KEINE Typen —
+# ein falscher Identifier / fehlender Import schlägt erst zur Laufzeit fehl
+# (White-Screen). Dieses Gate führt `tsc --noEmit` über den Client aus, damit
+# solche Fehler vor einem Deploy auffallen. `--ignore-scripts`, weil Typecheck
+# keine nativen Builds (esbuild/argon2) braucht.
+name: client-typecheck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install --ignore-scripts
+      - run: npm run typecheck --workspace client
