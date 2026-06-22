@@ -4661,6 +4661,18 @@ const DICT: Record<string, Dict> = {
     ru: "Общие файлы", ar: "الوسائط المشتركة", zh: "共享内容",
     hi: "साझा सामग्री",
   },
+  "info.seeAll": {
+    en: "See all ({n})", de: "Alle anzeigen ({n})", tr: "Tümünü gör ({n})",
+    es: "Ver todo ({n})", fr: "Tout voir ({n})", pt: "Ver tudo ({n})",
+    ru: "Показать все ({n})", ar: "عرض الكل ({n})", zh: "查看全部（{n}）",
+    hi: "सभी देखें ({n})",
+  },
+  "info.showLess": {
+    en: "Show less", de: "Weniger anzeigen", tr: "Daha az göster",
+    es: "Ver menos", fr: "Voir moins", pt: "Ver menos",
+    ru: "Свернуть", ar: "عرض أقل", zh: "收起",
+    hi: "कम दिखाएँ",
+  },
   "info.noShared": {
     en: "No files or voice notes in this chat yet.",
     de: "Noch keine Dateien oder Sprachnotizen in diesem Chat.",

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import * as api from "../lib/api";
 import { saveStringSet, userGradient } from "../lib/chatHelpers";
 import { safeMediaSrc } from "../lib/safeMedia";
@@ -61,6 +62,8 @@ export function InfoPanel({
   sharedMediaItems: SharedMediaItem[];
 }) {
   useLocale(); // re-render on language change
+  const [showAllMedia, setShowAllMedia] = useState(false);
+  const MEDIA_PREVIEW_COUNT = 8;
   const title =
     mode === "dm"
       ? (peerDisplayName?.trim() || peer?.username) ?? t("chat.contactFallback")
@@ -257,7 +260,10 @@ export function InfoPanel({
           </p>
         ) : (
           <div className="space-y-2">
-            {sharedMediaItems.slice(0, 8).map((item) => (
+            {(showAllMedia
+              ? sharedMediaItems
+              : sharedMediaItems.slice(0, MEDIA_PREVIEW_COUNT)
+            ).map((item) => (
               <a
                 key={item.id}
                 href={item.href}
@@ -272,6 +278,18 @@ export function InfoPanel({
                 </span>
               </a>
             ))}
+            {sharedMediaItems.length > MEDIA_PREVIEW_COUNT && (
+              <button
+                type="button"
+                className="w-full rounded-xl border border-dashed p-2 text-xs font-medium transition hover:opacity-90"
+                style={{ borderColor: "var(--border)", color: "var(--accent)" }}
+                onClick={() => setShowAllMedia((v) => !v)}
+              >
+                {showAllMedia
+                  ? t("info.showLess")
+                  : t("info.seeAll", { n: sharedMediaItems.length })}
+              </button>
+            )}
           </div>
         )}
       </div>
