@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ApiUser, ApiGroup } from "../lib/api";
 import { type ChatFolder, newFolderId } from "../lib/chatFolders";
 import { canAddFolder, getLimits } from "../lib/plan";
 import { t, useLocale } from "../lib/i18n";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { IconX, IconBookmark, IconUsers } from "./Icons";
 
 type Props = {
@@ -34,6 +35,8 @@ export function FoldersManageModal({
   setEditing,
 }: Props) {
   useLocale();
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
   const [draft, setDraft] = useState<ChatFolder | null>(editing);
 
   useEffect(() => {
@@ -106,6 +109,7 @@ export function FoldersManageModal({
       aria-labelledby="folders-modal-title"
     >
       <div
+        ref={cardRef}
         className="app-surface u-modal-card w-full max-w-md rounded-2xl p-5"
         onClick={(e) => e.stopPropagation()}
         style={{ maxHeight: "85vh", display: "flex", flexDirection: "column" }}

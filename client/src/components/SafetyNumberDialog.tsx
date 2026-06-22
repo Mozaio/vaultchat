@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { safetyNumber } from "../lib/crypto";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import {
   acceptKeyChange,
   confirmPeerVerified,
@@ -27,11 +28,22 @@ export function SafetyNumberDialog({
   onTrustChanged?: (pin: PeerPin) => void;
 }) {
   useLocale();
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
   const [groups, setGroups] = useState<string[]>([]);
   const [emojiSeq, setEmojiSeq] = useState<string[]>([]);
   const [pin, setPin] = useState<PeerPin | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // Schließen per Escape (Konsistenz mit den übrigen Modals).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   function copyNumber() {
     const text = groups.join(" ").trim();
@@ -77,7 +89,7 @@ export function SafetyNumberDialog({
       aria-modal="true"
       aria-labelledby="safety-number-title"
     >
-      <div className="safety-number-dialog u-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div ref={cardRef} className="safety-number-dialog u-modal-card" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="header">
           <div>

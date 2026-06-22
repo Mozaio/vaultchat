@@ -32,6 +32,7 @@ import {
 import { ThemeToggle } from "./ThemeToggle";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { t, useLocale } from "../lib/i18n";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { useInstallAvailable, promptInstall } from "../lib/installPrompt";
 import { isTauri } from "../lib/desktopNotify";
 import { loadScreenSecurity, setScreenSecurity } from "../lib/screenSecurity";
@@ -193,6 +194,15 @@ export function SecuritySettings({
   onUnblockContact,
 }: SecuritySettingsProps) {
   useLocale(); // re-render on language change
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const installAvailable = useInstallAvailable();
   const desktop = isTauri();
   const [screenSec, setScreenSec] = useState(() => loadScreenSecurity());
@@ -300,8 +310,10 @@ export function SecuritySettings({
   return (
     <div className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
       <div
+        ref={cardRef}
         className="app-surface u-modal-card flex max-h-[min(90vh,720px)] w-full max-w-lg flex-col rounded-2xl p-0 shadow-xl"
         role="dialog"
+        aria-modal="true"
         aria-labelledby="settings-title"
       >
         <div

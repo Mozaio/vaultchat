@@ -1732,6 +1732,11 @@ const DICT: Record<string, Dict> = {
     zh: "选择联系人（每条私信单独加密）",
     hi: "संपर्क चुनें (प्रत्येक DM अलग से एन्क्रिप्टेड)",
   },
+  "chat.forwardPreview": {
+    en: "Preview", de: "Vorschau", tr: "Önizleme", es: "Vista previa",
+    fr: "Aperçu", pt: "Pré-visualização", ru: "Предпросмотр", ar: "معاينة",
+    zh: "预览", hi: "पूर्वावलोकन",
+  },
   "chat.noContactsAvail": {
     en: "No contacts available.", de: "Keine Kontakte verfügbar.",
     tr: "Kişi yok.", es: "No hay contactos disponibles.",

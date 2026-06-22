@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { searchUsers, type ApiUser } from "../lib/api";
 import { userGradient } from "../lib/chatHelpers";
 import { t, useLocale } from "../lib/i18n";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { IconX } from "./Icons";
 
 const MIN_SEARCH_CHARS = 3;
@@ -22,6 +23,8 @@ export function AddContactModal({
   onContactSelected,
 }: AddContactModalProps) {
   useLocale(); // re-render on language change
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef, isOpen);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ApiUser[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -100,14 +103,18 @@ export function AddContactModal({
     <div
       className="u-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={handleClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-contact-title"
     >
       <div
+        ref={cardRef}
         className="app-surface u-modal-card w-full max-w-md rounded-2xl p-6"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+            <h2 id="add-contact-title" className="text-lg font-semibold" style={{ color: "var(--text)" }}>
               {t("addc.title")}
             </h2>
             <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>

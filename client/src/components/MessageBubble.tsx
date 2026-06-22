@@ -33,6 +33,7 @@ import {
   IconX,
 } from "./Icons";
 import { EmojiPicker } from "./EmojiPicker";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import {
   renderInlineMarkdown,
   extractLinks,
@@ -1083,39 +1084,74 @@ export function MessageBubble({
       </div>
 
       {imageOpen && isImage && (
-        <div
-          className="image-lightbox"
-          onClick={() => setImageOpen(false)}
-          role="dialog"
-          aria-modal="true"
+        <ImageLightbox
+          src={imageSrc}
+          fileName={msg.plain.fileName}
+          onClose={() => setImageOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Vollbild-Lightbox für Bilder. Eigene Komponente, damit die Fokus-Falle
+ * sauber mit dem geöffneten Dialog mountet/unmountet (statt einen Ref pro
+ * Bubble dauerhaft zu halten). Schließt per Klick auf den Hintergrund, per
+ * Schließen-Button und per Escape; Tab-Fokus bleibt im Dialog.
+ */
+function ImageLightbox({
+  src,
+  fileName,
+  onClose,
+}: {
+  src: string;
+  fileName?: string;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      ref={ref}
+      className="image-lightbox"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={fileName ?? t("msg.imageFallback")}
+    >
+      <button
+        type="button"
+        className="image-lightbox-close"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        aria-label={t("common.close")}
+      >
+        <IconX size={20} />
+      </button>
+      <img
+        src={src}
+        alt={fileName ?? t("msg.imageFallback")}
+        onClick={(e) => e.stopPropagation()}
+      />
+      {fileName && (
+        <a
+          href={src}
+          download={fileName}
+          className="image-lightbox-download"
+          onClick={(e) => e.stopPropagation()}
         >
-          <button
-            type="button"
-            className="image-lightbox-close"
-            onClick={(e) => {
-              e.stopPropagation();
-              setImageOpen(false);
-            }}
-            aria-label={t("common.close")}
-          >
-            <IconX size={20} />
-          </button>
-          <img
-            src={imageSrc}
-            alt={msg.plain.fileName ?? t("msg.imageFallback")}
-            onClick={(e) => e.stopPropagation()}
-          />
-          {msg.plain.fileName && (
-            <a
-              href={imageSrc}
-              download={msg.plain.fileName}
-              className="image-lightbox-download"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <IconDownload size={14} /> {msg.plain.fileName}
-            </a>
-          )}
-        </div>
+          <IconDownload size={14} /> {fileName}
+        </a>
       )}
     </div>
   );

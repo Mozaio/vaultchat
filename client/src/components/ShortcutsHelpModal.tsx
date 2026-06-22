@@ -1,10 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SHORTCUTS } from "../lib/shortcuts";
 import { t, useLocale } from "../lib/i18n";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import { IconX } from "./Icons";
 
 export function ShortcutsHelpModal({ onClose }: { onClose: () => void }) {
   useLocale();
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -22,6 +25,7 @@ export function ShortcutsHelpModal({ onClose }: { onClose: () => void }) {
       aria-labelledby="shortcuts-help-title"
     >
       <div
+        ref={cardRef}
         className="app-surface u-modal-card w-full max-w-md rounded-2xl p-5"
         onClick={(e) => e.stopPropagation()}
       >

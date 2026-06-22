@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IconLock, IconShieldCheck, IconUsers } from "./Icons";
 import { t, useLocale } from "../lib/i18n";
+import { useFocusTrap } from "../lib/useFocusTrap";
 
 const ONBOARDING_KEY = "vaultchat.onboarding.pending";
 
@@ -33,6 +34,8 @@ type Props = {
 
 export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
   useLocale(); // re-render on language change
+  const cardRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(cardRef);
   const [step, setStep] = useState(0);
   const last = step === STEPS.length - 1;
 
@@ -55,7 +58,7 @@ export function OnboardingOverlay({ onDone, onRequestBackup }: Props) {
       aria-modal="true"
       aria-labelledby="onboarding-title"
     >
-      <div className="onboarding-card">
+      <div ref={cardRef} className="onboarding-card">
         <div className="onboarding-icon" aria-hidden>
           {STEPS[step].icon}
         </div>

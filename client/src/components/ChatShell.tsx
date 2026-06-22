@@ -27,6 +27,7 @@ import {
   type ProfileKey,
 } from "../lib/profileKeys";
 import { encryptProfile, type ProfileData } from "../lib/profileCrypto";
+import { useFocusTrap } from "../lib/useFocusTrap";
 import {
   isGroupAdmin,
   canKick,
@@ -739,6 +740,12 @@ export function ChatShell({
   const [profileEditName, setProfileEditName] = useState("");
   const [profileEditAvatar, setProfileEditAvatar] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+  // Fokus-Fallen für die Inline-Modals (a11y: WCAG 2.4.3 — Fokus in den
+  // Dialog, Tab bleibt drin, Rückgabe beim Schließen).
+  const profileEditorRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(profileEditorRef, profileEditorOpen);
+  const forwardModalRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(forwardModalRef, forwardTarget != null);
   const [sendTypingIndicators, setSendTypingIndicators] = useState(
     () => localStorage.getItem("vaultchat.privacy.typing") !== "off"
   );
@@ -5513,13 +5520,20 @@ export function ChatShell({
           onClick={() => {
             if (!profileSaving) setProfileEditorOpen(false);
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !profileSaving) setProfileEditorOpen(false);
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="profile-editor-title"
         >
           <div
+            ref={profileEditorRef}
             className="app-surface u-modal-card w-full max-w-md rounded-2xl p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+              <h2 id="profile-editor-title" className="text-lg font-semibold" style={{ color: "var(--text)" }}>
                 {t("profile.title")}
               </h2>
               <button
@@ -5617,14 +5631,24 @@ export function ChatShell({
             setForwardTarget(null);
             setForwardPick(new Set());
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setForwardTarget(null);
+              setForwardPick(new Set());
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="forward-modal-title"
         >
           <div
+            ref={forwardModalRef}
             className="app-surface u-modal-card w-full max-w-md rounded-2xl p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold" style={{ color: "var(--text)" }}>
-                Weiterleiten
+              <h2 id="forward-modal-title" className="text-lg font-semibold" style={{ color: "var(--text)" }}>
+                {t("msg.forward")}
               </h2>
               <button
                 type="button"
@@ -5639,7 +5663,7 @@ export function ChatShell({
               </button>
             </div>
             <p className="mb-1 text-xs font-medium" style={{ color: "var(--text-muted)" }}>
-              Vorschau
+              {t("chat.forwardPreview")}
             </p>
             <p
               className="mb-4 rounded-lg border px-3 py-2 text-sm"
