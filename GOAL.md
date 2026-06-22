@@ -103,7 +103,12 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 - [ ] Marke „Umbra": Logo, Farbwelt, Tonalität, Landingpage
 - [ ] Onboarding, das E2EE/Schlüssel verständlich macht (Sicherheit als Feature sichtbar)
 - [ ] Vollwertige PWA / installierbare App (mobil + Desktop), Offline-fähig
-- [ ] Barrierefreiheit (Tastatur, Screenreader, Kontraste) und Internationalisierung (i18n)
+- [ ] Barrierefreiheit (Tastatur, Screenreader, Kontraste) und Internationalisierung (i18n) — vom denker zerlegt:
+  - [x] i18n: 10 Sprachen, vollständig + jetzt **automatisch abgesichert** (`i18n.coverage.test.ts` scannt alle Quelldateien nach literalen `t("…")`-Keys und schlägt fehl, falls einer im DICT fehlt — schützt vor stillen Tippfehler-Keys, weil der Client beim Deploy nicht typgecheckt wird). Cloud-verifiziert.
+  - [x] Tastatur/Screenreader — Modal-Fokus-Management: `useFocusTrap`-Hook (Fokus in den Dialog, Tab-Falle, Rückgabe beim Schließen) auf alle Modals angewandt (Shortcuts, Folders, Safety-Number, Onboarding, Settings, Add-Contact, Bild-Lightbox, Suche, Profil-Editor, Weiterleiten); fehlende `role=dialog`/`aria-modal`/Escape ergänzt. WCAG 2.4.3/2.1.2. +9 Unit-Tests. Cloud-verifiziert.
+  - [x] Statusmeldungen (WCAG 4.1.3): Auth-Fehler `role=alert`, Toast-Live-Region dauerhaft gemountet. Icon-only-Buttons tragen bereits durchgängig `aria-label` (Audit: keine Lücken). Formular-Labels/`autoComplete`/`aria-describedby` in AuthPanel bereits vollständig.
+  - [ ] Farbkontraste systematisch gegen WCAG AA prüfen (warm-cozy Theme + Dark) — noch offen, braucht visuelle Verifikation.
+  - [ ] Vollständige Tastatur-Navigation der Chat-Liste/Composer (Pfeiltasten, Roving-Tabindex) — noch offen, braucht Verhaltens-Test im Browser.
 
 ## Phase 6 — Monetarisierung (ohne die Privatsphäre zu verraten)
 
