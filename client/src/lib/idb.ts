@@ -67,6 +67,37 @@ export type StoredGroupMessage = {
   expiresAt?: number;
 };
 
+// --- Live message-mutation hook (GOAL Phase 1: keep the local full-text search
+// index fresh within a session). idb stays decoupled — it only emits raw events;
+// searchIndex.ts registers the listener (no idb→searchIndex import, no cycle).
+// Best-effort: a throwing listener never affects persistence. ---
+export type IdbMsgEvent =
+  | { kind: "putDm"; id: string; peerId: string; plainJson: string; at: number }
+  | {
+      kind: "putGroup";
+      id: string;
+      groupId: string;
+      fromUserId: string;
+      plainJson: string;
+      at: number;
+    }
+  | { kind: "delete"; id: string };
+
+let _msgListener: ((e: IdbMsgEvent) => void) | null = null;
+
+export function setIdbMsgListener(fn: ((e: IdbMsgEvent) => void) | null): void {
+  _msgListener = fn;
+}
+
+function emitMsg(e: IdbMsgEvent): void {
+  if (!_msgListener) return;
+  try {
+    _msgListener(e);
+  } catch {
+    /* index update is best-effort; never break persistence */
+  }
+}
+
 export function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const r = indexedDB.open(DB, VER);
@@ -120,6 +151,7 @@ export async function idbPutDm(m: StoredDmMessage): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  emitMsg({ kind: "putDm", id: m.id, peerId: m.peerId, plainJson: m.plainJson, at: m.at });
 }
 
 export async function idbUpdateDmPayload(
@@ -143,6 +175,7 @@ export async function idbUpdateDmPayload(
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  emitMsg({ kind: "putDm", id, peerId: existing.peerId, plainJson, at: existing.at });
 }
 
 export async function idbDeleteDm(id: string): Promise<void> {
@@ -153,6 +186,7 @@ export async function idbDeleteDm(id: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  emitMsg({ kind: "delete", id });
 }
 
 export async function idbListDm(peerId: string): Promise<StoredDmMessage[]> {
@@ -424,6 +458,14 @@ export async function idbPutGroupMsg(m: StoredGroupMessage): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  emitMsg({
+    kind: "putGroup",
+    id: m.id,
+    groupId: m.groupId,
+    fromUserId: m.fromUserId,
+    plainJson: m.plainJson,
+    at: m.at,
+  });
 }
 
 export async function idbUpdateGroupPayload(
@@ -448,6 +490,14 @@ export async function idbUpdateGroupPayload(
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  emitMsg({
+    kind: "putGroup",
+    id,
+    groupId: existing.groupId,
+    fromUserId: existing.fromUserId,
+    plainJson,
+    at: existing.at,
+  });
 }
 
 export async function idbDeleteGroupMsg(id: string): Promise<void> {
@@ -458,6 +508,7 @@ export async function idbDeleteGroupMsg(id: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+  emitMsg({ kind: "delete", id });
 }
 
 export async function idbListGroup(

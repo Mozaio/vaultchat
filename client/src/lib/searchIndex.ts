@@ -25,7 +25,12 @@
  *  - Stemming: keine — komplex für Multi-Sprach (DE/EN-mix in Real-World-Data).
  *  - Prefix-Match: ja — wer "vault" tippt, findet "vaultchat".
  */
-import { idbListAllDm, idbListAllGroupMsgs } from "./idb";
+import {
+  idbListAllDm,
+  idbListAllGroupMsgs,
+  setIdbMsgListener,
+  type IdbMsgEvent,
+} from "./idb";
 import type { PlainPayload } from "./crypto";
 
 export type IndexedMessage = {
@@ -89,10 +94,50 @@ export function updateIndexed(msgId: string, newBody: string): void {
   addToIndex({ ...doc, body: newBody });
 }
 
+/**
+ * Applies a live idb mutation to the in-memory index so search stays fresh
+ * within a session (GOAL Phase 1). Registered once the index is built, detached
+ * on lock. Re-puts/edits reindex via remove-then-add.
+ */
+function applyIdbEvent(e: IdbMsgEvent): void {
+  if (e.kind === "delete") {
+    removeFromIndex(e.id);
+    return;
+  }
+  let plain: PlainPayload;
+  try {
+    plain = JSON.parse(e.plainJson) as PlainPayload;
+  } catch {
+    return;
+  }
+  removeFromIndex(e.id);
+  if (e.kind === "putDm") {
+    addToIndex({
+      id: e.id,
+      scope: "dm",
+      scopeId: e.peerId,
+      body: plain.body ?? "",
+      at: e.at,
+      cid: plain.cid ?? e.id,
+    });
+  } else {
+    addToIndex({
+      id: e.id,
+      scope: "group",
+      scopeId: e.groupId,
+      fromUserId: e.fromUserId,
+      body: plain.body ?? "",
+      at: e.at,
+      cid: plain.cid ?? e.id,
+    });
+  }
+}
+
 export function clearSearchIndex(): void {
   _index.clear();
   _docs.clear();
   _built = false;
+  setIdbMsgListener(null);
 }
 
 /**
@@ -102,6 +147,8 @@ export function clearSearchIndex(): void {
 export async function getOrBuildIndex(): Promise<void> {
   if (_built) return;
   _built = true;
+  // Keep the index live for the rest of the session (new/edited/deleted msgs).
+  setIdbMsgListener(applyIdbEvent);
   try {
     const dms = await idbListAllDm();
     for (const m of dms) {
