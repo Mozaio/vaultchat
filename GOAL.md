@@ -55,11 +55,11 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 
 ## Phase 1 — Alltagstauglichkeit (WhatsApp-Parität)
 
-- [ ] Verschlüsselte clientseitige Volltextsuche über die lokale Historie
+- [ ] Verschlüsselte clientseitige Volltextsuche über die lokale Historie. **Großteils umgesetzt** (`client/src/lib/searchIndex.ts`): zero-knowledge In-Memory-Inverted-Index (nur RAM — Server sieht nie Inhalt), Tokenizer + Prefix-/AND-Suche, `SearchPanel` ruft `getOrBuildIndex()`+`search()`, Clear-on-Lock. Durchsucht die persistierte Historie. **Offen:** Live-Index-Pflege in der Session (`addToIndex`/`removeFromIndex`/`updateIndexed` bei neuer/editierter/gelöschter Nachricht) ist NICHT verdrahtet → in der Session erst nach Lock/Reload frisch. Sauber nachrüsten via **einem** idb-Chokepoint (Zyklus `idb`↔`searchIndex` vermeiden, z.B. Event/Callback) — eigener fokussierter Schritt, nicht am Turn-Ende überstürzen.
 - [ ] Medien-/Datei-Galerie pro Chat (verschlüsselt, nur im Browser)
 - [ ] Nachrichten/Medien weiterleiten (E2EE-konform, mit Weiterleitungs-Markierung)
 - [ ] Kontakte & Profile: Anzeigename + Avatar, E2E-verschlüsselt geteilt
-- [ ] Entwürfe und Scroll-Position pro Chat persistent (lokal). Hinweis: halbfertige, nicht verdrahtete Scroll-Handler (`handleDmScroll`/`handleGroupScroll`/`scrollToBottom`, „Scroll-to-bottom"/Unread-beim-Hochscrollen) liegen in `ChatShell.tsx` (per `void` erhalten, tsc-clean) — hier entweder verdrahten (mit Verifikation) oder entfernen.
+- [ ] Entwürfe und Scroll-Position pro Chat persistent (lokal). Entwürfe ✅ (per-Chat, verschlüsselt, „Draft:"-Preview). Scroll-to-bottom-Button + Unread-beim-Hochscrollen ✅ **verdrahtet + live** (`onScroll`→`handleDmScroll`/`handleGroupScroll`, 19d8f64, deployed + im Browser geprüft). **Offen:** Scroll-Position pro Chat über Reload persistent merken.
 - [ ] Push-Benachrichtigungen ohne Inhalts-Leak an den Push-Dienst (nur „Wakeup", Inhalt wird lokal entschlüsselt)
 - [ ] Link-Vorschauen clientseitig erzeugt (kein Server-Fetch, kein Leak an Dritte)
 
