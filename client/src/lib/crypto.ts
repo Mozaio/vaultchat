@@ -159,7 +159,8 @@ export type PlainPayload = {
     | "system"
     | "poll"
     | "poll-vote"
-    | "voice_announce";
+    | "voice_announce"
+    | "profile_key";
   /** Text-Body bzw. Data-URL für Datei/Voice. Leer für Meta-Frames. */
   body?: string;
   fileName?: string;
@@ -215,6 +216,13 @@ export type PlainPayload = {
    *  (Beitreten/Verlassen/Anwesend). Wird NICHT gespeichert oder gerendert,
    *  sondern an den GroupCallController weitergereicht. */
   voiceKind?: "voice_join" | "voice_leave" | "voice_present";
+  /** Profile-Key des Absenders (base64) zum E2EE-Entschlüsseln seines
+   *  Profil-Blobs (Anzeigename/Avatar). Wird auf einem dedizierten
+   *  `profile_key`-Frame ODER huckepack auf Distributions-Frames über Olm
+   *  geteilt — NIE an den Server. `profileKeyEpoch` versioniert Rotationen
+   *  (höhere Epoche gewinnt). Empfänger ruft `adoptContactProfileKey`. */
+  profileKey?: string;
+  profileKeyEpoch?: number;
   /**
    * Für Gruppen-Sealed-Sender: der Absender ist in der E2EE-Payload enthalten,
    * nicht im server-sichtbaren Group-Frame. Für DMs wird der Absender per
