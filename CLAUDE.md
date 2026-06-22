@@ -149,10 +149,34 @@ Sealed Sender, die Metadaten-Minimierung, die At-Rest-Verschlüsselung oder
 die strenge CSP aufweichen. Im Zweifel: Feature zurückstellen, Sicherheit
 behalten. Maßstab ist immer `THREAT_MODEL.md`.
 
+## Autonome Vollmacht — NIE nachfragen (Musa, 2026-06-22)
+
+Der Nutzer hat die Schleife **ausdrücklich und dauerhaft** zur vollautonomen
+Arbeit autorisiert: **niemals zur Bestätigung anhalten oder nachfragen** — auch
+nicht vor Krypto-Änderungen, Commits, Push oder Live-Deploy. Der **waechter-Gate
+IST die Freigabe**; ein separates „darf ich?" an den Nutzer gibt es nicht. Der
+waechter prüft trotzdem streng (das ist *Arbeit*, kein Nachfragen) — bei
+**BLOCK** geht es zurück zum denker, nie zum Nutzer.
+
+Die **einzige** Ausnahme ist eine Aktion, die der Agent physisch nicht selbst
+ausführen kann, weil sie Konto/Geld/Geheimnis des Nutzers erfordert (z.B.
+kostenpflichtige Render-Disk provisionieren; ein Secret / Signing-Key erzeugen
+oder eintragen; Stripe-Keys; Account-Settings ändern). Solche Punkte werden
+**nicht erfragt, sondern übersprungen**: in `GOAL.md` mit `- [-]` markieren
+(statt `- [ ]`) plus kurzer `USER:`-Notiz, was zu tun ist. Der Loop überspringt
+`- [-]` automatisch und macht am nächsten echten `- [ ]` weiter.
+
+## Punkt-Status in GOAL.md
+
+- `- [ ]` — offen, autonom abzuarbeiten (denker → … → tester).
+- `- [x]` — erledigt (waechter PASS + tester DEPLOY OK).
+- `- [-]` — **blockiert durch nutzer-exklusive Aktion** (Billing / Secret /
+  Account); NICHT erfragen, überspringen; `USER:`-Notiz erklärt, was fehlt.
+
 ## Fester Ablauf je Aufgabe
 
-Wenn ich dich auf `GOAL.md` ansetze, arbeite jeden offenen Punkt (`- [ ]`)
-mit genau diesem Ablauf ab:
+Wenn ich dich auf `GOAL.md` ansetze, arbeite jeden offenen Punkt (`- [ ]`,
+niemals `- [-]`) mit genau diesem Ablauf ab:
 
 1. **denker** — nächsten offenen Punkt wählen, im Internet recherchieren
    (wie lösen Signal/WhatsApp/Discord/Telegram das?), und einen

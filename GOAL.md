@@ -12,6 +12,11 @@ waechter PASS und tester DEPLOY OK liefern. Arbeite die Phasen von oben
 nach unten ab. Halte Punkte klein; bei zu großen Punkten lass den denker
 sie in Unterpunkte zerlegen und ergänze sie hier.
 
+Status-Marker: `- [ ]` offen · `- [x]` erledigt · `- [-]` blockiert durch eine
+**nutzer-exklusive Aktion** (Billing/Secret/Account) — nie erfragen, automatisch
+überspringen, eine `USER:`-Notiz sagt, was der Nutzer tun muss. Sonst gilt:
+vollautonom, nie nachfragen (siehe CLAUDE.md „Autonome Vollmacht").
+
 > Privatsphäre-Regel für die ganze Roadmap: Manche Bequemlichkeits-Features
 > etablierter Apps stehen im Konflikt mit E2EE/Metadaten-Minimierung
 > (serverseitige Suche, Klartext-Cloud-Backup, Public Discovery, nahtloses
@@ -27,7 +32,7 @@ Aktuell leben Server-Nutzer und Gruppen nur im RAM und sind nach Neustart
 weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
 
 - [ ] Durable, blind gespeicherte Konten: Identitäts-/Routing-Daten serverseitig persistent, aber für den Server inhaltlich blind (keine Klartext-Identität, keine lesbaren Metadaten) — vom denker zerlegt:
-  - [ ] 0.1a Durable Storage-Backend, das Render-Restart übersteht (Render Disk oder externer KV/DB) — **Code fertig** (serverState.ts: atomare File-Persistenz + AES-256-GCM at-rest unter `VAULTCHAT_STATE_KEY`, fail-closed). **Offen = reine Infra-/Kosten- + Account-Aktion des Nutzers, autonom NICHT lösbar:** Render Disk (persistent, kostenpflichtig) ODER externen KV/DB provisionieren und `VAULTCHAT_STATE_FILE`+`VAULTCHAT_STATE_KEY` im Render-Dashboard setzen. Service läuft sonst weiter `state: ephemeral` (im Live-Log bestätigt). Loop überspringt den Punkt bis zur Entscheidung. **denker-Empfehlung:** 1-GB-Render-Disk direkt am `vaultchat-server`-Service — einfachster Pfad, keine zweite Abhängigkeit, Frankfurt-Region bleibt.
+  - [-] 0.1a **USER:** Durable Storage-Backend, das Render-Restart übersteht (Render Disk oder externer KV/DB) — **Code fertig** (serverState.ts: atomare File-Persistenz + AES-256-GCM at-rest unter `VAULTCHAT_STATE_KEY`, fail-closed). **Offen = reine Infra-/Kosten- + Account-Aktion des Nutzers, autonom NICHT lösbar:** Render Disk (persistent, kostenpflichtig) ODER externen KV/DB provisionieren und `VAULTCHAT_STATE_FILE`+`VAULTCHAT_STATE_KEY` im Render-Dashboard setzen. Service läuft sonst weiter `state: ephemeral` (im Live-Log bestätigt). Loop überspringt den Punkt bis zur Entscheidung. **denker-Empfehlung:** 1-GB-Render-Disk direkt am `vaultchat-server`-Service — einfachster Pfad, keine zweite Abhängigkeit, Frankfurt-Region bleibt.
   - [x] 0.1b Verzeichnis at-rest verschlüsseln (AES-256-GCM unter `VAULTCHAT_STATE_KEY`) — persistierte Datei/Backups ohne Klartext-Identität/Metadaten. Deployed (19895c5, live, Build grün). **Aktiv sobald 0.1a + `VAULTCHAT_STATE_FILE`/`VAULTCHAT_STATE_KEY` gesetzt** — Service läuft aktuell ephemeral.
   - [x] 0.1c Gruppen-Metadaten (Name/Beschreibung/Avatar) E2EE statt Server-Klartext — **BEREITS IMPLEMENTIERT (#25)**: Client verschlüsselt via GMK (`groupSecret.ts` `encryptGroupMeta`/`GMETA1`); `createGroup` legt Platzhalter an + reicht Ciphertext nach, `decryptGroupList` entschlüsselt mit Platzhalter-Fallback, GMK-Verteilung über Olm. Server sieht NIE den echten Namen. (Mein 2026-06-20-„Korrektur" fba7959 war falsch — zurückgenommen.)
   - [ ] 0.1d Blinde Discovery via OPRF/PSI (Server lernt Username auch live nie)

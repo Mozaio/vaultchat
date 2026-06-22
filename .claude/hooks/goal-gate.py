@@ -25,13 +25,17 @@ if "- [ ]" in goal:
         "decision": "block",
         "reason": (
             "GOAL.md hat noch offene Punkte (- [ ]). Nimm den naechsten "
-            "offenen Punkt und durchlauf den Ablauf aus CLAUDE.md: "
-            "denker -> schreiber -> waechter -> tester. Der tester prueft "
-            "nur den neuen Code auf Bugs und deployt bei sauberem Ergebnis "
-            "(und nur nach waechter PASS): git commit/push ueber das "
-            "Terminal, dann Manual Deploy im Render-Dashboard ueber Chrome. "
-            "Hake den Punkt nur ab, wenn waechter PASS und tester DEPLOY OK "
-            "liefern. Dann weiter zum naechsten Punkt."
+            "offenen Punkt von oben und durchlauf den Ablauf aus CLAUDE.md: "
+            "denker -> schreiber -> waechter -> tester. UEBERSPRINGE Punkte "
+            "mit Marker '- [-]' (nutzer-exklusiv, Billing/Secret/Account) — "
+            "die NICHT erfragen, nur ueberspringen. NIE den Nutzer um "
+            "Bestaetigung fragen (volle Vollmacht laut CLAUDE.md): der "
+            "waechter-Gate IST die Freigabe. Der tester prueft nur den neuen "
+            "Code auf Bugs und deployt bei sauberem Ergebnis (und nur nach "
+            "waechter PASS): git commit/push ueber das Terminal, dann Manual "
+            "Deploy im Render-Dashboard ueber Chrome. Hake den Punkt nur ab, "
+            "wenn waechter PASS und tester DEPLOY OK liefern. Dann weiter zum "
+            "naechsten Punkt."
         )
     }))
 
