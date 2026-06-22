@@ -11,15 +11,37 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createRequire } from "node:module";
 
 globalThis.btoa ??= (value: string) => Buffer.from(value, "binary").toString("base64");
 globalThis.atob ??= (value: string) => Buffer.from(value, "base64").toString("binary");
+
+/**
+ * Under the browser build Olm fetches `/olm.wasm` over HTTP. Under the Node
+ * test runner Emscripten reads `locateFile`'s result as a *filesystem* path,
+ * so `/olm.wasm` would resolve to the drive root (`C:\olm.wasm`), fail the
+ * async wasm load, and crash the process via Olm's own `uncaughtException`
+ * re-throw. We resolve the real wasm shipped in node_modules and hand its
+ * absolute path to `olmInit` so the same auditied Olm code path runs in the
+ * test as in production — instead of skipping with a masked crash.
+ */
+function resolveOlmWasmPath(): string | null {
+  try {
+    const require = createRequire(import.meta.url);
+    const olmJs = require.resolve("@matrix-org/olm");
+    const url = new URL("./olm.wasm", new URL(`file://${olmJs}`));
+    return decodeURIComponent(url.pathname).replace(/^\/([A-Za-z]:)/, "$1");
+  } catch {
+    return null;
+  }
+}
 
 let olmAvailable = false;
 try {
   // Probe: dynamisches Import + init
   const adapter = await import("./olmAdapter");
-  await adapter.olmInit();
+  const wasmPath = resolveOlmWasmPath();
+  await adapter.olmInit(wasmPath ? { locateFile: () => wasmPath } : undefined);
   olmAvailable = true;
 } catch (e) {
   // Olm konnte nicht geladen werden — vermutlich kein WASM-Support im Test-Env.
@@ -94,9 +116,13 @@ test("olm: tampered ciphertext is rejected", { skip: !olmAvailable }, async () =
   const { outbound, inbound } = await establishOlmPair(alice, bob);
 
   const ct = olmEncrypt(outbound, "secret");
-  // Flip middle byte.
+  // An Olm message body is base64 of `… || ciphertext || HMAC-truncated(8)`.
+  // The authentication tag sits at the very end, so flipping the LAST byte
+  // reliably invalidates the MAC and forces a decrypt failure. (Flipping a
+  // *middle* byte can land in the framing/public-key fields of a pre-key
+  // message, which are not all covered the same way and may not throw.)
   const raw = Buffer.from(ct.body, "base64");
-  raw[Math.floor(raw.length / 2)] ^= 0x01;
+  raw[raw.length - 1] ^= 0x01;
   const tampered = raw.toString("base64");
 
   assert.throws(() => olmDecrypt(inbound, ct.type, tampered));

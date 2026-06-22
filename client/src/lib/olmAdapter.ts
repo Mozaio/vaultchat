@@ -36,7 +36,19 @@ let _initPromise: Promise<OlmModule> | null = null;
  * zurück und WebAssembly.instantiate failed mit "expected magic word
  * 00 61 73 6d, found 3c 21 64 6f".
  */
-export async function olmInit(): Promise<OlmModule> {
+export async function olmInit(opts?: {
+  /**
+   * Override the wasm locator. Production (Vite/browser) leaves this unset
+   * and falls back to `/olm.wasm` (copied to the web root by the
+   * `vaultchat-copy-olm-wasm` plugin). The Node/`tsx` test runner passes an
+   * absolute filesystem path to the wasm in `node_modules`, because under
+   * Node Emscripten reads `locateFile`'s result as a file path and would
+   * otherwise resolve `/olm.wasm` to the drive root (e.g. `C:\olm.wasm`),
+   * fail the async wasm fetch, and crash the process via Olm's own
+   * `uncaughtException` re-throw — masking otherwise-passing crypto tests.
+   */
+  locateFile?: (file: string) => string;
+}): Promise<OlmModule> {
   if (_olm) return _olm;
   if (_initPromise) return _initPromise;
   _initPromise = (async () => {
@@ -56,7 +68,7 @@ export async function olmInit(): Promise<OlmModule> {
       throw new Error("olm_module_missing_init");
     }
     await (olm.init as (opts?: { locateFile?: (f: string) => string }) => Promise<void>)({
-      locateFile: () => "/olm.wasm",
+      locateFile: opts?.locateFile ?? (() => "/olm.wasm"),
     });
     _olm = olm;
     return olm;
