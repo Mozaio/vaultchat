@@ -1715,14 +1715,13 @@ export function ChatShell({
     });
   }, []);
 
-  // Absichtlich (noch) nicht verdrahtet: halbfertiges Scroll-/Such-UX
-  // (Scroll-to-bottom, Unread-beim-Hochscrollen, Username-Suche). Bewusst
-  // referenziert, damit der Code erhalten bleibt UND der Client tsc-clean ist —
-  // kein totes Löschen (Kaskade auf State-Setter) und kein blindes Aktivieren
-  // auf der Live-App. Verdrahten/Entfernen = eigener Schritt (GOAL Phase 1).
+  // handleDmScroll/handleGroupScroll sind jetzt via onScroll an den Message-
+  // Containern verdrahtet (Scroll-to-bottom-Button + Unread-beim-Hochscrollen).
+  // Weiterhin ungenutzt (bewusst referenziert, damit tsc-clean):
+  //  - searchUserByUsername: Legacy (durch SearchPanel/AddContact ersetzt; der
+  //    blinde Tag-Lookup aus 0.1d-4 ersetzt Username-Suche ohnehin).
+  //  - scrollToBottom: durch den Inline-scrollTo des Jump-Buttons abgelöst.
   void searchUserByUsername;
-  void handleDmScroll;
-  void handleGroupScroll;
   void scrollToBottom;
 
   const sendRtc = useCallback((toUserId: string, payload: RtcPayload) => {
@@ -6215,6 +6214,7 @@ export function ChatShell({
 
             <div
               ref={dmScrollRef}
+              onScroll={handleDmScroll}
               role="log"
               aria-label={`Direktnachrichten mit ${peer.username}`}
               className="messages-container !px-4 !py-4 relative"
@@ -7190,6 +7190,7 @@ export function ChatShell({
             />
             <div
               ref={groupScrollRef}
+              onScroll={handleGroupScroll}
               role="log"
               aria-label={t("chat.groupChatAria", { name: group?.name ?? "" })}
               className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4 relative"
