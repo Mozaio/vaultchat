@@ -1713,6 +1713,25 @@ function createBucket() {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Per-IP cap on *pre-authenticated* WebSocket connections (GOAL 0.4b).
+//
+// The relay is content-blind, but an unauthenticated peer can still open many
+// sockets from one host and sit in the 5s auth window to exhaust file
+// descriptors / memory. We bound the number of *simultaneously pre-auth*
+// sockets per source IP. A socket is released from the counter the moment it
+// authenticates, so legitimate users behind a shared NAT (corporate / uni /
+// mobile carrier) are NOT limited — only concurrent *unauthenticated* sockets
+// from one IP are. Fail-open by design: if the client IP can't be determined,
+// or the cap is non-positive / unparseable, no limit is applied (never lock
+// out real users). IPs live only transiently in memory and are never persisted
+// or tied to an identity (metadata minimisation).
+// ---------------------------------------------------------------------------
+const MAX_PREAUTH_WS_PER_IP = Number(
+  process.env.VAULTCHAT_MAX_PREAUTH_WS_PER_IP ?? 30
+);
+const preAuthSocketsByIp = new Map<string, number>();
+
 wss.on("connection", (ws, req) => {
   // Heartbeat-Tracking: Verbindung gilt als alive, bis der nächste Heartbeat-
   // Tick keinen pong bekommen hat.
@@ -1720,6 +1739,36 @@ wss.on("connection", (ws, req) => {
   ws.on("pong", () => {
     (ws as WebSocket & { _vcAlive?: boolean })._vcAlive = true;
   });
+
+  // Per-IP pre-auth connection cap (GOAL 0.4b). Render terminates TLS and
+  // prepends the real client IP as the first X-Forwarded-For hop.
+  const xffRaw = req.headers["x-forwarded-for"];
+  const xff = Array.isArray(xffRaw) ? xffRaw[0] : xffRaw;
+  const clientIp: string | null =
+    (typeof xff === "string" && xff.split(",")[0]?.trim()) ||
+    req.socket?.remoteAddress ||
+    null;
+  let preAuthCounted = false;
+  const releasePreAuth = () => {
+    if (!preAuthCounted || !clientIp) return;
+    preAuthCounted = false;
+    const n = (preAuthSocketsByIp.get(clientIp) ?? 1) - 1;
+    if (n <= 0) preAuthSocketsByIp.delete(clientIp);
+    else preAuthSocketsByIp.set(clientIp, n);
+  };
+  if (clientIp && MAX_PREAUTH_WS_PER_IP > 0) {
+    const current = preAuthSocketsByIp.get(clientIp) ?? 0;
+    if (current >= MAX_PREAUTH_WS_PER_IP) {
+      log.warn("ws_preauth_ip_cap", { cap: MAX_PREAUTH_WS_PER_IP });
+      ws.close(4429, "too_many_preauth_connections");
+      return;
+    }
+    preAuthSocketsByIp.set(clientIp, current + 1);
+    preAuthCounted = true;
+    // Release on close too, so early-return paths below (url-token disabled /
+    // unauthorized) and the auth-timeout don't leak the counter.
+    ws.on("close", releasePreAuth);
+  }
 
   const url = new URL(req.url ?? "", "http://localhost");
   const urlToken = url.searchParams.get("token");
@@ -1739,6 +1788,7 @@ wss.on("connection", (ws, req) => {
       return;
     }
     registerClient(jwtUser.userId, ws);
+    releasePreAuth(); // authenticated → no longer counts against the pre-auth cap
     flushMailboxToSocket(jwtUser.userId, ws);
   } else {
     authTimer = setTimeout(() => {
@@ -1805,6 +1855,7 @@ wss.on("connection", (ws, req) => {
         authTimer = null;
       }
       registerClient(u.userId, ws);
+      releasePreAuth(); // authenticated → no longer counts against the pre-auth cap
       ws.send(JSON.stringify({ type: "auth_ok" }));
       flushMailboxToSocket(u.userId, ws);
       return;
