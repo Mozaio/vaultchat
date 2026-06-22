@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { Session } from "../lib/sessionHelpers";
 import * as api from "../lib/api";
 import { decryptIncomingSealedDmWithReplayCheck } from "../lib/incomingDm";
@@ -98,7 +98,6 @@ import {
   loadFolders,
   saveFolders,
   subscribeFolders,
-  newFolderId,
   type ChatFolder,
 } from "../lib/chatFolders";
 import { SearchPanel } from "./SearchPanel";
@@ -135,8 +134,6 @@ import {
   IconCopy,
   IconDownload,
   IconFileText,
-  IconForward,
-  IconImage,
   IconInfo,
   IconHelpCircle,
   IconLock,
@@ -150,7 +147,6 @@ import {
   IconSearch,
   IconSend,
   IconSettings,
-  IconShield,
   IconShieldCheck,
   IconSmile,
   IconStar,
@@ -490,7 +486,7 @@ export function ChatShell({
     }
   );
   // Online status tracking
-  const [onlinePeers, setOnlinePeers] = useState<Set<string>>(new Set());
+  const [onlinePeers] = useState<Set<string>>(new Set());
   const [replyGroup, setReplyGroup] = useState<ReplyTarget>(null);
   const [ttlDm, setTtlDm] = useState<number>(0);
   const [ttlGroup, setTtlGroup] = useState<number>(0);
@@ -1719,6 +1715,16 @@ export function ChatShell({
     });
   }, []);
 
+  // Absichtlich (noch) nicht verdrahtet: halbfertiges Scroll-/Such-UX
+  // (Scroll-to-bottom, Unread-beim-Hochscrollen, Username-Suche). Bewusst
+  // referenziert, damit der Code erhalten bleibt UND der Client tsc-clean ist —
+  // kein totes Löschen (Kaskade auf State-Setter) und kein blindes Aktivieren
+  // auf der Live-App. Verdrahten/Entfernen = eigener Schritt (GOAL Phase 1).
+  void searchUserByUsername;
+  void handleDmScroll;
+  void handleGroupScroll;
+  void scrollToBottom;
+
   const sendRtc = useCallback((toUserId: string, payload: RtcPayload) => {
     wsRef.current?.send(JSON.stringify({ type: "rtc", toUserId, payload }));
   }, []);
@@ -2281,7 +2287,7 @@ export function ChatShell({
                 });
                 const ex = groupTypingClearTimers.current.get(tk);
                 if (ex) clearTimeout(ex);
-                const t = window.setTimeout(() => {
+                const t = setTimeout(() => {
                   setGroupTypingMap((prev) => {
                     const next = new Map(prev);
                     const set = new Set(next.get(gid) ?? []);
@@ -4029,8 +4035,8 @@ export function ChatShell({
       if (!el) return;
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       setJumpHighlightCid(cid);
-      if (jumpClearTimer.current) window.clearTimeout(jumpClearTimer.current);
-      jumpClearTimer.current = window.setTimeout(() => {
+      if (jumpClearTimer.current) clearTimeout(jumpClearTimer.current);
+      jumpClearTimer.current = setTimeout(() => {
         setJumpHighlightCid(null);
       }, 1700);
     },
@@ -4473,7 +4479,7 @@ export function ChatShell({
           ? rawGroupRef.current.get(group.id) ?? []
           : [];
     return rows
-      .flatMap((row) => {
+      .flatMap((row): SharedMediaItem[] => {
         try {
           const plain = JSON.parse(row.plainJson) as PlainPayload;
           if (plain.kind === "file") {

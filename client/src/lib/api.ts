@@ -442,13 +442,16 @@ export async function getPreKeyBundle(token: string, userId: string) {
 export async function uploadPreKeys(
   token: string,
   body: {
-    signedPreKey: {
+    // Legacy-Prekeys (vor der Olm-Migration). Aktuelle Clients laden nur noch
+    // `olm` hoch (buildUploadBodyWithOlm), daher optional — der Server akzeptiert
+    // Olm-only Bundles. Felder bleiben für Rückwärtskompatibilität im Typ.
+    signedPreKey?: {
       keyId: number;
       publicKey: string;
       signature: string;
       signingPublicKey?: string;
     };
-    oneTimePreKeys: { keyId: number; publicKey: string }[];
+    oneTimePreKeys?: { keyId: number; publicKey: string }[];
     pqKem?: {
       alg: "ML-KEM-1024";
       publicKey: string;
