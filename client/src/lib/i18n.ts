@@ -5642,6 +5642,20 @@ export function setLocale(loc: Locale): void {
 }
 
 /** Translate a key for the current locale. Falls back current -> en -> key. */
+/** All translation keys defined in DICT (English is the canonical entry).
+ *  Exposed for the i18n key-coverage test, which asserts that every literal
+ *  `t("…")` key used in the source actually exists here — the client is NOT
+ *  type-checked on deploy, so a typo'd key would otherwise silently render
+ *  the raw key string to users. */
+export function definedI18nKeys(): string[] {
+  return Object.keys(DICT);
+}
+
+/** Whether a key has a translation entry (used by the coverage test). */
+export function hasI18nKey(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(DICT, key);
+}
+
 export function t(key: string, vars?: Record<string, string | number>): string {
   const row = DICT[key];
   let s = (row && (row[current] ?? row.en)) ?? key;

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-test-module-mocks --import ./test/libsodium-cjs-resolve.mjs --import tsx --test src/lib/backup.test.ts src/lib/historyBackup.test.ts src/lib/deviceProvisioning.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/olmAdapter.test.ts src/lib/olmSession.test.ts src/lib/megolmSession.test.ts src/lib/profileCrypto.test.ts src/lib/profileKeys.test.ts src/lib/groupRoles.test.ts src/lib/notifyPrefs.test.ts src/lib/communitySecret.test.ts src/lib/mediaCompress.test.ts src/lib/useFocusTrap.test.ts src/lib/plan.test.ts",
+    "test": "node --experimental-test-module-mocks --import ./test/libsodium-cjs-resolve.mjs --import tsx --test src/lib/backup.test.ts src/lib/historyBackup.test.ts src/lib/deviceProvisioning.test.ts src/lib/messagePreview.test.ts src/lib/sealedSender.test.ts src/lib/olmAdapter.test.ts src/lib/olmSession.test.ts src/lib/megolmSession.test.ts src/lib/profileCrypto.test.ts src/lib/profileKeys.test.ts src/lib/groupRoles.test.ts src/lib/notifyPrefs.test.ts src/lib/communitySecret.test.ts src/lib/mediaCompress.test.ts src/lib/useFocusTrap.test.ts src/lib/plan.test.ts src/lib/i18n.coverage.test.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:icon": "tauri icon src-tauri/app-icon.svg",
