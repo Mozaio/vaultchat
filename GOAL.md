@@ -12,10 +12,12 @@ waechter PASS und tester DEPLOY OK liefern. Arbeite die Phasen von oben
 nach unten ab. Halte Punkte klein; bei zu großen Punkten lass den denker
 sie in Unterpunkte zerlegen und ergänze sie hier.
 
-Status-Marker: `- [ ]` offen · `- [x]` erledigt · `- [-]` blockiert durch eine
-**nutzer-exklusive Aktion** (Billing/Secret/Account) — nie erfragen, automatisch
-überspringen, eine `USER:`-Notiz sagt, was der Nutzer tun muss. Sonst gilt:
-vollautonom, nie nachfragen (siehe CLAUDE.md „Autonome Vollmacht").
+Status-Marker: `- [ ]` offen · `- [x]` erledigt · `- [-]` blockiert (vom Loop
+nicht selbst abschließbar) — entweder **nutzer-exklusiv** (Billing/Secret/
+Account, `USER:`-Notiz) oder **fehlendes Tooling/Verifikation** (z.B. kein
+lokales npm, Client nicht deploy-typgecheckt, `BLOCKED:`-Notiz). `- [-]` wird
+nie erfragt, automatisch übersprungen. Sonst gilt: vollautonom, nie nachfragen
+(siehe CLAUDE.md „Autonome Vollmacht").
 
 > Privatsphäre-Regel für die ganze Roadmap: Manche Bequemlichkeits-Features
 > etablierter Apps stehen im Konflikt mit E2EE/Metadaten-Minimierung
@@ -38,8 +40,8 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
   - [ ] 0.1d Blinde Discovery via OPRF/PSI (Server lernt Username auch live nie) — vom denker zerlegt, Design in `DISCOVERY_SPEC.md`:
     - [x] 0.1d-1 Design-Spec + ehrliche Sicherheitsgrenze (`DISCOVERY_SPEC.md`): OPRF(ristretto255, SHA-512), Tag-Index statt Klartext-Name. *(docs, kein Deploy nötig)*
     - [x] 0.1d-2 Server-OPRF-Primitive + Key-Mgmt: `POST /api/discovery/evaluate` → `k·B`, `k` aus `VAULTCHAT_DISCOVERY_OPRF_KEY` (fail-closed in prod), rate-limited; libsodium als Server-Dep (lazy import, boot-safe). Dormant (kein Caller bis 0.1d-3/4). Deployed (11ac596, live, Build grün).
-    - [ ] 0.1d-3 Account-Index per OPRF-Tag (Registrierung/Discovery per Tag, Klartext-Name raus aus Server-State; Migration/Back-Compat)
-    - [ ] 0.1d-4 Client-Blinding + Verdrahtung (Tag bei Register+Lookup; `?q=<name>` → blinder Tag-Lookup) — ⚠️ Client-Runtime-Risiko, braucht Verifikation (Client wird beim Deploy NICHT typgecheckt)
+    - [-] 0.1d-3 Account-Index per OPRF-Tag (Registrierung/Discovery per Tag, Klartext-Name raus aus Server-State; Migration/Back-Compat). **BLOCKED:** gekoppelt an 0.1d-4 — server-allein ausgerollt würde die Live-Discovery brechen, solange der Client noch Klartext schickt. Erst zusammen mit dem Client deployen.
+    - [-] 0.1d-4 Client-Blinding + Verdrahtung (Tag bei Register+Lookup; `?q=<name>` → blinder Tag-Lookup). **BLOCKED:** Client-Code; Client wird beim Deploy NICHT typgecheckt und ist hier nicht lauffähig → blindes Live-Deploy = White-Screen-Risiko. Braucht Cloud/Sandbox-Session mit npm (Build/Typecheck/Tests) zur Verifikation.
     - [-] 0.1d-5 **USER:** `VAULTCHAT_DISCOVERY_OPRF_KEY` dauerhaft stabil setzen + durable State (hängt an 0.1a)
 - [x] Verschlüsselte, serverseitige Offline-Mailbox (Store-and-Forward), ohne dass der Server Absender/Inhalt sieht — Sealed-Sender bleibt intakt. **Bereits implementiert & live** (`server/src/mailboxStore.ts`): speichert nur Ciphertext (DM = Sealed-Sender-`envelope` ohne `fromUserId`, Gruppe = `ciphertext`+`groupId`), TTL (7 d) + Count-Cap (500) + Byte-Quota (48 MB/Empfänger) gegen OOM-DoS, Dedup per `cid`, periodischer Sweep, Clear-on-Account-Deletion. Offline-Enqueue ist im Send-Pfad verdrahtet (`delivered===0` → enqueue). **Rest = Persistenz über Restart**, hängt an 0.1a (heute RAM-only, `state: ephemeral`).
 - [x] Account-Recovery-Konzept entwerfen und umsetzen (Verlust des Geräts), ohne Zero-Knowledge zu brechen. **Umgesetzt & live** (`client/src/lib/backup.ts`): client-verschlüsseltes Identity-Backup (Argon2id INTERACTIVE → XSalsa20-Poly1305-`secretbox`, versionierte KDF-Params #22, Shape-Check, `memzero`); Import auf neuem Gerät stellt Identität wieder her; Server sieht nie Identität/Passphrase. `BackupReminder` + `SecuritySettings` + `backupRequiredForNewDevices`. **Konzept dokumentiert** in `RECOVERY.md` (inkl. der ZK-Grenze: ohne Backup keine Recovery — by design). Historien-Recovery ist separat (Phase 2).
@@ -47,7 +49,7 @@ weg. Ohne durable, zero-knowledge Persistenz ist es kein Produkt.
   - [x] 0.4a Per-Account-Cap auf gleichzeitige WS-Sockets (Evict-Oldest, inhaltsblind, `VAULTCHAT_MAX_SOCKETS_PER_USER`=16) — deployed (2b03e65, live, Build grün)
   - [x] 0.4b Per-IP-Cap auf gleichzeitige Pre-Auth-WS-Verbindungen pro Quell-IP (default 30, `VAULTCHAT_MAX_PREAUTH_WS_PER_IP`); ein Socket wird beim Authentifizieren sofort freigegeben → NAT-Nutzer (Firma/Uni/Mobilfunk) NICHT limitiert, nur gleichzeitige unauth Sockets. Fail-open ohne ermittelbare IP / bei cap<=0. Client-IP aus erstem X-Forwarded-For-Hop (Render-Proxy), nur transient im RAM, nie persistiert/identitäts-geloggt. Deployed (398413e, live, Build grün).
 - [x] Reproduzierbarer Build + veröffentlichter Bundle-Hash als Pipeline-Schritt — CI-Workflow `reproducible-build.yml`: baut Client auf gepinntem Node 20.20.2, publiziert SHA-384 (SRI-Format) aller Bundle-Assets (Job-Summary + Artefakt) + aufgelöstes `package-lock.json`. Run #1 (15e5df6) grün.
-  - [ ] 0.5b `package-lock.json` committen + SOURCE_DATE_EPOCH-Honoring für bit-genaue Reproduzierbarkeit (lockfile liegt bereits als CI-Artefakt vor)
+  - [-] 0.5b `package-lock.json` committen + SOURCE_DATE_EPOCH-Honoring für bit-genaue Reproduzierbarkeit. **BLOCKED:** kein `package-lock.json` im Repo; der CI-Artefakt-Lockfile ist nach dem libsodium-Add (11ac596) veraltet, und ohne lokales npm kann der Agent keinen korrekten Lockfile erzeugen/verifizieren. Braucht eine Umgebung mit npm (Cloud/Sandbox) oder einen frischen CI-Lauf.
 
 ## Phase 1 — Alltagstauglichkeit (WhatsApp-Parität)
 

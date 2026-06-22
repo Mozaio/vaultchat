@@ -170,8 +170,12 @@ oder eintragen; Stripe-Keys; Account-Settings ändern). Solche Punkte werden
 
 - `- [ ]` — offen, autonom abzuarbeiten (denker → … → tester).
 - `- [x]` — erledigt (waechter PASS + tester DEPLOY OK).
-- `- [-]` — **blockiert durch nutzer-exklusive Aktion** (Billing / Secret /
-  Account); NICHT erfragen, überspringen; `USER:`-Notiz erklärt, was fehlt.
+- `- [-]` — **blockiert, vom Loop nicht selbst abschließbar**: entweder eine
+  nutzer-exklusive Aktion (Billing / Secret / Account; `USER:`-Notiz) ODER
+  fehlendes Tooling/Verifikation, das der Agent in der laufenden Umgebung nicht
+  hat (z.B. kein lokales npm, Client wird beim Deploy nicht typgecheckt →
+  blindes Client-Deploy = White-Screen-Risiko; `BLOCKED:`-Notiz). NICHT
+  erfragen, überspringen.
 
 ## Fester Ablauf je Aufgabe
 
